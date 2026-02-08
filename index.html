@@ -56,6 +56,26 @@
 
 <body>
   <div id="root"></div>
+<script>
+  // Safety overlay (prevents "blank screen")
+  window.addEventListener("error", function (e) {
+    const root = document.getElementById("root");
+    if (!root || root.innerHTML.trim().length > 0) return;
+    root.innerHTML = `
+      <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;color:#fff;font-family:system-ui;">
+        <div style="max-width:720px;width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:24px;">
+          <div style="font-size:20px;font-weight:700;margin-bottom:10px;">The dashboard didn’t load.</div>
+          <div style="color:#AAB0C0;margin-bottom:12px;">
+            Open DevTools → Console and send me the first red error message.
+          </div>
+          <pre style="white-space:pre-wrap;background:rgba(0,0,0,.35);padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,.12);overflow:auto;max-height:220px;">
+${String(e.message || e.error || "Unknown error")}
+          </pre>
+        </div>
+      </div>
+    `;
+  });
+</script>
 
   <script type="text/babel">
     const { useState, useEffect } = React;
@@ -201,6 +221,9 @@
       const [revenueData, setRevenueData] = useState(null);
       const [insights, setInsights] = useState([]);
       const [clients, setClients] = useState([]);
+const [mode, setMode] = useState(localStorage.getItem("butler_mode") || "demo"); 
+// "demo" or "live"
+useEffect(() => localStorage.setItem("butler_mode", mode), [mode]);
 
       const demoRevenue = {
         total_revenue: 295422,
@@ -234,8 +257,7 @@
         { id: 2, company_name: "Sunrise Manufacturing", industry: "Manufacturing", status: "active", mrr: 8600, health_score: 88 }
       ];
 
-      useEffect(() => { loadData(); }, []);
-
+      
       const loadData = async () => {
         try {
           const [revenue, insightsData, clientsData] = await Promise.all([
@@ -261,6 +283,9 @@
           setLoading(false);
         }
       };
+useEffect(() => {
+  loadData();
+}, [mode]);
 
       if (loading) {
         return (
