@@ -9,127 +9,433 @@
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 
-  <!-- PropTypes (Recharts needs this in UMD builds) -->
+  <!-- PropTypes required by Recharts UMD -->
   <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
 
-  <!-- Recharts UMD -->
+  <!-- Recharts -->
   <script src="https://cdn.jsdelivr.net/npm/recharts@2.5.0/umd/Recharts.min.js"></script>
 
-  <!-- Babel (so we can run JSX in a single HTML file) -->
+  <!-- Babel (works on static sites) -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-      background: linear-gradient(135deg, #0A0E1A 0%, #1A1F2E 100%);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: radial-gradient(1200px 700px at 20% 10%, rgba(0,71,255,0.18), transparent 60%),
+                  radial-gradient(900px 600px at 80% 20%, rgba(0,217,255,0.12), transparent 55%),
+                  linear-gradient(135deg, #0A0E1A 0%, #141a2b 100%);
       color: #fff;
       min-height: 100vh;
     }
+
+    a { color: inherit; }
+
+    .container { padding: 24px; max-width: 1200px; margin: 0 auto; }
+    .row { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+    .spacer { flex: 1; }
+
+    .card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      padding: 18px;
+      backdrop-filter: blur(10px);
+    }
+
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+      margin-bottom: 18px;
+    }
+
+    .title { font-size: 32px; font-weight: 800; letter-spacing: 0.2px; }
+    .muted { color: #8B92A8; }
+    .small { font-size: 12px; }
+    .label { font-size: 13px; color: #8B92A8; margin-bottom: 8px; }
+    .value { font-size: 34px; font-weight: 800; }
+    .chip {
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 12px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.04);
+    }
+    .chip.demo { border-color: rgba(0,217,255,0.35); background: rgba(0,217,255,0.08); color: #00D9FF; }
+    .chip.live { border-color: rgba(0,255,136,0.35); background: rgba(0,255,136,0.08); color: #00FF88; }
+
+    .btn {
+      cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.05);
+      color: #fff;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 14px;
+      transition: transform .06s ease, opacity .15s ease;
+    }
+    .btn:hover { opacity: 0.92; }
+    .btn:active { transform: translateY(1px); }
+    .btn.primary {
+      border: none;
+      background: linear-gradient(135deg, #0047FF, #00D9FF);
+    }
+    .btn.danger {
+      border-color: rgba(255,51,102,0.4);
+      background: rgba(255,51,102,0.08);
+      color: #FF3366;
+    }
+
+    .tabs {
+      display: flex; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.10);
+      margin-top: 20px; margin-bottom: 18px; padding-bottom: 10px;
+    }
+    .tab {
+      padding: 10px 14px;
+      border-radius: 10px;
+      background: transparent;
+      border: 1px solid transparent;
+      color: #8B92A8;
+      font-weight: 800;
+      text-transform: capitalize;
+      cursor: pointer;
+    }
+    .tab.active {
+      color: #00D9FF;
+      border-color: rgba(0,217,255,0.35);
+      background: rgba(0,217,255,0.08);
+    }
+
     .loading {
-      display: flex; align-items: center; justify-content: center;
-      min-height: 100vh; flex-direction: column; gap: 20px;
+      min-height: 70vh;
+      display:flex; align-items:center; justify-content:center;
+      flex-direction:column; gap: 16px;
+      color: #c7cbe0;
     }
     .spinner {
       width: 60px; height: 60px;
-      border: 4px solid rgba(0, 71, 255, 0.1);
-      border-top: 4px solid #0047FF;
+      border: 4px solid rgba(0, 71, 255, 0.12);
+      border-top: 4px solid #00D9FF;
       border-radius: 50%;
       animation: spin 1s linear infinite;
     }
-    @keyframes spin { 0% { transform: rotate(0deg);} 100% { transform: rotate(360deg);} }
+    @keyframes spin { 0%{ transform: rotate(0deg);} 100%{ transform: rotate(360deg);} }
 
-    button { cursor: pointer; font-family: inherit; }
-    input { font-family: inherit; }
-
-    .errorBox {
-      background: rgba(255, 51, 102, 0.10);
-      border: 1px solid #FF3366;
-      padding: 16px;
-      border-radius: 10px;
-      margin: 20px;
-      white-space: pre-wrap;
-      line-height: 1.4;
+    .banner {
+      margin-top: 12px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,184,0,0.25);
+      background: rgba(255,184,0,0.08);
+      color: #ffd48a;
+      font-weight: 700;
+      display:flex;
+      gap: 10px;
+      align-items:center;
+      justify-content: space-between;
     }
+
+    .grid2 { display:grid; grid-template-columns: 1.2fr 0.8fr; gap: 16px; }
+    @media (max-width: 980px) { .grid2 { grid-template-columns: 1fr; } }
+
+    .modalOverlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.65);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding: 18px;
+      z-index: 50;
+    }
+    .modal {
+      width: 100%;
+      max-width: 520px;
+      border-radius: 14px;
+      background: #0f1425;
+      border: 1px solid rgba(255,255,255,0.12);
+      padding: 18px;
+    }
+    .modal h3 { font-size: 18px; margin-bottom: 12px; }
+    .field { margin-bottom: 12px; }
+    .field label { display:block; font-size: 12px; color: #8B92A8; margin-bottom: 6px; }
+    .field input, .field select {
+      width:100%;
+      padding: 10px 10px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 10px;
+      color:#fff;
+      outline:none;
+      font-weight: 700;
+    }
+    .modalFooter { display:flex; gap: 10px; justify-content:flex-end; margin-top: 10px; }
+
+    .list { display:grid; gap: 12px; }
+    .clientTitle { font-size: 16px; font-weight: 900; margin-bottom: 2px; }
+    .pill {
+      display:inline-flex;
+      align-items:center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-weight: 900;
+      font-size: 12px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.10);
+      color:#cfd3ea;
+    }
+    .pill.ok { border-color: rgba(0,255,136,0.35); background: rgba(0,255,136,0.08); color: #00FF88; }
+    .pill.warn { border-color: rgba(255,184,0,0.35); background: rgba(255,184,0,0.08); color: #FFB800; }
+    .pill.bad { border-color: rgba(255,51,102,0.35); background: rgba(255,51,102,0.08); color: #FF3366; }
+
+    .hr { height:1px; background: rgba(255,255,255,0.08); margin: 12px 0; }
   </style>
 </head>
-
 <body>
   <div id="root"></div>
-<script>
-  // Safety overlay (prevents "blank screen")
-  window.addEventListener("error", function (e) {
-    const root = document.getElementById("root");
-    if (!root || root.innerHTML.trim().length > 0) return;
-    root.innerHTML = `
-      <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;color:#fff;font-family:system-ui;">
-        <div style="max-width:720px;width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:24px;">
-          <div style="font-size:20px;font-weight:700;margin-bottom:10px;">The dashboard didn’t load.</div>
-          <div style="color:#AAB0C0;margin-bottom:12px;">
-            Open DevTools → Console and send me the first red error message.
-          </div>
-          <pre style="white-space:pre-wrap;background:rgba(0,0,0,.35);padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,.12);overflow:auto;max-height:220px;">
-${String(e.message || e.error || "Unknown error")}
-          </pre>
-        </div>
-      </div>
-    `;
-  });
-</script>
 
   <script type="text/babel">
-    const { useState, useEffect } = React;
+    const { useEffect, useMemo, useState } = React;
     const {
-      AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-      ResponsiveContainer, PieChart, Pie, Cell
+      AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+      PieChart, Pie, Cell
     } = Recharts;
 
-    // ========= CONFIG =========
-    const API_URL = 'https://butler-platform-backend.onrender.com/api/v1';
+    // -----------------------------
+    // Config
+    // -----------------------------
+    const API_URL = "https://butler-platform-backend.onrender.com/api/v1";
 
-    // ========= API HELPER =========
+    const STORAGE = {
+      mode: "butler_mode",
+      token: "butler_token",
+      user: "butler_user",
+      demoRevenue: "butler_demo_revenue",
+      demoClients: "butler_demo_clients",
+      demoInsights: "butler_demo_insights",
+    };
+
+    const COLORS = ["#0047FF", "#00D9FF", "#00FF88", "#FFB800", "#FF3366", "#9b59b6"];
+
+    // -----------------------------
+    // Helpers
+    // -----------------------------
+    function safeNumber(n, fallback = 0) {
+      const x = Number(n);
+      return Number.isFinite(x) ? x : fallback;
+    }
+
+    function formatMoney(n) {
+      return "$" + safeNumber(n, 0).toLocaleString();
+    }
+
+    function todayISO() {
+      const d = new Date();
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    }
+
+    function getLS(key, fallback) {
+      try {
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : fallback;
+      } catch {
+        return fallback;
+      }
+    }
+
+    function setLS(key, value) {
+      localStorage.setItem(key, JSON.stringify(value));
+    }
+
+    function normalizeRevenueFromApi(apiObj) {
+      // handles snake_case or other names
+      const total = safeNumber(apiObj?.total_revenue ?? apiObj?.totalRevenue ?? apiObj?.total, 0);
+      const mrr = safeNumber(apiObj?.mrr ?? apiObj?.monthly_recurring_revenue ?? apiObj?.monthlyRecurringRevenue ?? apiObj?.monthly, 0);
+      const arr = safeNumber(apiObj?.arr ?? apiObj?.annual_recurring_revenue ?? apiObj?.annualRecurringRevenue ?? apiObj?.annual, 0);
+
+      const prev = safeNumber(
+        apiObj?.previous_period_revenue ??
+        apiObj?.previousPeriodRevenue ??
+        apiObj?.prev_total_revenue ??
+        apiObj?.prev ??
+        0,
+        0
+      );
+
+      // growth rate can be provided or calculated
+      let growthRate = apiObj?.growth_rate;
+      if (growthRate == null) {
+        growthRate = prev > 0 ? (total - prev) / prev : null;
+      }
+      const g = (growthRate == null) ? null : safeNumber(growthRate, null);
+
+      // charts (optional)
+      const byPeriod = Array.isArray(apiObj?.by_period) ? apiObj.by_period : [];
+      const bySource = Array.isArray(apiObj?.by_source) ? apiObj.by_source : [];
+
+      return {
+        totalRevenue: total,
+        mrr,
+        arr,
+        previousPeriodRevenue: prev,
+        growthRate: (g == null || !Number.isFinite(g)) ? null : g,
+        byPeriod,
+        bySource
+      };
+    }
+
+    function buildRevenueBySourceFromEntries(entries) {
+      // super simple "source" assignment for demo
+      const sources = ["SEO", "Paid Ads", "Email", "Referrals"];
+      const totals = {};
+      for (const e of entries) {
+        const src = e.source || sources[Math.floor(Math.random() * sources.length)];
+        totals[src] = (totals[src] || 0) + safeNumber(e.amount, 0);
+      }
+      const total = Object.values(totals).reduce((a,b)=>a+b,0) || 1;
+      return Object.keys(totals).map((k)=>({
+        source: k,
+        revenue: totals[k],
+        percentage: Math.round((totals[k] / total) * 100)
+      }));
+    }
+
+    function buildRevenueByPeriod(entries) {
+      // group by month (YYYY-MM)
+      const buckets = {};
+      for (const e of entries) {
+        const date = e.date || todayISO();
+        const month = date.slice(0, 7);
+        buckets[month] = (buckets[month] || 0) + safeNumber(e.amount, 0);
+      }
+      const keys = Object.keys(buckets).sort();
+      return keys.map((k)=>({ period_start: k, revenue: buckets[k] }));
+    }
+
+    function normalizeClient(c) {
+      return {
+        id: c.id ?? cryptoRandomId(),
+        name: c.name ?? c.company_name ?? "Unnamed Client",
+        industry: c.industry ?? "Unknown",
+        status: (c.status ?? "ACTIVE").toUpperCase(),
+        mrr: safeNumber(c.mrr ?? c.monthlyRevenue ?? c.monthly_revenue ?? 0, 0),
+        healthScore: safeNumber(c.healthScore ?? c.health_score ?? 85, 85),
+        churnRisk: c.churnRisk ?? c.churn_risk ?? "Low",
+        growthTrend: c.growthTrend ?? c.growth_trend ?? "Upward",
+      };
+    }
+
+    function cryptoRandomId() {
+      // works even if crypto isn't available in some contexts
+      const r = Math.random().toString(16).slice(2);
+      return `id_${Date.now()}_${r}`;
+    }
+
+    // -----------------------------
+    // API helper
+    // -----------------------------
     const api = {
       async login(email, password) {
-        const response = await fetch(`${API_URL}/auth/token`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+        const res = await fetch(`${API_URL}/auth/token`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password })
         });
-        if (!response.ok) throw new Error('Login failed');
-        return response.json();
+        if (!res.ok) throw new Error("Login failed");
+        return res.json();
       },
+
       async get(endpoint, token) {
-        const response = await fetch(`${API_URL}${endpoint}`, {
+        const res = await fetch(`${API_URL}${endpoint}`, {
           headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json"
           }
         });
-        if (!response.ok) throw new Error(`API request failed: ${endpoint}`);
-        return response.json();
+        if (!res.ok) throw new Error("API request failed");
+        return res.json();
       }
     };
 
-    // ========= ERROR BOUNDARY (prevents blank screen) =========
+    // -----------------------------
+    // Default Demo Data
+    // -----------------------------
+    const DEFAULT_DEMO = {
+      revenue: {
+        totalRevenue: 295422,
+        mrr: 25109,
+        arr: 301304,
+        previousPeriodRevenue: 220000,
+        growthRate: 0.34,
+        entries: [
+          { id: "e1", date: "2026-01-05", amount: 22000, source: "SEO" },
+          { id: "e2", date: "2026-01-12", amount: 18000, source: "Paid Ads" },
+          { id: "e3", date: "2026-01-20", amount: 26000, source: "Referrals" },
+          { id: "e4", date: "2026-02-02", amount: 31000, source: "SEO" },
+          { id: "e5", date: "2026-02-06", amount: 27000, source: "Email" }
+        ]
+      },
+      clients: [
+        { id: 1, name: "TechCorp Industries", industry: "IT Services", status: "ACTIVE", mrr: 12500, healthScore: 92, churnRisk: "Low", growthTrend: "Upward" },
+        { id: 2, name: "Apex Manufacturing", industry: "Manufacturing", status: "ACTIVE", mrr: 8600, healthScore: 88, churnRisk: "Medium", growthTrend: "Upward" },
+        { id: 3, name: "BluePeak Staffing", industry: "Staffing & Recruiting", status: "ACTIVE", mrr: 5400, healthScore: 81, churnRisk: "Low", growthTrend: "Stable" },
+      ],
+      insights: [
+        { id: "i1", type: "opportunity", impact: "HIGH", confidence: 92, title: "Retargeting can lift MRR", description: "Launching a retargeting loop to warm website visitors can increase conversions and stabilize recurring revenue." },
+        { id: "i2", type: "warning", impact: "MEDIUM", confidence: 84, title: "One client showing churn signals", description: "Health score trends indicate potential churn risk. Recommend executive check-in + revised 30-day plan." },
+        { id: "i3", type: "success", impact: "HIGH", confidence: 89, title: "SEO traction compounding", description: "Top pages are climbing. Publishing 4 supporting articles can improve rankings and increase inbound leads." },
+      ]
+    };
+
+    function initDemoStorageIfMissing() {
+      const mode = localStorage.getItem(STORAGE.mode);
+      if (!mode) localStorage.setItem(STORAGE.mode, JSON.stringify("demo"));
+
+      const demoRevenue = getLS(STORAGE.demoRevenue, null);
+      const demoClients = getLS(STORAGE.demoClients, null);
+      const demoInsights = getLS(STORAGE.demoInsights, null);
+
+      if (!demoRevenue) setLS(STORAGE.demoRevenue, DEFAULT_DEMO.revenue);
+      if (!demoClients) setLS(STORAGE.demoClients, DEFAULT_DEMO.clients);
+      if (!demoInsights) setLS(STORAGE.demoInsights, DEFAULT_DEMO.insights);
+    }
+
+    // -----------------------------
+    // Error Boundary
+    // -----------------------------
     class ErrorBoundary extends React.Component {
       constructor(props) {
         super(props);
-        this.state = { hasError: false, message: '' };
+        this.state = { hasError: false, error: null };
       }
       static getDerivedStateFromError(error) {
-        return { hasError: true, message: String(error?.stack || error) };
+        return { hasError: true, error };
       }
-      componentDidCatch(error) {
-        console.error('Render crash:', error);
+      componentDidCatch(error, info) {
+        console.error("UI crashed:", error, info);
       }
       render() {
         if (this.state.hasError) {
           return (
-            <div style={{ padding: '24px' }}>
-              <h2 style={{ marginBottom: '12px' }}>Something crashed (but it’s fixable).</h2>
-              <div className="errorBox">{this.state.message}</div>
-              <div style={{ color: '#8B92A8', fontSize: '14px' }}>
-                Tip: open DevTools → Console to see the same error.
+            <div className="container">
+              <div className="card" style={{ borderColor: "rgba(255,51,102,0.35)", background: "rgba(255,51,102,0.08)" }}>
+                <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 8 }}>Something crashed in the UI</div>
+                <div className="muted small" style={{ lineHeight: 1.6 }}>
+                  This usually happens from a code mismatch or unexpected API data.
+                  Refresh the page. If it continues, switch to Demo mode.
+                </div>
+                <div className="hr"></div>
+                <pre className="small" style={{ whiteSpace: "pre-wrap", color: "#ffd1db" }}>
+{String(this.state.error)}
+                </pre>
               </div>
             </div>
           );
@@ -138,429 +444,758 @@ ${String(e.message || e.error || "Unknown error")}
       }
     }
 
-    // ========= LOGIN =========
+    // -----------------------------
+    // Login Page
+    // -----------------------------
     function LoginPage({ onLogin }) {
-      const [email, setEmail] = useState('demo@butlerco.com');
-      const [password, setPassword] = useState('demo123');
+      const [email, setEmail] = useState("demo@butlerco.com");
+      const [password, setPassword] = useState("demo123");
       const [loading, setLoading] = useState(false);
-      const [error, setError] = useState('');
+      const [error, setError] = useState("");
 
-      const handleSubmit = async (e) => {
+      const submit = async (e) => {
         e.preventDefault();
         setLoading(true);
-        setError('');
+        setError("");
+
         try {
           const data = await api.login(email, password);
           onLogin(data.access_token, data.user || { email });
         } catch (err) {
-          setError('Invalid credentials. Try demo@butlerco.com / demo123');
+          setError("Login failed. If Live mode isn’t ready, switch to Demo mode in the top right after login.");
         } finally {
           setLoading(false);
         }
       };
 
       return (
-        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div style={{ maxWidth: '420px', width: '100%', background: 'rgba(255,255,255,0.03)', padding: '40px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <div style={{ textAlign: 'center', marginBottom: '26px' }}>
-              <div style={{ width: '60px', height: '60px', background: 'linear-gradient(135deg, #0047FF, #00D9FF)', borderRadius: '12px', margin: '0 auto 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>📊</div>
-              <h1 style={{ fontSize: '24px', marginBottom: '8px' }}>Butler & Co</h1>
-              <p style={{ color: '#8B92A8', fontSize: '14px' }}>Revenue Intelligence Platform</p>
+        <div className="container" style={{ minHeight: "100vh", display:"flex", alignItems:"center", justifyContent:"center" }}>
+          <div className="card" style={{ width:"100%", maxWidth: 460, padding: 22 }}>
+            <div style={{ textAlign:"center", marginBottom: 14 }}>
+              <div style={{
+                width: 64, height: 64, margin:"0 auto 12px",
+                borderRadius: 14,
+                background: "linear-gradient(135deg, #0047FF, #00D9FF)",
+                display:"flex", alignItems:"center", justifyContent:"center",
+                fontSize: 30
+              }}>📊</div>
+              <div style={{ fontSize: 22, fontWeight: 900 }}>Butler & Co</div>
+              <div className="muted">Revenue Intelligence Platform</div>
             </div>
 
             {error && (
-              <div className="errorBox" style={{ margin: '0 0 16px 0' }}>{error}</div>
+              <div className="banner" style={{ borderColor:"rgba(255,51,102,0.35)", background:"rgba(255,51,102,0.08)", color:"#ffd1db" }}>
+                <span>⚠️ {error}</span>
+              </div>
             )}
 
-            <form onSubmit={handleSubmit}>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: '#8B92A8' }}>Email</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: '14px' }}
-                  required
-                />
+            <form onSubmit={submit} style={{ marginTop: 14 }}>
+              <div className="field">
+                <label>Email</label>
+                <input value={email} onChange={(e)=>setEmail(e.target.value)} type="email" required />
+              </div>
+              <div className="field">
+                <label>Password</label>
+                <input value={password} onChange={(e)=>setPassword(e.target.value)} type="password" required />
               </div>
 
-              <div style={{ marginBottom: '22px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: '#8B92A8' }}>Password</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: '14px' }}
-                  required
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #0047FF, #00D9FF)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '16px', fontWeight: 600, opacity: loading ? 0.7 : 1 }}
-              >
-                {loading ? 'Signing in...' : 'Sign In'}
+              <button className="btn primary" style={{ width:"100%", padding: 12 }} disabled={loading} type="submit">
+                {loading ? "Signing in..." : "Sign In"}
               </button>
             </form>
 
-            <div style={{ marginTop: '18px', padding: '14px', background: 'rgba(0,217,255,0.05)', border: '1px solid rgba(0,217,255,0.2)', borderRadius: '8px', fontSize: '12px', color: '#8B92A8' }}>
-              <strong style={{ color: '#00D9FF' }}>Demo Account:</strong><br />
-              Email: demo@butlerco.com<br />
-              Password: demo123
+            <div className="hr"></div>
+            <div className="muted small">
+              Demo credentials are pre-filled. If Live mode isn’t ready yet, you can still run the full demo experience.
             </div>
           </div>
         </div>
       );
     }
 
-    // ========= DASHBOARD =========
+    // -----------------------------
+    // Modals
+    // -----------------------------
+    function Modal({ title, children, onClose }) {
+      return (
+        <div className="modalOverlay" onMouseDown={onClose}>
+          <div className="modal" onMouseDown={(e)=>e.stopPropagation()}>
+            <div className="row" style={{ marginBottom: 10 }}>
+              <h3>{title}</h3>
+              <div className="spacer"></div>
+              <button className="btn" onClick={onClose}>✕</button>
+            </div>
+            {children}
+          </div>
+        </div>
+      );
+    }
+
+    // -----------------------------
+    // Dashboard
+    // -----------------------------
     function Dashboard({ token, user, onLogout }) {
-      const [activeView, setActiveView] = useState('overview');
+      const [activeView, setActiveView] = useState("overview");
+      const [mode, setMode] = useState(getLS(STORAGE.mode, "demo"));
       const [loading, setLoading] = useState(true);
-      const [revenueData, setRevenueData] = useState(null);
-      const [insights, setInsights] = useState([]);
+      const [warning, setWarning] = useState("");
+
+      const [revenue, setRevenue] = useState(null); // normalized revenue object
       const [clients, setClients] = useState([]);
-const [mode, setMode] = useState(localStorage.getItem("butler_mode") || "demo"); 
-// "demo" or "live"
-useEffect(() => localStorage.setItem("butler_mode", mode), [mode]);
+      const [insights, setInsights] = useState([]);
 
-      const demoRevenue = {
-        total_revenue: 295422,
-        mrr: 25109,
-        arr: 301304,
-        previous_period_revenue: 220000,
-        growth_rate: 0.34,
-        by_period: [
-          { period_start: "Jan", revenue: 180000 },
-          { period_start: "Feb", revenue: 205000 },
-          { period_start: "Mar", revenue: 220000 },
-          { period_start: "Apr", revenue: 245000 },
-          { period_start: "May", revenue: 270000 },
-          { period_start: "Jun", revenue: 295422 }
-        ],
-        by_source: [
-          { source: "SEO", revenue: 120000, percentage: 41 },
-          { source: "Paid Ads", revenue: 95000, percentage: 32 },
-          { source: "Referrals", revenue: 55000, percentage: 19 },
-          { source: "Partners", revenue: 25422, percentage: 8 }
-        ]
-      };
+      const [showAddClient, setShowAddClient] = useState(false);
+      const [showAddRevenue, setShowAddRevenue] = useState(false);
 
-      const demoInsights = [
-        { id: 1, type: "opportunity", impact: "HIGH", confidence: 92, title: "Pipeline velocity increasing", description: "Your lead-to-close time is trending down. Consider scaling top-performing channels." },
-        { id: 2, type: "warning", impact: "MED", confidence: 84, title: "One client showing churn signals", description: "Engagement is down in the last 14 days. Recommend a quick check-in + value report." }
-      ];
+      // Keep mode in storage
+      useEffect(() => {
+        setLS(STORAGE.mode, mode);
+      }, [mode]);
 
-      const demoClients = [
-        { id: 1, company_name: "TechCorp Industries", industry: "IT Services", status: "active", mrr: 12500, health_score: 92 },
-        { id: 2, company_name: "Sunrise Manufacturing", industry: "Manufacturing", status: "active", mrr: 8600, health_score: 88 }
-      ];
+      // ----- DEMO load/save -----
+      function loadDemoAll() {
+        const demoRevenue = getLS(STORAGE.demoRevenue, DEFAULT_DEMO.revenue);
+        const demoClients = getLS(STORAGE.demoClients, DEFAULT_DEMO.clients);
+        const demoInsights = getLS(STORAGE.demoInsights, DEFAULT_DEMO.insights);
 
-      
-      const loadData = async () => {
+        // Build charts if missing
+        const entries = Array.isArray(demoRevenue.entries) ? demoRevenue.entries : [];
+        const byPeriod = buildRevenueByPeriod(entries);
+        const bySource = buildRevenueBySourceFromEntries(entries);
+
+        const normalized = {
+          totalRevenue: safeNumber(demoRevenue.totalRevenue ?? demoRevenue.total_revenue ?? DEFAULT_DEMO.revenue.totalRevenue, DEFAULT_DEMO.revenue.totalRevenue),
+          mrr: safeNumber(demoRevenue.mrr ?? DEFAULT_DEMO.revenue.mrr, DEFAULT_DEMO.revenue.mrr),
+          arr: safeNumber(demoRevenue.arr ?? DEFAULT_DEMO.revenue.arr, DEFAULT_DEMO.revenue.arr),
+          previousPeriodRevenue: safeNumber(demoRevenue.previousPeriodRevenue ?? DEFAULT_DEMO.revenue.previousPeriodRevenue, DEFAULT_DEMO.revenue.previousPeriodRevenue),
+          growthRate: (demoRevenue.growthRate == null)
+            ? (safeNumber(demoRevenue.previousPeriodRevenue, 0) > 0 ? (safeNumber(demoRevenue.totalRevenue,0) - safeNumber(demoRevenue.previousPeriodRevenue,0)) / safeNumber(demoRevenue.previousPeriodRevenue,1) : DEFAULT_DEMO.revenue.growthRate)
+            : safeNumber(demoRevenue.growthRate, DEFAULT_DEMO.revenue.growthRate),
+          byPeriod,
+          bySource,
+          entries
+        };
+
+        setRevenue(normalized);
+        setClients((demoClients || []).map(normalizeClient));
+        setInsights(demoInsights || []);
+      }
+
+      function saveDemoRevenue(nextRevenue) {
+        // Save only the parts we want persistent in demo
+        setLS(STORAGE.demoRevenue, {
+          totalRevenue: nextRevenue.totalRevenue,
+          mrr: nextRevenue.mrr,
+          arr: nextRevenue.arr,
+          previousPeriodRevenue: nextRevenue.previousPeriodRevenue,
+          growthRate: nextRevenue.growthRate,
+          entries: nextRevenue.entries || []
+        });
+      }
+
+      function saveDemoClients(nextClients) {
+        setLS(STORAGE.demoClients, nextClients.map(c => ({
+          id: c.id, name: c.name, industry: c.industry, status: c.status,
+          mrr: c.mrr, healthScore: c.healthScore, churnRisk: c.churnRisk, growthTrend: c.growthTrend
+        })));
+      }
+
+      function saveDemoInsights(nextInsights) {
+        setLS(STORAGE.demoInsights, nextInsights);
+      }
+
+      // ----- LIVE load -----
+      async function loadLiveAll() {
+        setWarning("");
         try {
-          const [revenue, insightsData, clientsData] = await Promise.all([
-            api.get('/revenue/summary', token),
-            api.get('/insights/latest?limit=5', token),
-            api.get('/clients', token)
+          const [revRes, insRes, cliRes] = await Promise.all([
+            api.get("/revenue/summary", token),
+            api.get("/insights/latest?limit=5", token),
+            api.get("/clients", token)
           ]);
 
-          const rev = (revenue && revenue.data && Object.keys(revenue.data).length > 0) ? revenue.data : demoRevenue;
-          setRevenueData(rev);
+          const revApi = revRes?.data ?? revRes ?? {};
+          const normalizedRev = normalizeRevenueFromApi(revApi);
 
-          const ins = (insightsData && insightsData.data && Array.isArray(insightsData.data.insights)) ? insightsData.data.insights : demoInsights;
-          setInsights(ins);
+          // If API doesn't provide charts, create a tiny placeholder trend so UI looks complete
+          if (!normalizedRev.byPeriod || normalizedRev.byPeriod.length === 0) {
+            normalizedRev.byPeriod = [
+              { period_start: "2026-01", revenue: Math.round(normalizedRev.totalRevenue * 0.35) },
+              { period_start: "2026-02", revenue: Math.round(normalizedRev.totalRevenue * 0.65) }
+            ];
+          }
+          if (!normalizedRev.bySource || normalizedRev.bySource.length === 0) {
+            normalizedRev.bySource = [
+              { source: "SEO", revenue: Math.round(normalizedRev.totalRevenue * 0.45), percentage: 45 },
+              { source: "Paid Ads", revenue: Math.round(normalizedRev.totalRevenue * 0.35), percentage: 35 },
+              { source: "Referrals", revenue: Math.round(normalizedRev.totalRevenue * 0.20), percentage: 20 }
+            ];
+          }
 
-          const cls = (clientsData && clientsData.data && Array.isArray(clientsData.data)) ? clientsData.data : demoClients;
-          setClients(cls);
+          const ins = insRes?.data?.insights || insRes?.data || [];
+          const cli = cliRes?.data?.clients || cliRes?.data || cliRes || [];
+
+          setRevenue(normalizedRev);
+          setInsights(Array.isArray(ins) ? ins : []);
+          setClients(Array.isArray(cli) ? cli.map(normalizeClient) : []);
+
         } catch (e) {
-          console.error('API failed, using demo data:', e);
-          setRevenueData(demoRevenue);
-          setInsights(demoInsights);
-          setClients(demoClients);
+          console.error("Live load failed:", e);
+          setWarning("Live mode couldn’t load from API right now. Showing Demo data instead.");
+          loadDemoAll();
+        }
+      }
+
+      // -----------------------------
+      // loadData (IMPORTANT ORDER)
+      // -----------------------------
+      const loadData = async () => {
+        setLoading(true);
+        try {
+          if (mode === "demo") {
+            loadDemoAll();
+          } else {
+            await loadLiveAll();
+          }
         } finally {
           setLoading(false);
         }
       };
-useEffect(() => {
-  loadData();
-}, [mode]);
 
+      // ✅ useEffect AFTER loadData exists
+      useEffect(() => {
+        initDemoStorageIfMissing();
+        loadData();
+      }, [mode]);
+
+      // -----------------------------
+      // Actions
+      // -----------------------------
+      function toggleMode() {
+        setMode(prev => (prev === "demo" ? "live" : "demo"));
+      }
+
+      function addClient(newClient) {
+        const next = [normalizeClient(newClient), ...clients];
+        setClients(next);
+        if (mode === "demo") saveDemoClients(next);
+      }
+
+      function addRevenueEntry(entry) {
+        // demo-only action (safe to allow in live visually, but it updates only demo storage)
+        const current = revenue || normalizeRevenueFromApi({});
+        const entries = Array.isArray(current.entries) ? current.entries : [];
+        const nextEntries = [{ id: cryptoRandomId(), ...entry }, ...entries];
+
+        // recompute totals
+        const added = safeNumber(entry.amount, 0);
+        const nextTotal = safeNumber(current.totalRevenue, 0) + added;
+
+        // keep prev period stable so growth stays meaningful
+        const prev = safeNumber(current.previousPeriodRevenue, DEFAULT_DEMO.revenue.previousPeriodRevenue);
+
+        const growth = prev > 0 ? (nextTotal - prev) / prev : null;
+
+        const byPeriod = buildRevenueByPeriod(nextEntries);
+        const bySource = buildRevenueBySourceFromEntries(nextEntries);
+
+        const nextRevenue = {
+          ...current,
+          totalRevenue: nextTotal,
+          growthRate: (growth == null || !Number.isFinite(growth)) ? null : growth,
+          byPeriod,
+          bySource,
+          entries: nextEntries
+        };
+
+        setRevenue(nextRevenue);
+        if (mode === "demo") saveDemoRevenue(nextRevenue);
+      }
+
+      // -----------------------------
+      // Render
+      // -----------------------------
       if (loading) {
         return (
-          <div className="loading">
-            <div className="spinner"></div>
-            <div>Loading platform data...</div>
+          <div className="container">
+            <div className="loading">
+              <div className="spinner"></div>
+              <div style={{ fontWeight: 900 }}>Loading platform data...</div>
+              <div className="muted small">Mode: {mode.toUpperCase()}</div>
+            </div>
           </div>
         );
       }
 
       return (
-        <div style={{ padding: '24px', minHeight: '100vh' }}>
-          <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="container">
+          {/* Top Header */}
+          <div className="row" style={{ marginBottom: 14 }}>
             <div>
-              <h1 style={{ fontSize: '32px', marginBottom: '8px' }}>Revenue Intelligence Platform</h1>
-              <p style={{ color: '#8B92A8' }}>Welcome back, {user?.firstName || user?.email || 'Demo'}</p>
+              <div className="title">Revenue Intelligence Platform</div>
+              <div className="muted">Welcome back, {user?.firstName || user?.email || "Demo"}</div>
             </div>
-            <button
-              onClick={onLogout}
-              style={{ padding: '10px 20px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: '14px' }}
-            >
-              Sign Out
+
+            <div className="spacer"></div>
+
+            <span className={"chip " + (mode === "demo" ? "demo" : "live")}>
+              {mode === "demo" ? "DEMO MODE" : "LIVE MODE"}
+            </span>
+
+            <button className="btn" onClick={loadData}>↻ Refresh</button>
+
+            <button className="btn" onClick={toggleMode}>
+              Switch to {mode === "demo" ? "Live" : "Demo"}
             </button>
+
+            <button className="btn danger" onClick={onLogout}>Sign Out</button>
           </div>
 
-          <div style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '32px' }}>
-            {['overview', 'insights', 'clients'].map(view => (
+          {warning && (
+            <div className="banner">
+              <span>⚠️ {warning}</span>
+              <button className="btn" onClick={() => setWarning("")}>Dismiss</button>
+            </div>
+          )}
+
+          {/* Tabs */}
+          <div className="tabs">
+            {["overview", "insights", "clients"].map((t) => (
               <button
-                key={view}
-                onClick={() => setActiveView(view)}
-                style={{
-                  padding: '12px 24px',
-                  background: 'transparent',
-                  border: 'none',
-                  borderBottom: activeView === view ? '2px solid #0047FF' : '2px solid transparent',
-                  color: activeView === view ? '#0047FF' : '#8B92A8',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  textTransform: 'capitalize'
-                }}
+                key={t}
+                className={"tab " + (activeView === t ? "active" : "")}
+                onClick={() => setActiveView(t)}
               >
-                {view}
+                {t}
               </button>
             ))}
           </div>
 
-          {activeView === 'overview' && <OverviewView data={revenueData} />}
-          {activeView === 'insights' && <InsightsView insights={insights} />}
-          {activeView === 'clients' && <ClientsView clients={clients} />}
-        </div>
-      );
-    }
+          {/* Action bar */}
+          <div className="row" style={{ marginBottom: 12 }}>
+            {activeView === "overview" && (
+              <>
+                <button className="btn primary" onClick={() => setShowAddRevenue(true)}>
+                  + Add Revenue Entry
+                </button>
+                <div className="muted small">
+                  Tip: Demo mode saves changes in your browser (localStorage).
+                </div>
+              </>
+            )}
 
-    function Card({ title, value, subtitle, accent }) {
-      return (
-        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px' }}>
-          <div style={{ color: '#8B92A8', fontSize: '14px', marginBottom: '8px' }}>{title}</div>
-          <div style={{ fontSize: '36px', fontWeight: 700, marginBottom: '8px' }}>{value}</div>
-          <div style={{ color: accent || '#00FF88', fontSize: '14px' }}>{subtitle}</div>
-        </div>
-      );
-    }
+            {activeView === "clients" && (
+              <>
+                <button className="btn primary" onClick={() => setShowAddClient(true)}>
+                  + Add Client
+                </button>
+                <div className="muted small">
+                  Demo mode: client list persists even after refresh.
+                </div>
+              </>
+            )}
 
-    function OverviewView({ data }) {
-      if (!data) return <div>No data available</div>;
+            <div className="spacer"></div>
 
-      const total = Number(data.total_revenue || 0);
-      const mrr = Number(data.mrr || 0);
-      const arr = Number(data.arr || 0);
-
-      const growth = Number.isFinite(data.growth_rate) ? data.growth_rate : 0.34;
-
-      const COLORS = ['#0047FF', '#00D9FF', '#00FF88', '#FFB800'];
-
-      return (
-        <div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '32px' }}>
-            <Card title="Total Revenue" value={`$${total.toLocaleString()}`} subtitle="↗ +34% vs last period" accent="#00FF88" />
-            <Card title="Monthly Recurring Revenue" value={`$${Math.round(mrr).toLocaleString()}`} subtitle="↗ Trending up" accent="#00FF88" />
-            <Card title="Annual Recurring Revenue" value={`$${Math.round(arr).toLocaleString()}`} subtitle="Projected growth" accent="#00D9FF" />
-            <Card title="Growth Rate" value={`${(growth * 100).toFixed(1)}%`} subtitle="Month over month" accent="#00FF88" />
+            <div className="muted small">
+              API: {API_URL}
+            </div>
           </div>
 
-          {Array.isArray(data.by_period) && data.by_period.length > 0 && (
-            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px', marginBottom: '32px' }}>
-              <h3 style={{ marginBottom: '20px', fontSize: '20px' }}>Revenue Trend</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={data.by_period}>
-                  <defs>
-                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#0047FF" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#0047FF" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                  <XAxis dataKey="period_start" stroke="#8B92A8" />
-                  <YAxis stroke="#8B92A8" />
-                  <Tooltip contentStyle={{ background: 'rgba(10, 14, 26, 0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }} />
-                  <Area type="monotone" dataKey="revenue" stroke="#0047FF" fill="url(#colorRevenue)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+          {/* Views */}
+          {activeView === "overview" && <OverviewView revenue={revenue} />}
+          {activeView === "insights" && <InsightsView insights={insights} />}
+          {activeView === "clients" && <ClientsView clients={clients} />}
+
+          {/* Modals */}
+          {showAddClient && (
+            <AddClientModal
+              onClose={() => setShowAddClient(false)}
+              onSave={(c) => { addClient(c); setShowAddClient(false); }}
+            />
           )}
 
-          {Array.isArray(data.by_source) && data.by_source.length > 0 && (
-            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px' }}>
-              <h3 style={{ marginBottom: '20px', fontSize: '20px' }}>Revenue by Source</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={data.by_source}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={(p) => `${p.source}: ${p.percentage || ''}%`}
-                    outerRadius={100}
-                    dataKey="revenue"
-                  >
-                    {data.by_source.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip contentStyle={{ background: 'rgba(10, 14, 26, 0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
+          {showAddRevenue && (
+            <AddRevenueModal
+              onClose={() => setShowAddRevenue(false)}
+              onSave={(e) => { addRevenueEntry(e); setShowAddRevenue(false); }}
+            />
           )}
         </div>
       );
     }
 
+    // -----------------------------
+    // Overview View
+    // -----------------------------
+    function OverviewView({ revenue }) {
+      if (!revenue) return <div className="card">No revenue data available.</div>;
+
+      const total = safeNumber(revenue.totalRevenue, 0);
+      const mrr = safeNumber(revenue.mrr, 0);
+      const arr = safeNumber(revenue.arr, 0);
+
+      // Growth rate safe
+      const g = revenue.growthRate;
+      const growthText = (g == null || !Number.isFinite(g))
+        ? "—"
+        : `${(g * 100).toFixed(1)}%`;
+
+      const growthColor = (g == null) ? "#8B92A8" : (g >= 0 ? "#00FF88" : "#FF3366");
+
+      const byPeriod = Array.isArray(revenue.byPeriod) ? revenue.byPeriod : [];
+      const bySource = Array.isArray(revenue.bySource) ? revenue.bySource : [];
+
+      return (
+        <div>
+          <div className="kpis">
+            <div className="card">
+              <div className="label">Total Revenue</div>
+              <div className="value">{formatMoney(total)}</div>
+              <div className="muted small">Executive snapshot</div>
+            </div>
+
+            <div className="card">
+              <div className="label">Monthly Recurring Revenue</div>
+              <div className="value">{formatMoney(mrr)}</div>
+              <div className="muted small">Stability indicator</div>
+            </div>
+
+            <div className="card">
+              <div className="label">Annual Recurring Revenue</div>
+              <div className="value">{formatMoney(arr)}</div>
+              <div className="muted small">Projected run-rate</div>
+            </div>
+
+            <div className="card">
+              <div className="label">Growth Rate</div>
+              <div className="value" style={{ color: growthColor }}>{growthText}</div>
+              <div className="muted small">Compared to previous period</div>
+            </div>
+          </div>
+
+          <div className="grid2">
+            <div className="card">
+              <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 12 }}>Revenue Trend</div>
+              {byPeriod.length === 0 ? (
+                <div className="muted small">No trend data available.</div>
+              ) : (
+                <ResponsiveContainer width="100%" height={320}>
+                  <AreaChart data={byPeriod}>
+                    <defs>
+                      <linearGradient id="gradRev" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#00D9FF" stopOpacity={0.30} />
+                        <stop offset="95%" stopColor="#00D9FF" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                    <XAxis dataKey="period_start" stroke="#8B92A8" />
+                    <YAxis stroke="#8B92A8" />
+                    <Tooltip
+                      contentStyle={{
+                        background: "rgba(10, 14, 26, 0.95)",
+                        border: "1px solid rgba(255,255,255,0.12)",
+                        borderRadius: "10px",
+                        color: "#fff"
+                      }}
+                      formatter={(val) => formatMoney(val)}
+                    />
+                    <Area type="monotone" dataKey="revenue" stroke="#00D9FF" fill="url(#gradRev)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+
+            <div className="card">
+              <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 12 }}>Revenue by Source</div>
+              {bySource.length === 0 ? (
+                <div className="muted small">No source breakdown available.</div>
+              ) : (
+                <ResponsiveContainer width="100%" height={320}>
+                  <PieChart>
+                    <Pie
+                      data={bySource}
+                      dataKey="revenue"
+                      nameKey="source"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={105}
+                      labelLine={false}
+                      label={({ source, percentage }) => `${source} ${percentage || ""}%`}
+                    >
+                      {bySource.map((_, i) => (
+                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        background: "rgba(10, 14, 26, 0.95)",
+                        border: "1px solid rgba(255,255,255,0.12)",
+                        borderRadius: "10px",
+                        color: "#fff"
+                      }}
+                      formatter={(val) => formatMoney(val)}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // -----------------------------
+    // Insights View
+    // -----------------------------
     function InsightsView({ insights }) {
+      const list = Array.isArray(insights) ? insights : [];
       return (
         <div>
-          <h2 style={{ fontSize: '24px', marginBottom: '24px' }}>AI-Powered Insights</h2>
-          {(!insights || insights.length === 0) ? (
-            <div style={{ textAlign: 'center', padding: '60px', color: '#8B92A8' }}>No insights available yet. Check back soon!</div>
+          <div className="row" style={{ marginBottom: 12 }}>
+            <div style={{ fontWeight: 900, fontSize: 20 }}>AI-Powered Insights</div>
+            <div className="spacer"></div>
+            <div className="muted small">Short, executive-ready recommendations</div>
+          </div>
+
+          {list.length === 0 ? (
+            <div className="card muted" style={{ padding: 20 }}>No insights available yet.</div>
           ) : (
-            <div style={{ display: 'grid', gap: '20px' }}>
-              {insights.map(insight => (
-                <div
-                  key={insight.id}
-                  style={{
-                    background: 'rgba(255,255,255,0.03)',
-                    border: `1px solid ${insight.type === 'opportunity' ? '#00D9FF' : insight.type === 'warning' ? '#FFB800' : '#00FF88'}`,
-                    borderLeft: `4px solid ${insight.type === 'opportunity' ? '#00D9FF' : insight.type === 'warning' ? '#FFB800' : '#00FF88'}`,
-                    borderRadius: '12px',
-                    padding: '24px'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                    <div>
-                      <span style={{
-                        background: insight.type === 'opportunity' ? 'rgba(0,217,255,0.1)' : insight.type === 'warning' ? 'rgba(255,184,0,0.1)' : 'rgba(0,255,136,0.1)',
-                        color: insight.type === 'opportunity' ? '#00D9FF' : insight.type === 'warning' ? '#FFB800' : '#00FF88',
-                        padding: '4px 12px',
-                        borderRadius: '20px',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        textTransform: 'uppercase'
-                      }}>
-                        {insight.type}
+            <div className="list">
+              {list.map((ins) => {
+                const type = (ins.type || "success").toLowerCase();
+                const pillClass = type === "warning" ? "warn" : (type === "opportunity" ? "ok" : "ok");
+                return (
+                  <div key={ins.id || cryptoRandomId()} className="card">
+                    <div className="row" style={{ marginBottom: 10 }}>
+                      <span className={"pill " + pillClass}>
+                        {type.toUpperCase()}
                       </span>
-                      <span style={{ marginLeft: '12px', color: '#8B92A8', fontSize: '12px' }}>
-                        {insight.impact} IMPACT
-                      </span>
+                      <span className="muted small">Impact: {ins.impact || "—"}</span>
+                      <span className="muted small">Confidence: {ins.confidence || "—"}%</span>
+                      <div className="spacer"></div>
                     </div>
-                    <div style={{ textAlign: 'center', padding: '8px 16px', background: 'rgba(0,217,255,0.1)', borderRadius: '8px' }}>
-                      <div style={{ fontSize: '20px', fontWeight: 700, color: '#00D9FF' }}>{insight.confidence}%</div>
-                      <div style={{ fontSize: '10px', color: '#8B92A8' }}>CONFIDENCE</div>
+                    <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 6 }}>
+                      {ins.title || "Insight"}
+                    </div>
+                    <div className="muted" style={{ lineHeight: 1.6 }}>
+                      {ins.description || "—"}
                     </div>
                   </div>
-                  <h4 style={{ fontSize: '18px', marginBottom: '8px' }}>{insight.title}</h4>
-                  <p style={{ color: '#8B92A8', lineHeight: 1.6 }}>{insight.description}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
       );
     }
 
+    // -----------------------------
+    // Clients View
+    // -----------------------------
     function ClientsView({ clients }) {
+      const list = Array.isArray(clients) ? clients : [];
       return (
         <div>
-          <h2 style={{ fontSize: '24px', marginBottom: '24px' }}>Client Portfolio</h2>
-          {(!clients || clients.length === 0) ? (
-            <div style={{ textAlign: 'center', padding: '60px', color: '#8B92A8' }}>No clients yet.</div>
-          ) : (
-            <div style={{ display: 'grid', gap: '16px' }}>
-              {clients.map(client => (
-                <div
-                  key={client.id}
-                  style={{
-                    background: 'rgba(255,255,255,0.03)',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    borderRadius: '12px',
-                    padding: '24px'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                    <div>
-                      <h4 style={{ fontSize: '18px', marginBottom: '4px' }}>{client.company_name || client.name || 'Client'}</h4>
-                      <span style={{ color: '#8B92A8', fontSize: '14px' }}>{client.industry || '-'}</span>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: '24px', fontWeight: 700, marginBottom: '4px' }}>
-                        ${Number(client.mrr || client.monthlyRevenue || 0).toLocaleString()}
-                      </div>
-                      <div style={{ fontSize: '12px', color: '#8B92A8' }}>Monthly Recurring</div>
-                    </div>
-                  </div>
+          <div className="row" style={{ marginBottom: 12 }}>
+            <div style={{ fontWeight: 900, fontSize: 20 }}>Client Portfolio</div>
+            <div className="spacer"></div>
+            <div className="muted small">{list.length} clients tracked</div>
+          </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                    <div>
-                      <div style={{ fontSize: '12px', color: '#8B92A8', marginBottom: '8px' }}>Status</div>
-                      <span style={{
-                        background: String(client.status).toLowerCase() === 'active' ? 'rgba(0,255,136,0.1)' : 'rgba(255,184,0,0.1)',
-                        color: String(client.status).toLowerCase() === 'active' ? '#00FF88' : '#FFB800',
-                        padding: '4px 12px',
-                        borderRadius: '20px',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        textTransform: 'uppercase'
-                      }}>
-                        {client.status || 'active'}
-                      </span>
+          {list.length === 0 ? (
+            <div className="card muted" style={{ padding: 20 }}>No clients yet.</div>
+          ) : (
+            <div className="list">
+              {list.map((c) => {
+                const status = (c.status || "ACTIVE").toUpperCase();
+                const statusClass = status === "ACTIVE" ? "ok" : (status === "PAUSED" ? "warn" : "bad");
+
+                return (
+                  <div key={c.id} className="card">
+                    <div className="row" style={{ marginBottom: 10 }}>
+                      <div>
+                        <div className="clientTitle">{c.name}</div>
+                        <div className="muted small">{c.industry}</div>
+                      </div>
+
+                      <div className="spacer"></div>
+
+                      <span className={"pill " + statusClass}>{status}</span>
                     </div>
-                    <div>
-                      <div style={{ fontSize: '12px', color: '#8B92A8', marginBottom: '8px' }}>Health Score</div>
-                      <div style={{ fontSize: '20px', fontWeight: 700, color: '#00FF88' }}>
-                        {Number(client.health_score || client.healthScore || 85)}%
+
+                    <div className="row" style={{ gap: 12 }}>
+                      <div className="card" style={{ padding: 12, flex: 1 }}>
+                        <div className="muted small">MRR</div>
+                        <div style={{ fontWeight: 900, fontSize: 18 }}>{formatMoney(c.mrr)}</div>
+                      </div>
+                      <div className="card" style={{ padding: 12, flex: 1 }}>
+                        <div className="muted small">Health Score</div>
+                        <div style={{ fontWeight: 900, fontSize: 18, color: c.healthScore >= 85 ? "#00FF88" : c.healthScore >= 70 ? "#FFB800" : "#FF3366" }}>
+                          {safeNumber(c.healthScore, 0)}%
+                        </div>
+                      </div>
+                      <div className="card" style={{ padding: 12, flex: 1 }}>
+                        <div className="muted small">Churn Risk</div>
+                        <div style={{ fontWeight: 900, fontSize: 18 }}>{c.churnRisk}</div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
       );
     }
 
-    // ========= APP =========
-    function App() {
-      const [token, setToken] = useState(localStorage.getItem('token'));
-      const [user, setUser] = useState(JSON.parse(localStorage.getItem('user') || 'null'));
+    // -----------------------------
+    // Add Client Modal
+    // -----------------------------
+    function AddClientModal({ onClose, onSave }) {
+      const [name, setName] = useState("");
+      const [industry, setIndustry] = useState("IT Services");
+      const [status, setStatus] = useState("ACTIVE");
+      const [mrr, setMrr] = useState(5000);
+      const [healthScore, setHealthScore] = useState(85);
 
-      const handleLogin = (newToken, newUser) => {
-        setToken(newToken);
-        setUser(newUser);
-        localStorage.setItem('token', newToken);
-        localStorage.setItem('user', JSON.stringify(newUser));
+      return (
+        <Modal title="Add Client" onClose={onClose}>
+          <div className="field">
+            <label>Client Name</label>
+            <input value={name} onChange={(e)=>setName(e.target.value)} placeholder="Example: Free Fly Apparel" />
+          </div>
+
+          <div className="field">
+            <label>Industry</label>
+            <input value={industry} onChange={(e)=>setIndustry(e.target.value)} />
+          </div>
+
+          <div className="row" style={{ gap: 12 }}>
+            <div className="field" style={{ flex: 1 }}>
+              <label>Status</label>
+              <select value={status} onChange={(e)=>setStatus(e.target.value)}>
+                <option value="ACTIVE">ACTIVE</option>
+                <option value="PAUSED">PAUSED</option>
+                <option value="AT_RISK">AT_RISK</option>
+              </select>
+            </div>
+
+            <div className="field" style={{ flex: 1 }}>
+              <label>MRR</label>
+              <input type="number" value={mrr} onChange={(e)=>setMrr(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="field">
+            <label>Health Score (0–100)</label>
+            <input type="number" value={healthScore} onChange={(e)=>setHealthScore(e.target.value)} />
+          </div>
+
+          <div className="modalFooter">
+            <button className="btn" onClick={onClose}>Cancel</button>
+            <button
+              className="btn primary"
+              onClick={() => onSave({
+                id: cryptoRandomId(),
+                name: name.trim() || "New Client",
+                industry,
+                status,
+                mrr: safeNumber(mrr, 0),
+                healthScore: Math.max(0, Math.min(100, safeNumber(healthScore, 85))),
+                churnRisk: status === "AT_RISK" ? "High" : "Low",
+                growthTrend: "Upward"
+              })}
+            >
+              Save Client
+            </button>
+          </div>
+        </Modal>
+      );
+    }
+
+    // -----------------------------
+    // Add Revenue Modal
+    // -----------------------------
+    function AddRevenueModal({ onClose, onSave }) {
+      const [amount, setAmount] = useState(10000);
+      const [date, setDate] = useState(todayISO());
+      const [source, setSource] = useState("SEO");
+
+      return (
+        <Modal title="Add Revenue Entry" onClose={onClose}>
+          <div className="field">
+            <label>Amount</label>
+            <input type="number" value={amount} onChange={(e)=>setAmount(e.target.value)} />
+          </div>
+
+          <div className="field">
+            <label>Date</label>
+            <input type="date" value={date} onChange={(e)=>setDate(e.target.value)} />
+          </div>
+
+          <div className="field">
+            <label>Source</label>
+            <select value={source} onChange={(e)=>setSource(e.target.value)}>
+              <option>SEO</option>
+              <option>Paid Ads</option>
+              <option>Email</option>
+              <option>Referrals</option>
+              <option>Partnerships</option>
+            </select>
+          </div>
+
+          <div className="modalFooter">
+            <button className="btn" onClick={onClose}>Cancel</button>
+            <button
+              className="btn primary"
+              onClick={() => onSave({
+                amount: safeNumber(amount, 0),
+                date,
+                source
+              })}
+            >
+              Add Revenue
+            </button>
+          </div>
+        </Modal>
+      );
+    }
+
+    // -----------------------------
+    // App
+    // -----------------------------
+    function App() {
+      initDemoStorageIfMissing();
+
+      const [token, setToken] = useState(getLS(STORAGE.token, null));
+      const [user, setUser] = useState(getLS(STORAGE.user, null));
+
+      const handleLogin = (t, u) => {
+        setToken(t);
+        setUser(u);
+        setLS(STORAGE.token, t);
+        setLS(STORAGE.user, u);
       };
 
       const handleLogout = () => {
         setToken(null);
         setUser(null);
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        localStorage.removeItem(STORAGE.token);
+        localStorage.removeItem(STORAGE.user);
       };
+
+      if (!token) return <LoginPage onLogin={handleLogin} />;
 
       return (
         <ErrorBoundary>
-          {!token ? (
-            <LoginPage onLogin={handleLogin} />
-          ) : (
-            <Dashboard token={token} user={user} onLogout={handleLogout} />
-          )}
+          <Dashboard token={token} user={user} onLogout={handleLogout} />
         </ErrorBoundary>
       );
     }
 
-    // ========= RENDER =========
-    const root = ReactDOM.createRoot(document.getElementById('root'));
+    // Render
+    const root = ReactDOM.createRoot(document.getElementById("root"));
     root.render(<App />);
   </script>
 </body>
