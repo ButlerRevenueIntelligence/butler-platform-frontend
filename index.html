@@ -215,7 +215,36 @@
             const [loading, setLoading] = useState(true);
             const [revenueData, setRevenueData] = useState(null);
             const [insights, setInsights] = useState([]);
-            const [clients, setClients] = useState([]);
+            // ✅ Demo Clients (stored in browser for demos)
+const DEFAULT_CLIENTS = [
+  {
+    id: 1,
+    name: "TechCorp Industries",
+    industry: "IT Services",
+    status: "ACTIVE",
+    healthScore: 95,
+    mrr: 12500
+  }
+];
+
+function loadClients() {
+  try {
+    const saved = localStorage.getItem("butler_demo_clients");
+    return saved ? JSON.parse(saved) : DEFAULT_CLIENTS;
+  } catch (e) {
+    return DEFAULT_CLIENTS;
+  }
+}
+
+function saveClients(clients) {
+  localStorage.setItem("butler_demo_clients", JSON.stringify(clients));
+}
+
+const [clients, setClients] = useState(loadClients());
+useEffect(() => {
+  saveClients(clients);
+}, [clients]);
+
             
             useEffect(() => {
                 loadData();
@@ -231,7 +260,10 @@
                     
                     setRevenueData(revenue.data);
                     setInsights(insightsData.data.insights);
-                    setClients(clientsData.data);
+                    if (clientsData && clientsData.length) {
+  setClients(clientsData);
+}
+
                 } catch (error) {
                     console.error('Failed to load data:', error);
                 } finally {
