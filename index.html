@@ -1,5 +1,3 @@
-<!-- deploy test -->
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,45 +5,52 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Butler & Co Revenue Intelligence Platform</title>
 
+  <!-- React -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 
-  <!-- PropTypes (required by Recharts UMD) -->
+  <!-- PropTypes (Recharts needs this in UMD builds) -->
   <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
 
   <!-- Recharts UMD -->
   <script src="https://cdn.jsdelivr.net/npm/recharts@2.5.0/umd/Recharts.min.js"></script>
 
-  <!-- Babel for JSX -->
+  <!-- Babel (so we can run JSX in a single HTML file) -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
       background: linear-gradient(135deg, #0A0E1A 0%, #1A1F2E 100%);
       color: #fff;
       min-height: 100vh;
     }
     .loading {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      flex-direction: column;
-      gap: 20px;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; flex-direction: column; gap: 20px;
     }
     .spinner {
-      width: 60px;
-      height: 60px;
+      width: 60px; height: 60px;
       border: 4px solid rgba(0, 71, 255, 0.1);
       border-top: 4px solid #0047FF;
       border-radius: 50%;
       animation: spin 1s linear infinite;
     }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    @keyframes spin { 0% { transform: rotate(0deg);} 100% { transform: rotate(360deg);} }
+
     button { cursor: pointer; font-family: inherit; }
     input { font-family: inherit; }
+
+    .errorBox {
+      background: rgba(255, 51, 102, 0.10);
+      border: 1px solid #FF3366;
+      padding: 16px;
+      border-radius: 10px;
+      margin: 20px;
+      white-space: pre-wrap;
+      line-height: 1.4;
+    }
   </style>
 </head>
 
@@ -55,50 +60,14 @@
   <script type="text/babel">
     const { useState, useEffect } = React;
     const {
-      AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-      PieChart, Pie, Cell
+      AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
+      ResponsiveContainer, PieChart, Pie, Cell
     } = Recharts;
 
-    // ✅ API Configuration
+    // ========= CONFIG =========
     const API_URL = 'https://butler-platform-backend.onrender.com/api/v1';
 
-    // ✅ Demo Revenue (matches OverviewView reads)
-    const DEMO_REVENUE = {
-      total_revenue: 295422,
-      mrr: 25109,
-      arr: 301304,
-      growth_rate: 0.34,
-      by_period: [
-        { period_start: "2025-10", revenue: 19000 },
-        { period_start: "2025-11", revenue: 21000 },
-        { period_start: "2025-12", revenue: 23000 },
-        { period_start: "2026-01", revenue: 25109 },
-      ],
-      by_source: [
-        { source: "Organic", revenue: 120000, percentage: 41 },
-        { source: "Paid", revenue: 95000, percentage: 32 },
-        { source: "Referral", revenue: 52000, percentage: 18 },
-        { source: "Email", revenue: 28422, percentage: 9 }
-      ]
-    };
-
-    // ✅ Demo Clients (matches ClientsView reads)
-    const DEFAULT_CLIENTS = [
-      { id: 1, company_name: "TechCorp Industries", industry: "IT Services", status: "active", mrr: 12500, health_score: 92 },
-      { id: 2, company_name: "Apex Logistics Group", industry: "Logistics", status: "active", mrr: 8400, health_score: 88 },
-      { id: 3, company_name: "Sunrise Dental Partners", industry: "Healthcare", status: "active", mrr: 6700, health_score: 85 }
-    ];
-
-    // ✅ Demo Insights (optional but makes demo look real)
-    const DEFAULT_INSIGHTS = [
-      { id: 1, type: "opportunity", impact: "HIGH", confidence: 92, title: "Upsell opportunity detected", description: "Client is trending upward in MRR—recommend expanding paid search and retargeting budget." },
-      { id: 2, type: "warning", impact: "MEDIUM", confidence: 84, title: "Early churn risk signals", description: "Engagement dropped 12% in the last 14 days. Recommend a check-in and refreshed KPI targets." },
-      { id: 3, type: "success", impact: "HIGH", confidence: 90, title: "Organic traffic compounding", description: "SEO performance shows consistent month-over-month growth. Scale content around top converting pages." },
-      { id: 4, type: "opportunity", impact: "MEDIUM", confidence: 81, title: "Referral loop potential", description: "Client feedback score is high—request referrals and launch a simple incentive program." },
-      { id: 5, type: "success", impact: "MEDIUM", confidence: 79, title: "Conversion rate improvement", description: "Landing page tests indicate improved conversion rate. Deploy winning variant across campaigns." },
-    ];
-
-    // ✅ API Helper
+    // ========= API HELPER =========
     const api = {
       async login(email, password) {
         const response = await fetch(`${API_URL}/auth/token`, {
@@ -116,25 +85,40 @@
             'Content-Type': 'application/json'
           }
         });
-        if (!response.ok) throw new Error('API request failed');
+        if (!response.ok) throw new Error(`API request failed: ${endpoint}`);
         return response.json();
       }
     };
 
-    // ✅ Local storage helpers for demo clients
-    function loadClients() {
-      try {
-        const saved = localStorage.getItem("butler_demo_clients");
-        return saved ? JSON.parse(saved) : DEFAULT_CLIENTS;
-      } catch (e) {
-        return DEFAULT_CLIENTS;
+    // ========= ERROR BOUNDARY (prevents blank screen) =========
+    class ErrorBoundary extends React.Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false, message: '' };
+      }
+      static getDerivedStateFromError(error) {
+        return { hasError: true, message: String(error?.stack || error) };
+      }
+      componentDidCatch(error) {
+        console.error('Render crash:', error);
+      }
+      render() {
+        if (this.state.hasError) {
+          return (
+            <div style={{ padding: '24px' }}>
+              <h2 style={{ marginBottom: '12px' }}>Something crashed (but it’s fixable).</h2>
+              <div className="errorBox">{this.state.message}</div>
+              <div style={{ color: '#8B92A8', fontSize: '14px' }}>
+                Tip: open DevTools → Console to see the same error.
+              </div>
+            </div>
+          );
+        }
+        return this.props.children;
       }
     }
-    function saveClients(clients) {
-      localStorage.setItem("butler_demo_clients", JSON.stringify(clients));
-    }
 
-    // ✅ Login Page
+    // ========= LOGIN =========
     function LoginPage({ onLogin }) {
       const [email, setEmail] = useState('demo@butlerco.com');
       const [password, setPassword] = useState('demo123');
@@ -147,10 +131,9 @@
         setError('');
         try {
           const data = await api.login(email, password);
-          onLogin(data.access_token, data.user);
+          onLogin(data.access_token, data.user || { email });
         } catch (err) {
-          // still allow demo login even if backend auth fails (for presentation)
-          onLogin("demo-token", { email: "demo@butlerco.com", firstName: "Demo" });
+          setError('Invalid credentials. Try demo@butlerco.com / demo123');
         } finally {
           setLoading(false);
         }
@@ -158,17 +141,15 @@
 
       return (
         <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div style={{ maxWidth: '400px', width: '100%', background: 'rgba(255,255,255,0.03)', padding: '40px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+          <div style={{ maxWidth: '420px', width: '100%', background: 'rgba(255,255,255,0.03)', padding: '40px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <div style={{ textAlign: 'center', marginBottom: '26px' }}>
               <div style={{ width: '60px', height: '60px', background: 'linear-gradient(135deg, #0047FF, #00D9FF)', borderRadius: '12px', margin: '0 auto 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>📊</div>
               <h1 style={{ fontSize: '24px', marginBottom: '8px' }}>Butler & Co</h1>
               <p style={{ color: '#8B92A8', fontSize: '14px' }}>Revenue Intelligence Platform</p>
             </div>
 
             {error && (
-              <div style={{ background: 'rgba(255,51,102,0.1)', border: '1px solid #FF3366', padding: '12px', borderRadius: '8px', marginBottom: '20px', fontSize: '14px' }}>
-                {error}
-              </div>
+              <div className="errorBox" style={{ margin: '0 0 16px 0' }}>{error}</div>
             )}
 
             <form onSubmit={handleSubmit}>
@@ -183,7 +164,7 @@
                 />
               </div>
 
-              <div style={{ marginBottom: '24px' }}>
+              <div style={{ marginBottom: '22px' }}>
                 <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: '#8B92A8' }}>Password</label>
                 <input
                   type="password"
@@ -203,7 +184,7 @@
               </button>
             </form>
 
-            <div style={{ marginTop: '20px', padding: '16px', background: 'rgba(0,217,255,0.05)', border: '1px solid rgba(0,217,255,0.2)', borderRadius: '8px', fontSize: '12px', color: '#8B92A8' }}>
+            <div style={{ marginTop: '18px', padding: '14px', background: 'rgba(0,217,255,0.05)', border: '1px solid rgba(0,217,255,0.2)', borderRadius: '8px', fontSize: '12px', color: '#8B92A8' }}>
               <strong style={{ color: '#00D9FF' }}>Demo Account:</strong><br />
               Email: demo@butlerco.com<br />
               Password: demo123
@@ -213,370 +194,69 @@
       );
     }
 
-    // ✅ Dashboard
+    // ========= DASHBOARD =========
     function Dashboard({ token, user, onLogout }) {
-  const [activeView, setActiveView] = useState('overview');
-  const [loading, setLoading] = useState(true);
-
-  // --- DEMO MODE TOGGLE ---
-  const [demoMode, setDemoMode] = useState(() => {
-    const saved = localStorage.getItem("butler_demo_mode");
-    return saved ? saved === "true" : true; // default true for demos
-  });
-
-  useEffect(() => {
-    localStorage.setItem("butler_demo_mode", String(demoMode));
-  }, [demoMode]);
-
-  // --- DEMO DATA ---
-  const DEMO_REVENUE = {
-    totalRevenue: 295422,
-    monthlyRecurringRevenue: 25109,
-    annualRecurringRevenue: 301304,
-    previousPeriodRevenue: 220000,
-    growthRate: 0.34,
-    byPeriod: [
-      { period: "Oct", revenue: 210000 },
-      { period: "Nov", revenue: 232000 },
-      { period: "Dec", revenue: 245000 },
-      { period: "Jan", revenue: 265000 },
-      { period: "Feb", revenue: 295422 },
-    ],
-    bySource: [
-      { source: "SEO", revenue: 128000 },
-      { source: "Paid Ads", revenue: 98000 },
-      { source: "Outbound", revenue: 42000 },
-      { source: "Partners", revenue: 27422 },
-    ],
-  };
-
-  const DEFAULT_CLIENTS = [
-    {
-      id: 1,
-      name: "TechCorp Industries",
-      industry: "IT Services",
-      status: "ACTIVE",
-      mrr: 12500,
-      healthScore: 92,
-      churnRisk: "Low",
-      growthTrend: "Upward",
-    },
-    {
-      id: 2,
-      name: "Apex Staffing Group",
-      industry: "Staffing & Recruiting",
-      status: "ACTIVE",
-      mrr: 8900,
-      healthScore: 88,
-      churnRisk: "Medium",
-      growthTrend: "Stable",
-    },
-  ];
-
-  // --- LOCAL STORAGE (so your demo edits persist) ---
-  function loadClients() {
-    try {
-      const saved = localStorage.getItem("butler_demo_clients");
-      return saved ? JSON.parse(saved) : DEFAULT_CLIENTS;
-    } catch {
-      return DEFAULT_CLIENTS;
-    }
-  }
-
-  function saveClients(next) {
-    localStorage.setItem("butler_demo_clients", JSON.stringify(next));
-  }
-
-  const [revenueData, setRevenueData] = useState(null);
-  const [insights, setInsights] = useState([]);
-  const [clients, setClients] = useState(loadClients());
-
-  useEffect(() => saveClients(clients), [clients]);
-
-  // --- NORMALIZERS (handles backend field name differences) ---
-  function normalizeRevenue(raw) {
-    const d = raw?.data ? raw.data : raw;
-
-    const total =
-      d?.total_revenue ?? d?.totalRevenue ?? d?.totalRevenueValue ?? 0;
-
-    const mrr =
-      d?.mrr ?? d?.monthly_recurring_revenue ?? d?.monthlyRecurringRevenue ?? 0;
-
-    const arr =
-      d?.arr ?? d?.annual_recurring_revenue ?? d?.annualRecurringRevenue ?? 0;
-
-    const prev =
-      d?.previous_period_revenue ??
-      d?.previousPeriodRevenue ??
-      d?.prevRevenue ??
-      0;
-
-    const gr =
-      d?.growth_rate ?? d?.growthRate ?? d?.growth ?? null;
-
-    // charts
-    const byPeriod = d?.by_period ?? d?.byPeriod ?? [];
-    const bySource = d?.by_source ?? d?.bySource ?? [];
-
-    return {
-      totalRevenue: Number(total) || 0,
-      monthlyRecurringRevenue: Number(mrr) || 0,
-      annualRecurringRevenue: Number(arr) || 0,
-      previousPeriodRevenue: Number(prev) || 0,
-      growthRate:
-        gr != null
-          ? Number(gr)
-          : (Number(prev) > 0 ? (Number(total) - Number(prev)) / Number(prev) : 0.34),
-      byPeriod: Array.isArray(byPeriod) ? byPeriod : [],
-      bySource: Array.isArray(bySource) ? bySource : [],
-    };
-  }
-
-  function normalizeClients(raw) {
-    const d = raw?.data ? raw.data : raw;
-    const list = Array.isArray(d) ? d : (Array.isArray(d?.clients) ? d.clients : []);
-
-    return list.map((c, idx) => ({
-      id: c?.id ?? idx + 1,
-      name: c?.company_name ?? c?.name ?? c?.companyName ?? "Client",
-      industry: c?.industry ?? "—",
-      status: (c?.status ?? "ACTIVE").toUpperCase(),
-      mrr: Number(c?.mrr ?? c?.monthlyRevenue ?? 0) || 0,
-      healthScore: Number(c?.health_score ?? c?.healthScore ?? 85) || 85,
-      churnRisk: c?.churnRisk ?? "Low",
-      growthTrend: c?.growthTrend ?? "Stable",
-    }));
-  }
-
-  // --- LOAD DATA ---
-  useEffect(() => {
-    loadData();
-    // eslint-disable-next-line
-  }, [demoMode]);
-
-  const loadData = async () => {
-    setLoading(true);
-
-    try {
-      if (demoMode) {
-        setRevenueData(DEMO_REVENUE);
-        setInsights([]); // keep simple for now
-        setClients(loadClients());
-        return;
-      }
-
-      const [rev, ins, cli] = await Promise.all([
-        api.get('/revenue/summary', token),
-        api.get('/insights/latest?limit=5', token),
-        api.get('/clients', token),
-      ]);
-
-      const normalizedRevenue = normalizeRevenue(rev);
-      setRevenueData(normalizedRevenue);
-
-      setInsights(ins?.data?.insights || []);
-
-      const normalizedClients = normalizeClients(cli);
-      setClients(normalizedClients.length ? normalizedClients : loadClients());
-    } catch (e) {
-      console.error("Live load failed, falling back to demo:", e);
-      setRevenueData(DEMO_REVENUE);
-      setClients(loadClients());
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // --- ACTIONS (Buttons) ---
-  const addClient = () => {
-    const name = prompt("Client name?");
-    if (!name) return;
-
-    const industry = prompt("Industry? (example: IT Services)") || "—";
-    const mrr = Number(prompt("MRR / Monthly Recurring Revenue? (number)") || "0");
-
-    const next = [
-      ...clients,
-      {
-        id: Date.now(),
-        name,
-        industry,
-        status: "ACTIVE",
-        mrr: isNaN(mrr) ? 0 : mrr,
-        healthScore: 85,
-        churnRisk: "Low",
-        growthTrend: "Stable",
-      },
-    ];
-    setClients(next);
-  };
-
-  const addRevenue = () => {
-    const total = Number(prompt("Total Revenue (number)?") || "");
-    const mrr = Number(prompt("MRR (number)?") || "");
-    const arr = Number(prompt("ARR (number)?") || "");
-    const prev = Number(prompt("Previous Period Revenue (number)?") || "");
-
-    const next = {
-      ...(revenueData || DEMO_REVENUE),
-      totalRevenue: isNaN(total) ? (revenueData?.totalRevenue ?? DEMO_REVENUE.totalRevenue) : total,
-      monthlyRecurringRevenue: isNaN(mrr) ? (revenueData?.monthlyRecurringRevenue ?? DEMO_REVENUE.monthlyRecurringRevenue) : mrr,
-      annualRecurringRevenue: isNaN(arr) ? (revenueData?.annualRecurringRevenue ?? DEMO_REVENUE.annualRecurringRevenue) : arr,
-      previousPeriodRevenue: isNaN(prev) ? (revenueData?.previousPeriodRevenue ?? DEMO_REVENUE.previousPeriodRevenue) : prev,
-    };
-
-    const denom = next.previousPeriodRevenue;
-    next.growthRate = denom > 0 ? (next.totalRevenue - denom) / denom : 0.34;
-
-    setRevenueData(next);
-  };
-
-  const resetDemo = () => {
-    localStorage.removeItem("butler_demo_clients");
-    setClients(DEFAULT_CLIENTS);
-    setRevenueData(DEMO_REVENUE);
-  };
-
-  if (loading) {
-    return (
-      <div className="loading">
-        <div className="spinner"></div>
-        <div>Loading platform data...</div>
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ padding: '24px', minHeight: '100vh' }}>
-      {/* Header */}
-      <div style={{ marginBottom: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
-        <div>
-          <h1 style={{ fontSize: '32px', marginBottom: '8px' }}>Revenue Intelligence Platform</h1>
-          <p style={{ color: '#8B92A8' }}>Welcome back, {user?.firstName || user?.email || "Demo"}</p>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {/* DEMO/LIVE TOGGLE */}
-          <button
-            onClick={() => setDemoMode((v) => !v)}
-            style={{
-              padding: '10px 14px',
-              background: demoMode ? 'rgba(0,217,255,0.12)' : 'rgba(255,184,0,0.12)',
-              border: `1px solid ${demoMode ? 'rgba(0,217,255,0.35)' : 'rgba(255,184,0,0.35)'}`,
-              borderRadius: '10px',
-              color: demoMode ? '#00D9FF' : '#FFB800',
-              fontSize: '13px',
-              fontWeight: 700
-            }}
-            title="Toggle Demo vs Live data"
-          >
-            {demoMode ? "DEMO MODE" : "LIVE MODE"}
-          </button>
-
-          {/* QUICK ACTIONS */}
-          <button
-            onClick={addRevenue}
-            style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: '#fff', fontSize: '13px', fontWeight: 700 }}
-          >
-            + Add Revenue
-          </button>
-
-          <button
-            onClick={addClient}
-            style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: '#fff', fontSize: '13px', fontWeight: 700 }}
-          >
-            + Add Client
-          </button>
-
-          {demoMode && (
-            <button
-              onClick={resetDemo}
-              style={{ padding: '10px 14px', background: 'rgba(255,51,102,0.10)', border: '1px solid rgba(255,51,102,0.35)', borderRadius: '10px', color: '#FF3366', fontSize: '13px', fontWeight: 800 }}
-            >
-              Reset Demo
-            </button>
-          )}
-
-          <button
-            onClick={onLogout}
-            style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: '#fff', fontSize: '13px' }}
-          >
-            Sign Out
-          </button>
-        </div>
-      </div>
-
-      {/* Navigation */}
-      <div style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '32px' }}>
-        {['overview', 'insights', 'clients'].map(view => (
-          <button
-            key={view}
-            onClick={() => setActiveView(view)}
-            style={{
-              padding: '12px 24px',
-              background: 'transparent',
-              border: 'none',
-              borderBottom: activeView === view ? '2px solid #0047FF' : '2px solid transparent',
-              color: activeView === view ? '#0047FF' : '#8B92A8',
-              fontSize: '14px',
-              fontWeight: 600,
-              textTransform: 'capitalize'
-            }}
-          >
-            {view}
-          </button>
-        ))}
-      </div>
-
-      {/* Content */}
-      {activeView === 'overview' && <OverviewView data={revenueData} />}
-      {activeView === 'insights' && <InsightsView insights={insights} />}
-      {activeView === 'clients' && <ClientsView clients={clients} />}
-    </div>
-  );
-}
-
       const [activeView, setActiveView] = useState('overview');
       const [loading, setLoading] = useState(true);
       const [revenueData, setRevenueData] = useState(null);
       const [insights, setInsights] = useState([]);
-      const [clients, setClients] = useState(loadClients());
+      const [clients, setClients] = useState([]);
 
-      useEffect(() => {
-        saveClients(clients);
-      }, [clients]);
+      const demoRevenue = {
+        total_revenue: 295422,
+        mrr: 25109,
+        arr: 301304,
+        previous_period_revenue: 220000,
+        growth_rate: 0.34,
+        by_period: [
+          { period_start: "Jan", revenue: 180000 },
+          { period_start: "Feb", revenue: 205000 },
+          { period_start: "Mar", revenue: 220000 },
+          { period_start: "Apr", revenue: 245000 },
+          { period_start: "May", revenue: 270000 },
+          { period_start: "Jun", revenue: 295422 }
+        ],
+        by_source: [
+          { source: "SEO", revenue: 120000, percentage: 41 },
+          { source: "Paid Ads", revenue: 95000, percentage: 32 },
+          { source: "Referrals", revenue: 55000, percentage: 19 },
+          { source: "Partners", revenue: 25422, percentage: 8 }
+        ]
+      };
 
-      useEffect(() => {
-        loadData();
-      }, []);
+      const demoInsights = [
+        { id: 1, type: "opportunity", impact: "HIGH", confidence: 92, title: "Pipeline velocity increasing", description: "Your lead-to-close time is trending down. Consider scaling top-performing channels." },
+        { id: 2, type: "warning", impact: "MED", confidence: 84, title: "One client showing churn signals", description: "Engagement is down in the last 14 days. Recommend a quick check-in + value report." }
+      ];
+
+      const demoClients = [
+        { id: 1, company_name: "TechCorp Industries", industry: "IT Services", status: "active", mrr: 12500, health_score: 92 },
+        { id: 2, company_name: "Sunrise Manufacturing", industry: "Manufacturing", status: "active", mrr: 8600, health_score: 88 }
+      ];
+
+      useEffect(() => { loadData(); }, []);
 
       const loadData = async () => {
         try {
-          const [revenueRes, insightsRes, clientsRes] = await Promise.all([
-            api.get('/revenue/summary', token).catch(() => null),
-            api.get('/insights/latest?limit=5', token).catch(() => null),
-            api.get('/clients', token).catch(() => null)
+          const [revenue, insightsData, clientsData] = await Promise.all([
+            api.get('/revenue/summary', token),
+            api.get('/insights/latest?limit=5', token),
+            api.get('/clients', token)
           ]);
 
-          const revenueObj = revenueRes?.data ?? revenueRes ?? {};
-          const insightsObj = insightsRes?.data ?? insightsRes ?? {};
-          const clientsObj = clientsRes?.data ?? clientsRes ?? [];
+          const rev = (revenue && revenue.data && Object.keys(revenue.data).length > 0) ? revenue.data : demoRevenue;
+          setRevenueData(rev);
 
-          const hasRevenue = revenueObj && typeof revenueObj === "object" && Object.keys(revenueObj).length > 0;
-          setRevenueData(hasRevenue ? revenueObj : DEMO_REVENUE);
+          const ins = (insightsData && insightsData.data && Array.isArray(insightsData.data.insights)) ? insightsData.data.insights : demoInsights;
+          setInsights(ins);
 
-          const listInsights = insightsObj?.insights || insightsObj?.data?.insights || [];
-          setInsights(Array.isArray(listInsights) && listInsights.length ? listInsights : DEFAULT_INSIGHTS);
-
-          const hasClients = Array.isArray(clientsObj) && clientsObj.length > 0;
-          if (hasClients) setClients(clientsObj);
-          else setClients(loadClients());
-
+          const cls = (clientsData && clientsData.data && Array.isArray(clientsData.data)) ? clientsData.data : demoClients;
+          setClients(cls);
         } catch (e) {
-          setRevenueData(DEMO_REVENUE);
-          setInsights(DEFAULT_INSIGHTS);
-          setClients(loadClients());
+          console.error('API failed, using demo data:', e);
+          setRevenueData(demoRevenue);
+          setInsights(demoInsights);
+          setClients(demoClients);
         } finally {
           setLoading(false);
         }
@@ -596,7 +276,7 @@
           <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <h1 style={{ fontSize: '32px', marginBottom: '8px' }}>Revenue Intelligence Platform</h1>
-              <p style={{ color: '#8B92A8' }}>Welcome back, {user?.firstName || user?.email || "Demo"}</p>
+              <p style={{ color: '#8B92A8' }}>Welcome back, {user?.firstName || user?.email || 'Demo'}</p>
             </div>
             <button
               onClick={onLogout}
@@ -634,145 +314,37 @@
       );
     }
 
-    // ✅ Overview
+    function Card({ title, value, subtitle, accent }) {
+      return (
+        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px' }}>
+          <div style={{ color: '#8B92A8', fontSize: '14px', marginBottom: '8px' }}>{title}</div>
+          <div style={{ fontSize: '36px', fontWeight: 700, marginBottom: '8px' }}>{value}</div>
+          <div style={{ color: accent || '#00FF88', fontSize: '14px' }}>{subtitle}</div>
+        </div>
+      );
+    }
+
     function OverviewView({ data }) {
-  if (!data) return <div>No data available</div>;
-
-  const total = Number(data.totalRevenue || 0);
-  const mrr = Number(data.monthlyRecurringRevenue || 0);
-  const arr = Number(data.annualRecurringRevenue || 0);
-
-  const gr = (data.growthRate != null && !isNaN(Number(data.growthRate)))
-    ? Number(data.growthRate)
-    : 0.34;
-
-  const grLabel = `${(gr * 100).toFixed(1)}%`;
-
-  const byPeriod = Array.isArray(data.byPeriod) ? data.byPeriod : [];
-  const bySource = Array.isArray(data.bySource) ? data.bySource : [];
-
-  const COLORS = ['#0047FF', '#00D9FF', '#00FF88', '#FFB800'];
-
-  return (
-    <div>
-      {/* KPI Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '32px' }}>
-        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px' }}>
-          <div style={{ color: '#8B92A8', fontSize: '14px', marginBottom: '8px' }}>Total Revenue</div>
-          <div style={{ fontSize: '36px', fontWeight: 700, marginBottom: '8px' }}>${total.toLocaleString()}</div>
-          <div style={{ color: '#00FF88', fontSize: '14px' }}>↗ {grLabel} vs last period</div>
-        </div>
-
-        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px' }}>
-          <div style={{ color: '#8B92A8', fontSize: '14px', marginBottom: '8px' }}>Monthly Recurring Revenue</div>
-          <div style={{ fontSize: '36px', fontWeight: 700, marginBottom: '8px' }}>${Math.round(mrr).toLocaleString()}</div>
-          <div style={{ color: '#00FF88', fontSize: '14px' }}>↗ Trending up</div>
-        </div>
-
-        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px' }}>
-          <div style={{ color: '#8B92A8', fontSize: '14px', marginBottom: '8px' }}>Annual Recurring Revenue</div>
-          <div style={{ fontSize: '36px', fontWeight: 700, marginBottom: '8px' }}>${Math.round(arr).toLocaleString()}</div>
-          <div style={{ color: '#00D9FF', fontSize: '14px' }}>Projected growth</div>
-        </div>
-
-        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px' }}>
-          <div style={{ color: '#8B92A8', fontSize: '14px', marginBottom: '8px' }}>Growth Rate</div>
-          <div style={{ fontSize: '36px', fontWeight: 700, marginBottom: '8px' }}>{grLabel}</div>
-          <div style={{ color: '#00FF88', fontSize: '14px' }}>Month over month</div>
-        </div>
-      </div>
-
-      {/* Revenue Trend */}
-      {byPeriod.length > 0 && (
-        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px', marginBottom: '32px' }}>
-          <h3 style={{ marginBottom: '20px', fontSize: '20px' }}>Revenue Trend</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={byPeriod.map(p => ({
-              period: p.period ?? p.period_start ?? p.month ?? "—",
-              revenue: Number(p.revenue || 0)
-            }))}>
-              <defs>
-                <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#0047FF" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#0047FF" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="period" stroke="#8B92A8" />
-              <YAxis stroke="#8B92A8" />
-              <Tooltip contentStyle={{ background: 'rgba(10, 14, 26, 0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }} />
-              <Area type="monotone" dataKey="revenue" stroke="#0047FF" fill="url(#colorRevenue)" />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
-      {/* Revenue by Source */}
-      {bySource.length > 0 && (
-        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px' }}>
-          <h3 style={{ marginBottom: '20px', fontSize: '20px' }}>Revenue by Source</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={bySource.map(s => ({
-                  source: s.source ?? s.name ?? "Source",
-                  revenue: Number(s.revenue || 0)
-                }))}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ source }) => source}
-                outerRadius={100}
-                dataKey="revenue"
-              >
-                {bySource.map((_, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip contentStyle={{ background: 'rgba(10, 14, 26, 0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }} />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-    </div>
-  );
-}
-
       if (!data) return <div>No data available</div>;
+
+      const total = Number(data.total_revenue || 0);
+      const mrr = Number(data.mrr || 0);
+      const arr = Number(data.arr || 0);
+
+      const growth = Number.isFinite(data.growth_rate) ? data.growth_rate : 0.34;
 
       const COLORS = ['#0047FF', '#00D9FF', '#00FF88', '#FFB800'];
 
       return (
         <div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '32px' }}>
-            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px' }}>
-              <div style={{ color: '#8B92A8', fontSize: '14px', marginBottom: '8px' }}>Total Revenue</div>
-              <div style={{ fontSize: '36px', fontWeight: 700, marginBottom: '8px' }}>${(data.total_revenue || 0).toLocaleString()}</div>
-              <div style={{ color: '#00FF88', fontSize: '14px' }}>↗ +34% vs last period</div>
-            </div>
-
-            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px' }}>
-              <div style={{ color: '#8B92A8', fontSize: '14px', marginBottom: '8px' }}>Monthly Recurring Revenue</div>
-              <div style={{ fontSize: '36px', fontWeight: 700, marginBottom: '8px' }}>${Math.round(data.mrr || 0).toLocaleString()}</div>
-              <div style={{ color: '#00FF88', fontSize: '14px' }}>↗ Trending up</div>
-            </div>
-
-            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px' }}>
-              <div style={{ color: '#8B92A8', fontSize: '14px', marginBottom: '8px' }}>Annual Recurring Revenue</div>
-              <div style={{ fontSize: '36px', fontWeight: 700, marginBottom: '8px' }}>${Math.round(data.arr || 0).toLocaleString()}</div>
-              <div style={{ color: '#00D9FF', fontSize: '14px' }}>Projected growth</div>
-            </div>
-
-            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px' }}>
-              <div style={{ color: '#8B92A8', fontSize: '14px', marginBottom: '8px' }}>Growth Rate</div>
-              <div style={{ fontSize: '36px', fontWeight: 700, marginBottom: '8px' }}>
-                {Number.isFinite(data.growth_rate) ? `${(data.growth_rate * 100).toFixed(1)}%` : "34.0%"}
-              </div>
-              <div style={{ color: '#00FF88', fontSize: '14px' }}>Month over month</div>
-            </div>
+            <Card title="Total Revenue" value={`$${total.toLocaleString()}`} subtitle="↗ +34% vs last period" accent="#00FF88" />
+            <Card title="Monthly Recurring Revenue" value={`$${Math.round(mrr).toLocaleString()}`} subtitle="↗ Trending up" accent="#00FF88" />
+            <Card title="Annual Recurring Revenue" value={`$${Math.round(arr).toLocaleString()}`} subtitle="Projected growth" accent="#00D9FF" />
+            <Card title="Growth Rate" value={`${(growth * 100).toFixed(1)}%`} subtitle="Month over month" accent="#00FF88" />
           </div>
 
-          {data.by_period && data.by_period.length > 0 && (
+          {Array.isArray(data.by_period) && data.by_period.length > 0 && (
             <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px', marginBottom: '32px' }}>
               <h3 style={{ marginBottom: '20px', fontSize: '20px' }}>Revenue Trend</h3>
               <ResponsiveContainer width="100%" height={300}>
@@ -793,7 +365,7 @@
             </div>
           )}
 
-          {data.by_source && data.by_source.length > 0 && (
+          {Array.isArray(data.by_source) && data.by_source.length > 0 && (
             <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px' }}>
               <h3 style={{ marginBottom: '20px', fontSize: '20px' }}>Revenue by Source</h3>
               <ResponsiveContainer width="100%" height={300}>
@@ -803,9 +375,8 @@
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ source, percentage }) => `${source}: ${percentage}%`}
+                    label={(p) => `${p.source}: ${p.percentage || ''}%`}
                     outerRadius={100}
-                    fill="#8884d8"
                     dataKey="revenue"
                   >
                     {data.by_source.map((entry, index) => (
@@ -821,16 +392,12 @@
       );
     }
 
-    // ✅ Insights
     function InsightsView({ insights }) {
       return (
         <div>
           <h2 style={{ fontSize: '24px', marginBottom: '24px' }}>AI-Powered Insights</h2>
-
           {(!insights || insights.length === 0) ? (
-            <div style={{ textAlign: 'center', padding: '60px', color: '#8B92A8' }}>
-              No insights available yet. Check back soon!
-            </div>
+            <div style={{ textAlign: 'center', padding: '60px', color: '#8B92A8' }}>No insights available yet. Check back soon!</div>
           ) : (
             <div style={{ display: 'grid', gap: '20px' }}>
               {insights.map(insight => (
@@ -847,8 +414,8 @@
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                     <div>
                       <span style={{
-                        background: `${insight.type === 'opportunity' ? 'rgba(0,217,255,0.1)' : insight.type === 'warning' ? 'rgba(255,184,0,0.1)' : 'rgba(0,255,136,0.1)'}`,
-                        color: `${insight.type === 'opportunity' ? '#00D9FF' : insight.type === 'warning' ? '#FFB800' : '#00FF88'}`,
+                        background: insight.type === 'opportunity' ? 'rgba(0,217,255,0.1)' : insight.type === 'warning' ? 'rgba(255,184,0,0.1)' : 'rgba(0,255,136,0.1)',
+                        color: insight.type === 'opportunity' ? '#00D9FF' : insight.type === 'warning' ? '#FFB800' : '#00FF88',
                         padding: '4px 12px',
                         borderRadius: '20px',
                         fontSize: '12px',
@@ -876,87 +443,12 @@
       );
     }
 
-    // ✅ Clients
     function ClientsView({ clients }) {
-  const list = Array.isArray(clients) ? clients : [];
-
-  return (
-    <div>
-      <h2 style={{ fontSize: '24px', marginBottom: '24px' }}>Client Portfolio</h2>
-
-      {list.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '60px', color: '#8B92A8' }}>
-          No clients yet. Use “+ Add Client” at the top to add one for the demo.
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gap: '16px' }}>
-          {list.map(client => (
-            <div
-              key={client.id}
-              style={{
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: '12px',
-                padding: '24px'
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', gap: 12 }}>
-                <div>
-                  <h4 style={{ fontSize: '18px', marginBottom: '4px' }}>{client.name}</h4>
-                  <span style={{ color: '#8B92A8', fontSize: '14px' }}>{client.industry}</span>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '24px', fontWeight: 700, marginBottom: '4px' }}>
-                    ${Number(client.mrr || 0).toLocaleString()}
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#8B92A8' }}>Monthly Recurring</div>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div>
-                  <div style={{ fontSize: '12px', color: '#8B92A8', marginBottom: '8px' }}>Status</div>
-                  <span style={{
-                    background: client.status === 'ACTIVE' ? 'rgba(0,255,136,0.1)' : 'rgba(255,184,0,0.1)',
-                    color: client.status === 'ACTIVE' ? '#00FF88' : '#FFB800',
-                    padding: '4px 12px',
-                    borderRadius: '20px',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    textTransform: 'uppercase'
-                  }}>
-                    {client.status}
-                  </span>
-                </div>
-
-                <div>
-                  <div style={{ fontSize: '12px', color: '#8B92A8', marginBottom: '8px' }}>Health Score</div>
-                  <div style={{ fontSize: '20px', fontWeight: 700, color: '#00FF88' }}>
-                    {Number(client.healthScore || 85)}%
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 12, color: "#8B92A8" }}>Churn Risk: <b style={{ color: "#fff" }}>{client.churnRisk || "Low"}</b></span>
-                <span style={{ fontSize: 12, color: "#8B92A8" }}>Growth Trend: <b style={{ color: "#fff" }}>{client.growthTrend || "Stable"}</b></span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
       return (
         <div>
           <h2 style={{ fontSize: '24px', marginBottom: '24px' }}>Client Portfolio</h2>
-
           {(!clients || clients.length === 0) ? (
-            <div style={{ textAlign: 'center', padding: '60px', color: '#8B92A8' }}>
-              No clients yet. Start adding clients to track their performance!
-            </div>
+            <div style={{ textAlign: 'center', padding: '60px', color: '#8B92A8' }}>No clients yet.</div>
           ) : (
             <div style={{ display: 'grid', gap: '16px' }}>
               {clients.map(client => (
@@ -971,12 +463,12 @@
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
                     <div>
-                      <h4 style={{ fontSize: '18px', marginBottom: '4px' }}>{client.company_name}</h4>
-                      <span style={{ color: '#8B92A8', fontSize: '14px' }}>{client.industry}</span>
+                      <h4 style={{ fontSize: '18px', marginBottom: '4px' }}>{client.company_name || client.name || 'Client'}</h4>
+                      <span style={{ color: '#8B92A8', fontSize: '14px' }}>{client.industry || '-'}</span>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: '24px', fontWeight: 700, marginBottom: '4px' }}>
-                        ${(client.mrr || 0).toLocaleString()}
+                        ${Number(client.mrr || client.monthlyRevenue || 0).toLocaleString()}
                       </div>
                       <div style={{ fontSize: '12px', color: '#8B92A8' }}>Monthly Recurring</div>
                     </div>
@@ -986,21 +478,21 @@
                     <div>
                       <div style={{ fontSize: '12px', color: '#8B92A8', marginBottom: '8px' }}>Status</div>
                       <span style={{
-                        background: client.status === 'active' ? 'rgba(0,255,136,0.1)' : 'rgba(255,184,0,0.1)',
-                        color: client.status === 'active' ? '#00FF88' : '#FFB800',
+                        background: String(client.status).toLowerCase() === 'active' ? 'rgba(0,255,136,0.1)' : 'rgba(255,184,0,0.1)',
+                        color: String(client.status).toLowerCase() === 'active' ? '#00FF88' : '#FFB800',
                         padding: '4px 12px',
                         borderRadius: '20px',
                         fontSize: '12px',
                         fontWeight: 600,
                         textTransform: 'uppercase'
                       }}>
-                        {client.status}
+                        {client.status || 'active'}
                       </span>
                     </div>
                     <div>
                       <div style={{ fontSize: '12px', color: '#8B92A8', marginBottom: '8px' }}>Health Score</div>
                       <div style={{ fontSize: '20px', fontWeight: 700, color: '#00FF88' }}>
-                        {client.health_score || 85}%
+                        {Number(client.health_score || client.healthScore || 85)}%
                       </div>
                     </div>
                   </div>
@@ -1012,7 +504,7 @@
       );
     }
 
-    // ✅ App
+    // ========= APP =========
     function App() {
       const [token, setToken] = useState(localStorage.getItem('token'));
       const [user, setUser] = useState(JSON.parse(localStorage.getItem('user') || 'null'));
@@ -1031,14 +523,20 @@
         localStorage.removeItem('user');
       };
 
-      if (!token) return <LoginPage onLogin={handleLogin} />;
-      return <Dashboard token={token} user={user} onLogout={handleLogout} />;
+      return (
+        <ErrorBoundary>
+          {!token ? (
+            <LoginPage onLogin={handleLogin} />
+          ) : (
+            <Dashboard token={token} user={user} onLogout={handleLogout} />
+          )}
+        </ErrorBoundary>
+      );
     }
 
-    // ✅ Render
+    // ========= RENDER =========
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
 </body>
 </html>
-
