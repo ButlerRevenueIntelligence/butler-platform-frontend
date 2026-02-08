@@ -3,601 +3,547 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Butler & Co Revenue Intelligence Platform</title>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Butler & Co Revenue Intelligence Platform</title>
 
-<!-- ADD THIS LINE (PropTypes) -->
-<script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 
-<!-- Recharts (keep this AFTER PropTypes) -->
-<script src="https://cdn.jsdelivr.net/npm/recharts@2.5.0/umd/Recharts.min.js"></script>
+  <!-- PropTypes (required by Recharts UMD) -->
+  <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
 
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Recharts UMD -->
+  <script src="https://cdn.jsdelivr.net/npm/recharts@2.5.0/umd/Recharts.min.js"></script>
 
+  <!-- Babel for JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
-            background: linear-gradient(135deg, #0A0E1A 0%, #1A1F2E 100%);
-            color: #fff;
-            min-height: 100vh;
-        }
-        
-        .loading {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            flex-direction: column;
-            gap: 20px;
-        }
-        
-        .spinner {
-            width: 60px;
-            height: 60px;
-            border: 4px solid rgba(0, 71, 255, 0.1);
-            border-top: 4px solid #0047FF;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        .error {
-            background: rgba(255, 51, 102, 0.1);
-            border: 1px solid #FF3366;
-            padding: 20px;
-            border-radius: 8px;
-            margin: 20px;
-        }
-        
-        button {
-            cursor: pointer;
-            font-family: inherit;
-        }
-        
-        input {
-            font-family: inherit;
-        }
-    </style>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+      background: linear-gradient(135deg, #0A0E1A 0%, #1A1F2E 100%);
+      color: #fff;
+      min-height: 100vh;
+    }
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .spinner {
+      width: 60px;
+      height: 60px;
+      border: 4px solid rgba(0, 71, 255, 0.1);
+      border-top: 4px solid #0047FF;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    button { cursor: pointer; font-family: inherit; }
+    input { font-family: inherit; }
+  </style>
 </head>
+
 <body>
-    <div id="root"></div>
-    
-    <script type="text/babel">
-        const { useState, useEffect } = React;
-        const { LineChart, Line, BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } = Recharts;
-        
-        // API Configuration
-        const API_URL = 'https://butler-platform-backend.onrender.com/api/v1'
-        
-        // API Helper
-        const api = {
-            async login(email, password) {
-                const response = await fetch(`${API_URL}/auth/token`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password })
-                });
-                if (!response.ok) throw new Error('Login failed');
-                return response.json();
-            },
-            
-            async register(data) {
-                const response = await fetch(`${API_URL}/auth/register`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                if (!response.ok) throw new Error('Registration failed');
-                return response.json();
-            },
-            
-            async get(endpoint, token) {
-                const response = await fetch(`${API_URL}${endpoint}`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-                if (!response.ok) throw new Error('API request failed');
-                return response.json();
-            },
-            
-            async post(endpoint, data, token) {
-                const response = await fetch(`${API_URL}${endpoint}`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(data)
-                });
-                if (!response.ok) throw new Error('API request failed');
-                return response.json();
-            }
-        };
-        
-        // Login Component
-        function LoginPage({ onLogin }) {
-            const [email, setEmail] = useState('demo@butlerco.com');
-            const [password, setPassword] = useState('demo123');
-            const [loading, setLoading] = useState(false);
-            const [error, setError] = useState('');
-            
-            const handleSubmit = async (e) => {
-                e.preventDefault();
-                setLoading(true);
-                setError('');
-                
-                try {
-                    const data = await api.login(email, password);
-                    onLogin(data.access_token, data.user);
-                } catch (err) {
-                    setError('Invalid credentials. Try demo@butlerco.com / demo123');
-                } finally {
-                    setLoading(false);
-                }
-            };
-            
-            return (
-                <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-                    <div style={{ maxWidth: '400px', width: '100%', background: 'rgba(255,255,255,0.03)', padding: '40px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)' }}>
-                        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-                            <div style={{ width: '60px', height: '60px', background: 'linear-gradient(135deg, #0047FF, #00D9FF)', borderRadius: '12px', margin: '0 auto 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>📊</div>
-                            <h1 style={{ fontSize: '24px', marginBottom: '8px' }}>Butler & Co</h1>
-                            <p style={{ color: '#8B92A8', fontSize: '14px' }}>Revenue Intelligence Platform</p>
-                        </div>
-                        
-                        {error && (
-                            <div style={{ background: 'rgba(255,51,102,0.1)', border: '1px solid #FF3366', padding: '12px', borderRadius: '8px', marginBottom: '20px', fontSize: '14px' }}>
-                                {error}
-                            </div>
-                        )}
-                        
-                        <form onSubmit={handleSubmit}>
-                            <div style={{ marginBottom: '16px' }}>
-                                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: '#8B92A8' }}>Email</label>
-                                <input
-                                    type="email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: '14px' }}
-                                    required
-                                />
-                            </div>
-                            
-                            <div style={{ marginBottom: '24px' }}>
-                                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: '#8B92A8' }}>Password</label>
-                                <input
-                                    type="password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: '14px' }}
-                                    required
-                                />
-                            </div>
-                            
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #0047FF, #00D9FF)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '16px', fontWeight: 600, opacity: loading ? 0.7 : 1 }}
-                            >
-                                {loading ? 'Signing in...' : 'Sign In'}
-                            </button>
-                        </form>
-                        
-                        <div style={{ marginTop: '20px', padding: '16px', background: 'rgba(0,217,255,0.05)', border: '1px solid rgba(0,217,255,0.2)', borderRadius: '8px', fontSize: '12px', color: '#8B92A8' }}>
-                            <strong style={{ color: '#00D9FF' }}>Demo Account:</strong><br />
-                            Email: demo@butlerco.com<br />
-                            Password: demo123
-                        </div>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+    const {
+      AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+      PieChart, Pie, Cell
+    } = Recharts;
+
+    // ✅ API Configuration
+    const API_URL = 'https://butler-platform-backend.onrender.com/api/v1';
+
+    // ✅ Demo Revenue (matches OverviewView reads)
+    const DEMO_REVENUE = {
+      total_revenue: 295422,
+      mrr: 25109,
+      arr: 301304,
+      growth_rate: 0.34,
+      by_period: [
+        { period_start: "2025-10", revenue: 19000 },
+        { period_start: "2025-11", revenue: 21000 },
+        { period_start: "2025-12", revenue: 23000 },
+        { period_start: "2026-01", revenue: 25109 },
+      ],
+      by_source: [
+        { source: "Organic", revenue: 120000, percentage: 41 },
+        { source: "Paid", revenue: 95000, percentage: 32 },
+        { source: "Referral", revenue: 52000, percentage: 18 },
+        { source: "Email", revenue: 28422, percentage: 9 }
+      ]
+    };
+
+    // ✅ Demo Clients (matches ClientsView reads)
+    const DEFAULT_CLIENTS = [
+      { id: 1, company_name: "TechCorp Industries", industry: "IT Services", status: "active", mrr: 12500, health_score: 92 },
+      { id: 2, company_name: "Apex Logistics Group", industry: "Logistics", status: "active", mrr: 8400, health_score: 88 },
+      { id: 3, company_name: "Sunrise Dental Partners", industry: "Healthcare", status: "active", mrr: 6700, health_score: 85 }
+    ];
+
+    // ✅ Demo Insights (optional but makes demo look real)
+    const DEFAULT_INSIGHTS = [
+      { id: 1, type: "opportunity", impact: "HIGH", confidence: 92, title: "Upsell opportunity detected", description: "Client is trending upward in MRR—recommend expanding paid search and retargeting budget." },
+      { id: 2, type: "warning", impact: "MEDIUM", confidence: 84, title: "Early churn risk signals", description: "Engagement dropped 12% in the last 14 days. Recommend a check-in and refreshed KPI targets." },
+      { id: 3, type: "success", impact: "HIGH", confidence: 90, title: "Organic traffic compounding", description: "SEO performance shows consistent month-over-month growth. Scale content around top converting pages." },
+      { id: 4, type: "opportunity", impact: "MEDIUM", confidence: 81, title: "Referral loop potential", description: "Client feedback score is high—request referrals and launch a simple incentive program." },
+      { id: 5, type: "success", impact: "MEDIUM", confidence: 79, title: "Conversion rate improvement", description: "Landing page tests indicate improved conversion rate. Deploy winning variant across campaigns." },
+    ];
+
+    // ✅ API Helper
+    const api = {
+      async login(email, password) {
+        const response = await fetch(`${API_URL}/auth/token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        if (!response.ok) throw new Error('Login failed');
+        return response.json();
+      },
+      async get(endpoint, token) {
+        const response = await fetch(`${API_URL}${endpoint}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        if (!response.ok) throw new Error('API request failed');
+        return response.json();
+      }
+    };
+
+    // ✅ Local storage helpers for demo clients
+    function loadClients() {
+      try {
+        const saved = localStorage.getItem("butler_demo_clients");
+        return saved ? JSON.parse(saved) : DEFAULT_CLIENTS;
+      } catch (e) {
+        return DEFAULT_CLIENTS;
+      }
+    }
+    function saveClients(clients) {
+      localStorage.setItem("butler_demo_clients", JSON.stringify(clients));
+    }
+
+    // ✅ Login Page
+    function LoginPage({ onLogin }) {
+      const [email, setEmail] = useState('demo@butlerco.com');
+      const [password, setPassword] = useState('demo123');
+      const [loading, setLoading] = useState(false);
+      const [error, setError] = useState('');
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setError('');
+        try {
+          const data = await api.login(email, password);
+          onLogin(data.access_token, data.user);
+        } catch (err) {
+          // still allow demo login even if backend auth fails (for presentation)
+          onLogin("demo-token", { email: "demo@butlerco.com", firstName: "Demo" });
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      return (
+        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ maxWidth: '400px', width: '100%', background: 'rgba(255,255,255,0.03)', padding: '40px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+              <div style={{ width: '60px', height: '60px', background: 'linear-gradient(135deg, #0047FF, #00D9FF)', borderRadius: '12px', margin: '0 auto 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>📊</div>
+              <h1 style={{ fontSize: '24px', marginBottom: '8px' }}>Butler & Co</h1>
+              <p style={{ color: '#8B92A8', fontSize: '14px' }}>Revenue Intelligence Platform</p>
+            </div>
+
+            {error && (
+              <div style={{ background: 'rgba(255,51,102,0.1)', border: '1px solid #FF3366', padding: '12px', borderRadius: '8px', marginBottom: '20px', fontSize: '14px' }}>
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: '#8B92A8' }}>Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: '14px' }}
+                  required
+                />
+              </div>
+
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: '#8B92A8' }}>Password</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: '14px' }}
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #0047FF, #00D9FF)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '16px', fontWeight: 600, opacity: loading ? 0.7 : 1 }}
+              >
+                {loading ? 'Signing in...' : 'Sign In'}
+              </button>
+            </form>
+
+            <div style={{ marginTop: '20px', padding: '16px', background: 'rgba(0,217,255,0.05)', border: '1px solid rgba(0,217,255,0.2)', borderRadius: '8px', fontSize: '12px', color: '#8B92A8' }}>
+              <strong style={{ color: '#00D9FF' }}>Demo Account:</strong><br />
+              Email: demo@butlerco.com<br />
+              Password: demo123
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ✅ Dashboard
+    function Dashboard({ token, user, onLogout }) {
+      const [activeView, setActiveView] = useState('overview');
+      const [loading, setLoading] = useState(true);
+      const [revenueData, setRevenueData] = useState(null);
+      const [insights, setInsights] = useState([]);
+      const [clients, setClients] = useState(loadClients());
+
+      useEffect(() => {
+        saveClients(clients);
+      }, [clients]);
+
+      useEffect(() => {
+        loadData();
+      }, []);
+
+      const loadData = async () => {
+        try {
+          const [revenueRes, insightsRes, clientsRes] = await Promise.all([
+            api.get('/revenue/summary', token).catch(() => null),
+            api.get('/insights/latest?limit=5', token).catch(() => null),
+            api.get('/clients', token).catch(() => null)
+          ]);
+
+          const revenueObj = revenueRes?.data ?? revenueRes ?? {};
+          const insightsObj = insightsRes?.data ?? insightsRes ?? {};
+          const clientsObj = clientsRes?.data ?? clientsRes ?? [];
+
+          const hasRevenue = revenueObj && typeof revenueObj === "object" && Object.keys(revenueObj).length > 0;
+          setRevenueData(hasRevenue ? revenueObj : DEMO_REVENUE);
+
+          const listInsights = insightsObj?.insights || insightsObj?.data?.insights || [];
+          setInsights(Array.isArray(listInsights) && listInsights.length ? listInsights : DEFAULT_INSIGHTS);
+
+          const hasClients = Array.isArray(clientsObj) && clientsObj.length > 0;
+          if (hasClients) setClients(clientsObj);
+          else setClients(loadClients());
+
+        } catch (e) {
+          setRevenueData(DEMO_REVENUE);
+          setInsights(DEFAULT_INSIGHTS);
+          setClients(loadClients());
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      if (loading) {
+        return (
+          <div className="loading">
+            <div className="spinner"></div>
+            <div>Loading platform data...</div>
+          </div>
+        );
+      }
+
+      return (
+        <div style={{ padding: '24px', minHeight: '100vh' }}>
+          <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h1 style={{ fontSize: '32px', marginBottom: '8px' }}>Revenue Intelligence Platform</h1>
+              <p style={{ color: '#8B92A8' }}>Welcome back, {user?.firstName || user?.email || "Demo"}</p>
+            </div>
+            <button
+              onClick={onLogout}
+              style={{ padding: '10px 20px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: '14px' }}
+            >
+              Sign Out
+            </button>
+          </div>
+
+          <div style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '32px' }}>
+            {['overview', 'insights', 'clients'].map(view => (
+              <button
+                key={view}
+                onClick={() => setActiveView(view)}
+                style={{
+                  padding: '12px 24px',
+                  background: 'transparent',
+                  border: 'none',
+                  borderBottom: activeView === view ? '2px solid #0047FF' : '2px solid transparent',
+                  color: activeView === view ? '#0047FF' : '#8B92A8',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  textTransform: 'capitalize'
+                }}
+              >
+                {view}
+              </button>
+            ))}
+          </div>
+
+          {activeView === 'overview' && <OverviewView data={revenueData} />}
+          {activeView === 'insights' && <InsightsView insights={insights} />}
+          {activeView === 'clients' && <ClientsView clients={clients} />}
+        </div>
+      );
+    }
+
+    // ✅ Overview
+    function OverviewView({ data }) {
+      if (!data) return <div>No data available</div>;
+
+      const COLORS = ['#0047FF', '#00D9FF', '#00FF88', '#FFB800'];
+
+      return (
+        <div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '32px' }}>
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px' }}>
+              <div style={{ color: '#8B92A8', fontSize: '14px', marginBottom: '8px' }}>Total Revenue</div>
+              <div style={{ fontSize: '36px', fontWeight: 700, marginBottom: '8px' }}>${(data.total_revenue || 0).toLocaleString()}</div>
+              <div style={{ color: '#00FF88', fontSize: '14px' }}>↗ +34% vs last period</div>
+            </div>
+
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px' }}>
+              <div style={{ color: '#8B92A8', fontSize: '14px', marginBottom: '8px' }}>Monthly Recurring Revenue</div>
+              <div style={{ fontSize: '36px', fontWeight: 700, marginBottom: '8px' }}>${Math.round(data.mrr || 0).toLocaleString()}</div>
+              <div style={{ color: '#00FF88', fontSize: '14px' }}>↗ Trending up</div>
+            </div>
+
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px' }}>
+              <div style={{ color: '#8B92A8', fontSize: '14px', marginBottom: '8px' }}>Annual Recurring Revenue</div>
+              <div style={{ fontSize: '36px', fontWeight: 700, marginBottom: '8px' }}>${Math.round(data.arr || 0).toLocaleString()}</div>
+              <div style={{ color: '#00D9FF', fontSize: '14px' }}>Projected growth</div>
+            </div>
+
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px' }}>
+              <div style={{ color: '#8B92A8', fontSize: '14px', marginBottom: '8px' }}>Growth Rate</div>
+              <div style={{ fontSize: '36px', fontWeight: 700, marginBottom: '8px' }}>
+                {Number.isFinite(data.growth_rate) ? `${(data.growth_rate * 100).toFixed(1)}%` : "34.0%"}
+              </div>
+              <div style={{ color: '#00FF88', fontSize: '14px' }}>Month over month</div>
+            </div>
+          </div>
+
+          {data.by_period && data.by_period.length > 0 && (
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px', marginBottom: '32px' }}>
+              <h3 style={{ marginBottom: '20px', fontSize: '20px' }}>Revenue Trend</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={data.by_period}>
+                  <defs>
+                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#0047FF" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#0047FF" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                  <XAxis dataKey="period_start" stroke="#8B92A8" />
+                  <YAxis stroke="#8B92A8" />
+                  <Tooltip contentStyle={{ background: 'rgba(10, 14, 26, 0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }} />
+                  <Area type="monotone" dataKey="revenue" stroke="#0047FF" fill="url(#colorRevenue)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {data.by_source && data.by_source.length > 0 && (
+            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px' }}>
+              <h3 style={{ marginBottom: '20px', fontSize: '20px' }}>Revenue by Source</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={data.by_source}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ source, percentage }) => `${source}: ${percentage}%`}
+                    outerRadius={100}
+                    fill="#8884d8"
+                    dataKey="revenue"
+                  >
+                    {data.by_source.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ background: 'rgba(10, 14, 26, 0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ✅ Insights
+    function InsightsView({ insights }) {
+      return (
+        <div>
+          <h2 style={{ fontSize: '24px', marginBottom: '24px' }}>AI-Powered Insights</h2>
+
+          {(!insights || insights.length === 0) ? (
+            <div style={{ textAlign: 'center', padding: '60px', color: '#8B92A8' }}>
+              No insights available yet. Check back soon!
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: '20px' }}>
+              {insights.map(insight => (
+                <div
+                  key={insight.id}
+                  style={{
+                    background: 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${insight.type === 'opportunity' ? '#00D9FF' : insight.type === 'warning' ? '#FFB800' : '#00FF88'}`,
+                    borderLeft: `4px solid ${insight.type === 'opportunity' ? '#00D9FF' : insight.type === 'warning' ? '#FFB800' : '#00FF88'}`,
+                    borderRadius: '12px',
+                    padding: '24px'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                    <div>
+                      <span style={{
+                        background: `${insight.type === 'opportunity' ? 'rgba(0,217,255,0.1)' : insight.type === 'warning' ? 'rgba(255,184,0,0.1)' : 'rgba(0,255,136,0.1)'}`,
+                        color: `${insight.type === 'opportunity' ? '#00D9FF' : insight.type === 'warning' ? '#FFB800' : '#00FF88'}`,
+                        padding: '4px 12px',
+                        borderRadius: '20px',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        textTransform: 'uppercase'
+                      }}>
+                        {insight.type}
+                      </span>
+                      <span style={{ marginLeft: '12px', color: '#8B92A8', fontSize: '12px' }}>
+                        {insight.impact} IMPACT
+                      </span>
                     </div>
-                </div>
-            );
-        }
-        
-        // Main Dashboard Component
-        function Dashboard({ token, user, onLogout }) {
-            const [activeView, setActiveView] = useState('overview');
-            const [loading, setLoading] = useState(true);
-            const [revenueData, setRevenueData] = useState(null);
-            const [insights, setInsights] = useState([]);
-            // ✅ Demo Clients (stored in browser for demos)
-const DEFAULT_CLIENTS = [
-  {
-    id: 1,
-    name: "TechCorp Industries",
-    industry: "IT Services",
-    status: "ACTIVE",
-    healthScore: 95,
-    mrr: 12500
-  }
-];
-
-function loadClients() {
-  try {
-    const saved = localStorage.getItem("butler_demo_clients");
-    return saved ? JSON.parse(saved) : DEFAULT_CLIENTS;
-  } catch (e) {
-    return DEFAULT_CLIENTS;
-  }
-}
-
-function saveClients(clients) {
-  localStorage.setItem("butler_demo_clients", JSON.stringify(clients));
-}
-
-const [clients, setClients] = useState(loadClients());
-useEffect(() => {
-  saveClients(clients);
-}, [clients]);
-
-            
-            useEffect(() => {
-                loadData();
-            }, []);
-            
-            const loadData = async () => {
-                try {
-                    const [revenue, insightsData, clientsData] = await Promise.all([
-                        api.get('/revenue/summary', token),
-                        api.get('/insights/latest?limit=5', token),
-                        api.get('/clients', token)
-                    ]);
-                    
-    const demoRevenue = {
-  totalRevenue: 295422,
-  monthlyRecurringRevenue: 25109,
-  annualRecurringRevenue: 301304,
-  previousPeriodRevenue: 220000,
-  growth_rate: 0.34,
-};
-
-setRevenueData(
-  revenue?.data && Object.keys(revenue.data).length > 0
-    ? revenue.data
-    : demoRevenue
-);
-
-setInsights(insightsData?.data?.insights || []);
-
-setClients([
-  {
-    id: 1,
-    name: "TechCorp Industries",
-    industry: "IT Services",
-    status: "ACTIVE",
-    monthlyRevenue: 12500,
-    healthScore: 92,
-    churnRisk: "Low",
-    growthTrend: "Upward"
-  }
-]);
-
-                } catch (error) {
-                    console.error('Failed to load data:', error);
-                } finally {
-                    setLoading(false);
-                }
-            };
-            
-            if (loading) {
-                return (
-                    <div className="loading">
-                        <div className="spinner"></div>
-                        <div>Loading platform data...</div>
+                    <div style={{ textAlign: 'center', padding: '8px 16px', background: 'rgba(0,217,255,0.1)', borderRadius: '8px' }}>
+                      <div style={{ fontSize: '20px', fontWeight: 700, color: '#00D9FF' }}>{insight.confidence}%</div>
+                      <div style={{ fontSize: '10px', color: '#8B92A8' }}>CONFIDENCE</div>
                     </div>
-                );
-            }
-            
-            return (
-                <div style={{ padding: '24px', minHeight: '100vh' }}>
-                    {/* Header */}
-                    <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                            <h1 style={{ fontSize: '32px', marginBottom: '8px' }}>Revenue Intelligence Platform</h1>
-                            <p style={{ color: '#8B92A8' }}>Welcome back, {user.firstName || user.email}</p>
-                        </div>
-                        <button
-                            onClick={onLogout}
-                            style={{ padding: '10px 20px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: '14px' }}
-                        >
-                            Sign Out
-                        </button>
+                  </div>
+                  <h4 style={{ fontSize: '18px', marginBottom: '8px' }}>{insight.title}</h4>
+                  <p style={{ color: '#8B92A8', lineHeight: 1.6 }}>{insight.description}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ✅ Clients
+    function ClientsView({ clients }) {
+      return (
+        <div>
+          <h2 style={{ fontSize: '24px', marginBottom: '24px' }}>Client Portfolio</h2>
+
+          {(!clients || clients.length === 0) ? (
+            <div style={{ textAlign: 'center', padding: '60px', color: '#8B92A8' }}>
+              No clients yet. Start adding clients to track their performance!
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: '16px' }}>
+              {clients.map(client => (
+                <div
+                  key={client.id}
+                  style={{
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: '12px',
+                    padding: '24px'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+                    <div>
+                      <h4 style={{ fontSize: '18px', marginBottom: '4px' }}>{client.company_name}</h4>
+                      <span style={{ color: '#8B92A8', fontSize: '14px' }}>{client.industry}</span>
                     </div>
-                    
-                    {/* Navigation */}
-                    <div style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '32px' }}>
-                        {['overview', 'insights', 'clients'].map(view => (
-                            <button
-                                key={view}
-                                onClick={() => setActiveView(view)}
-                                style={{
-                                    padding: '12px 24px',
-                                    background: 'transparent',
-                                    border: 'none',
-                                    borderBottom: activeView === view ? '2px solid #0047FF' : '2px solid transparent',
-                                    color: activeView === view ? '#0047FF' : '#8B92A8',
-                                    fontSize: '14px',
-                                    fontWeight: 600,
-                                    textTransform: 'capitalize'
-                                }}
-                            >
-                                {view}
-                            </button>
-                        ))}
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '24px', fontWeight: 700, marginBottom: '4px' }}>
+                        ${(client.mrr || 0).toLocaleString()}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#8B92A8' }}>Monthly Recurring</div>
                     </div>
-                    
-                    {/* Content */}
-                    {activeView === 'overview' && <OverviewView data={revenueData} />}
-                    {activeView === 'insights' && <InsightsView insights={insights} />}
-                    {activeView === 'clients' && <ClientsView clients={clients} />}
-                </div>
-            );
-        }
-        
-        // Overview View
-        function OverviewView({ data }) {
-            if (!data) return <div>No data available</div>;
-            
-            const COLORS = ['#0047FF', '#00D9FF', '#00FF88', '#FFB800'];
-            
-            return (
-                <div>
-                    {/* KPI Cards */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '32px' }}>
-                        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px' }}>
-                            <div style={{ color: '#8B92A8', fontSize: '14px', marginBottom: '8px' }}>Total Revenue</div>
-                            <div style={{ fontSize: '36px', fontWeight: 700, marginBottom: '8px' }}>${(data.total_revenue || 0).toLocaleString()}</div>
-                            <div style={{ color: '#00FF88', fontSize: '14px' }}>↗ +34% vs last period</div>
-                        </div>
-                        
-                        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px' }}>
-                            <div style={{ color: '#8B92A8', fontSize: '14px', marginBottom: '8px' }}>Monthly Recurring Revenue</div>
-                            <div style={{ fontSize: '36px', fontWeight: 700, marginBottom: '8px' }}>${Math.round(data.mrr || 0).toLocaleString()}</div>
-                            <div style={{ color: '#00FF88', fontSize: '14px' }}>↗ Trending up</div>
-                        </div>
-                        
-                        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px' }}>
-                            <div style={{ color: '#8B92A8', fontSize: '14px', marginBottom: '8px' }}>Annual Recurring Revenue</div>
-                            <div style={{ fontSize: '36px', fontWeight: 700, marginBottom: '8px' }}>${Math.round(data.arr || 0).toLocaleString()}</div>
-                            <div style={{ color: '#00D9FF', fontSize: '14px' }}>Projected growth</div>
-                        </div>
-                        
-                        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px' }}>
-                            <div style={{ color: '#8B92A8', fontSize: '14px', marginBottom: '8px' }}>Growth Rate</div>
-                            <div style={{ fontSize: '36px', fontWeight: 700, marginBottom: '8px' }}>{data.growth_rate != null
-  ? `${(data.growth_rate * 100).toFixed(1)}%`
-  : '34.0%'}
-                            <div style={{ color: '#00FF88', fontSize: '14px' }}>Month over month</div>
-                        </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div>
+                      <div style={{ fontSize: '12px', color: '#8B92A8', marginBottom: '8px' }}>Status</div>
+                      <span style={{
+                        background: client.status === 'active' ? 'rgba(0,255,136,0.1)' : 'rgba(255,184,0,0.1)',
+                        color: client.status === 'active' ? '#00FF88' : '#FFB800',
+                        padding: '4px 12px',
+                        borderRadius: '20px',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        textTransform: 'uppercase'
+                      }}>
+                        {client.status}
+                      </span>
                     </div>
-                    
-                    {/* Revenue by Period Chart */}
-                    {data.by_period && data.by_period.length > 0 && (
-                        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px', marginBottom: '32px' }}>
-                            <h3 style={{ marginBottom: '20px', fontSize: '20px' }}>Revenue Trend</h3>
-                            <ResponsiveContainer width="100%" height={300}>
-                                <AreaChart data={data.by_period}>
-                                    <defs>
-                                        <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#0047FF" stopOpacity={0.3}/>
-                                            <stop offset="95%" stopColor="#0047FF" stopOpacity={0}/>
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                                    <XAxis dataKey="period_start" stroke="#8B92A8" />
-                                    <YAxis stroke="#8B92A8" />
-                                    <Tooltip 
-                                        contentStyle={{ 
-                                            background: 'rgba(10, 14, 26, 0.95)', 
-                                            border: '1px solid rgba(255,255,255,0.1)',
-                                            borderRadius: '8px'
-                                        }}
-                                    />
-                                    <Area type="monotone" dataKey="revenue" stroke="#0047FF" fill="url(#colorRevenue)" />
-                                </AreaChart>
-                            </ResponsiveContainer>
-                        </div>
-                    )}
-                    
-                    {/* Revenue by Source */}
-                    {data.by_source && data.by_source.length > 0 && (
-                        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px' }}>
-                            <h3 style={{ marginBottom: '20px', fontSize: '20px' }}>Revenue by Source</h3>
-                            <ResponsiveContainer width="100%" height={300}>
-                                <PieChart>
-                                    <Pie
-                                        data={data.by_source}
-                                        cx="50%"
-                                        cy="50%"
-                                        labelLine={false}
-                                        label={({ source, percentage }) => `${source}: ${percentage}%`}
-                                        outerRadius={100}
-                                        fill="#8884d8"
-                                        dataKey="revenue"
-                                    >
-                                        {data.by_source.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                        ))}
-                                    </Pie>
-                                    <Tooltip 
-                                        contentStyle={{ 
-                                            background: 'rgba(10, 14, 26, 0.95)', 
-                                            border: '1px solid rgba(255,255,255,0.1)',
-                                            borderRadius: '8px'
-                                        }}
-                                    />
-                                </PieChart>
-                            </ResponsiveContainer>
-                        </div>
-                    )}
+                    <div>
+                      <div style={{ fontSize: '12px', color: '#8B92A8', marginBottom: '8px' }}>Health Score</div>
+                      <div style={{ fontSize: '20px', fontWeight: 700, color: '#00FF88' }}>
+                        {client.health_score || 85}%
+                      </div>
+                    </div>
+                  </div>
                 </div>
-            );
-        }
-        
-        // Insights View
-        function InsightsView({ insights }) {
-            return (
-                <div>
-                    <h2 style={{ fontSize: '24px', marginBottom: '24px' }}>AI-Powered Insights</h2>
-                    
-                    {insights.length === 0 ? (
-                        <div style={{ textAlign: 'center', padding: '60px', color: '#8B92A8' }}>
-                            No insights available yet. Check back soon!
-                        </div>
-                    ) : (
-                        <div style={{ display: 'grid', gap: '20px' }}>
-                            {insights.map(insight => (
-                                <div
-                                    key={insight.id}
-                                    style={{
-                                        background: 'rgba(255,255,255,0.03)',
-                                        border: `1px solid ${insight.type === 'opportunity' ? '#00D9FF' : insight.type === 'warning' ? '#FFB800' : '#00FF88'}`,
-                                        borderLeft: `4px solid ${insight.type === 'opportunity' ? '#00D9FF' : insight.type === 'warning' ? '#FFB800' : '#00FF88'}`,
-                                        borderRadius: '12px',
-                                        padding: '24px'
-                                    }}
-                                >
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                                        <div>
-                                            <span style={{
-                                                background: `${insight.type === 'opportunity' ? 'rgba(0,217,255,0.1)' : insight.type === 'warning' ? 'rgba(255,184,0,0.1)' : 'rgba(0,255,136,0.1)'}`,
-                                                color: `${insight.type === 'opportunity' ? '#00D9FF' : insight.type === 'warning' ? '#FFB800' : '#00FF88'}`,
-                                                padding: '4px 12px',
-                                                borderRadius: '20px',
-                                                fontSize: '12px',
-                                                fontWeight: 600,
-                                                textTransform: 'uppercase'
-                                            }}>
-                                                {insight.type}
-                                            </span>
-                                            <span style={{ marginLeft: '12px', color: '#8B92A8', fontSize: '12px' }}>
-                                                {insight.impact} IMPACT
-                                            </span>
-                                        </div>
-                                        <div style={{ textAlign: 'center', padding: '8px 16px', background: 'rgba(0,217,255,0.1)', borderRadius: '8px' }}>
-                                            <div style={{ fontSize: '20px', fontWeight: 700, color: '#00D9FF' }}>{insight.confidence}%</div>
-                                            <div style={{ fontSize: '10px', color: '#8B92A8' }}>CONFIDENCE</div>
-                                        </div>
-                                    </div>
-                                    <h4 style={{ fontSize: '18px', marginBottom: '8px' }}>{insight.title}</h4>
-                                    <p style={{ color: '#8B92A8', lineHeight: 1.6 }}>{insight.description}</p>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            );
-        }
-        
-        // Clients View
-        function ClientsView({ clients }) {
-            return (
-                <div>
-                    <h2 style={{ fontSize: '24px', marginBottom: '24px' }}>Client Portfolio</h2>
-                    
-                    {clients.length === 0 ? (
-                        <div style={{ textAlign: 'center', padding: '60px', color: '#8B92A8' }}>
-                            No clients yet. Start adding clients to track their performance!
-                        </div>
-                    ) : (
-                        <div style={{ display: 'grid', gap: '16px' }}>
-                            {clients.map(client => (
-                                <div
-                                    key={client.id}
-                                    style={{
-                                        background: 'rgba(255,255,255,0.03)',
-                                        border: '1px solid rgba(255,255,255,0.08)',
-                                        borderRadius: '12px',
-                                        padding: '24px'
-                                    }}
-                                >
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                                        <div>
-                                            <h4 style={{ fontSize: '18px', marginBottom: '4px' }}>{client.company_name}</h4>
-                                            <span style={{ color: '#8B92A8', fontSize: '14px' }}>{client.industry}</span>
-                                        </div>
-                                        <div style={{ textAlign: 'right' }}>
-                                            <div style={{ fontSize: '24px', fontWeight: 700, marginBottom: '4px' }}>
-                                                ${client.mrr?.toLocaleString() || 0}
-                                            </div>
-                                            <div style={{ fontSize: '12px', color: '#8B92A8' }}>Monthly Recurring</div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                                        <div>
-                                            <div style={{ fontSize: '12px', color: '#8B92A8', marginBottom: '8px' }}>Status</div>
-                                            <span style={{
-                                                background: client.status === 'active' ? 'rgba(0,255,136,0.1)' : 'rgba(255,184,0,0.1)',
-                                                color: client.status === 'active' ? '#00FF88' : '#FFB800',
-                                                padding: '4px 12px',
-                                                borderRadius: '20px',
-                                                fontSize: '12px',
-                                                fontWeight: 600,
-                                                textTransform: 'uppercase'
-                                            }}>
-                                                {client.status}
-                                            </span>
-                                        </div>
-                                        <div>
-                                            <div style={{ fontSize: '12px', color: '#8B92A8', marginBottom: '8px' }}>Health Score</div>
-                                            <div style={{ fontSize: '20px', fontWeight: 700, color: '#00FF88' }}>
-                                                {client.health_score || 85}%
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            );
-        }
-        
-        // Main App Component
-        function App() {
-            const [token, setToken] = useState(localStorage.getItem('token'));
-            const [user, setUser] = useState(JSON.parse(localStorage.getItem('user') || 'null'));
-            
-            const handleLogin = (newToken, newUser) => {
-                setToken(newToken);
-                setUser(newUser);
-                localStorage.setItem('token', newToken);
-                localStorage.setItem('user', JSON.stringify(newUser));
-            };
-            
-            const handleLogout = () => {
-                setToken(null);
-                setUser(null);
-                localStorage.removeItem('token');
-                localStorage.removeItem('user');
-            };
-            
-            if (!token) {
-                return <LoginPage onLogin={handleLogin} />;
-            }
-            
-            return <Dashboard token={token} user={user} onLogout={handleLogout} />;
-        }
-        
-        // Render
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ✅ App
+    function App() {
+      const [token, setToken] = useState(localStorage.getItem('token'));
+      const [user, setUser] = useState(JSON.parse(localStorage.getItem('user') || 'null'));
+
+      const handleLogin = (newToken, newUser) => {
+        setToken(newToken);
+        setUser(newUser);
+        localStorage.setItem('token', newToken);
+        localStorage.setItem('user', JSON.stringify(newUser));
+      };
+
+      const handleLogout = () => {
+        setToken(null);
+        setUser(null);
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      };
+
+      if (!token) return <LoginPage onLogin={handleLogin} />;
+      return <Dashboard token={token} user={user} onLogout={handleLogout} />;
+    }
+
+    // ✅ Render
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
 </body>
 </html>
+
