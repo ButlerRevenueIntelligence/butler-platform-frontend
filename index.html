@@ -5,46 +5,237 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Butler & Co Revenue Intelligence Platform</title>
 
-  <!-- React -->
+  <!-- Favicon to prevent 404 -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='0.9em' font-size='90'%3E%F0%9F%93%8A%3C/text%3E%3C/svg%3E" />
+
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 
-  <!-- PropTypes (required by Recharts UMD sometimes) -->
+  <!-- PropTypes MUST be before Recharts -->
   <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
-
-  <!-- Recharts -->
   <script src="https://cdn.jsdelivr.net/npm/recharts@2.5.0/umd/Recharts.min.js"></script>
 
-  <!-- Babel (for in-browser JSX) -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-      background: linear-gradient(135deg, #0A0E1A 0%, #1A1F2E 100%);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+      background: radial-gradient(1200px 700px at 20% 10%, rgba(0, 217, 255, 0.18), transparent 60%),
+                  radial-gradient(1200px 700px at 80% 0%, rgba(0, 71, 255, 0.18), transparent 60%),
+                  linear-gradient(135deg, #0A0E1A 0%, #10172A 100%);
       color: #fff;
       min-height: 100vh;
     }
+    a { color: inherit; }
+    button, input, select { font-family: inherit; }
+    button { cursor: pointer; }
+
     .loading {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      flex-direction: column;
-      gap: 20px;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; flex-direction: column; gap: 18px;
     }
     .spinner {
-      width: 60px;
-      height: 60px;
-      border: 4px solid rgba(0, 71, 255, 0.1);
-      border-top: 4px solid #0047FF;
+      width: 58px; height: 58px;
+      border: 4px solid rgba(0, 71, 255, 0.15);
+      border-top: 4px solid #00D9FF;
       border-radius: 50%;
       animation: spin 1s linear infinite;
     }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    button { cursor: pointer; font-family: inherit; }
-    input { font-family: inherit; }
+    @keyframes spin { 0% {transform: rotate(0deg);} 100% {transform: rotate(360deg);} }
+
+    .shell { padding: 24px; min-height: 100vh; }
+    .card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      box-shadow: 0 12px 45px rgba(0,0,0,0.35);
+    }
+    .muted { color: #8B92A8; }
+    .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .grow { flex: 1; }
+    .btn {
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.04);
+      color: #fff;
+      font-weight: 600;
+      font-size: 13px;
+      transition: transform .08s ease, opacity .2s ease;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+
+    .btnPrimary {
+      border: none;
+      background: linear-gradient(135deg, #0047FF, #00D9FF);
+    }
+    .btnDanger {
+      border: 1px solid rgba(255,51,102,0.35);
+      background: rgba(255,51,102,0.12);
+      color: #FFB2C4;
+    }
+    .pill {
+      padding: 7px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(0,0,0,0.18);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .2px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .pillDemo { border-color: rgba(0,217,255,0.32); background: rgba(0,217,255,0.10); color: #7BEFFF; }
+    .pillLive { border-color: rgba(0,255,136,0.28); background: rgba(0,255,136,0.10); color: #8DFFCA; }
+
+    .nav {
+      border-bottom: 1px solid rgba(255,255,255,0.10);
+      margin: 18px 0 22px;
+      display: flex; gap: 10px;
+    }
+    .navBtn {
+      padding: 12px 18px;
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: #8B92A8;
+      font-size: 14px;
+      font-weight: 800;
+      text-transform: capitalize;
+    }
+    .navBtnActive {
+      color: #00D9FF;
+      border-bottom-color: #00D9FF;
+    }
+
+    .gridKpi {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      margin-bottom: 22px;
+    }
+    .kpi {
+      padding: 18px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .kpiLabel { font-size: 13px; color: #8B92A8; margin-bottom: 8px; }
+    .kpiValue { font-size: 34px; font-weight: 900; letter-spacing: .2px; margin-bottom: 8px; }
+    .kpiSub {
+      font-size: 13px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .good { color: #00FF88; }
+    .info { color: #00D9FF; }
+    .warn { color: #FFB800; }
+
+    .twoCol {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 980px) {
+      .twoCol { grid-template-columns: 1fr; }
+    }
+    .panel { padding: 18px; }
+    .panelTitle { font-size: 18px; font-weight: 900; margin-bottom: 14px; }
+
+    .toast {
+      position: fixed;
+      bottom: 18px; left: 50%;
+      transform: translateX(-50%);
+      background: rgba(10, 14, 26, 0.92);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 12px;
+      padding: 12px 14px;
+      box-shadow: 0 18px 60px rgba(0,0,0,0.45);
+      display: flex; gap: 10px; align-items: center;
+      max-width: 92vw;
+      z-index: 9999;
+    }
+    .toastDot { width: 10px; height: 10px; border-radius: 50%; background: #00D9FF; }
+    .toastText { font-size: 13px; color: #D8DCEF; }
+
+    .alert {
+      margin: 12px 0 18px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: rgba(255,184,0,0.10);
+      border: 1px solid rgba(255,184,0,0.25);
+      color: #FFE6A6;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    /* Modal */
+    .modalBackdrop {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.55);
+      display: flex; align-items: center; justify-content: center;
+      padding: 18px;
+      z-index: 9998;
+    }
+    .modal {
+      width: 560px; max-width: 100%;
+      background: rgba(10, 14, 26, 0.98);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 16px;
+      box-shadow: 0 24px 90px rgba(0,0,0,0.55);
+      overflow: hidden;
+    }
+    .modalHeader {
+      padding: 16px 18px;
+      display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid rgba(255,255,255,0.10);
+    }
+    .modalTitle { font-size: 16px; font-weight: 900; }
+    .modalBody { padding: 16px 18px; }
+    .field { margin-bottom: 12px; }
+    .label { font-size: 12px; color: #8B92A8; margin-bottom: 7px; font-weight: 800; }
+    .input, .select {
+      width: 100%;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(255,255,255,0.04);
+      color: #fff;
+      font-size: 14px;
+      outline: none;
+    }
+    .modalFooter {
+      padding: 14px 18px;
+      border-top: 1px solid rgba(255,255,255,0.10);
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
+
+    /* Skeleton */
+    .skeleton {
+      position: relative;
+      overflow: hidden;
+      background: rgba(255,255,255,0.05);
+      border-radius: 12px;
+    }
+    .skeleton::after {
+      content: "";
+      position: absolute; inset: 0;
+      transform: translateX(-100%);
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.09), transparent);
+      animation: shimmer 1.2s infinite;
+    }
+    @keyframes shimmer { 100% { transform: translateX(100%); } }
+
+    .small { font-size: 12px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
   </style>
 </head>
 
@@ -52,709 +243,968 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect, useMemo } = React;
+    const { useEffect, useMemo, useRef, useState } = React;
     const {
-      AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-      PieChart, Pie, Cell
+      AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
+      ResponsiveContainer, PieChart, Pie, Cell
     } = Recharts;
 
     // =========================
     // CONFIG
     // =========================
-    const API_URL = 'https://butler-platform-backend.onrender.com/api/v1';
+    const API_BASE = "https://butler-platform-backend.onrender.com/api/v1";
 
     // =========================
-    // DEMO DATA (MATCHES UI KEYS)
+    // HELPERS
     // =========================
-    const DEMO_REVENUE = {
-      total_revenue: 295422,
-      mrr: 25109,
-      arr: 301304,
-      previous_period_revenue: 220000,
-      growth_rate: 0.34,
-      by_period: [
-        { period_start: "Jan", revenue: 52000 },
-        { period_start: "Feb", revenue: 56000 },
-        { period_start: "Mar", revenue: 60000 },
-        { period_start: "Apr", revenue: 64000 },
-        { period_start: "May", revenue: 68000 },
-        { period_start: "Jun", revenue: 72000 },
-      ],
-      by_source: [
-        { source: "SEO", revenue: 127000, percentage: 43 },
-        { source: "Paid Ads", revenue: 44300, percentage: 15 },
-        { source: "Direct", revenue: 53600, percentage: 18 },
-        { source: "Referrals", revenue: 70500, percentage: 24 },
-      ],
+    const fmtMoney = (n) => {
+      const num = Number(n || 0);
+      return num.toLocaleString(undefined, { maximumFractionDigits: 0 });
     };
 
-    const DEMO_INSIGHTS = [
-      { id: 1, type: "opportunity", impact: "HIGH", confidence: 92, title: "SEO is driving strongest ROI", description: "Organic search contributes the largest share of revenue. Scale content + technical fixes to push incremental MRR." },
-      { id: 2, type: "warning", impact: "MED", confidence: 81, title: "Paid Ads efficiency plateau", description: "Paid spend is steady but marginal returns are flattening. Refresh creatives and tighten audiences to protect CAC." },
-      { id: 3, type: "success", impact: "HIGH", confidence: 88, title: "Referral channel accelerating", description: "Referral revenue is growing faster than baseline. Introduce partner incentives and track lead-to-close velocity." },
-    ];
+    const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
 
-    const DEFAULT_CLIENTS = [
-      { id: 1, company_name: "TechCorp Industries", industry: "IT Services", status: "active", mrr: 12500, health_score: 92 },
-      { id: 2, company_name: "ProManufacture Co", industry: "Manufacturing", status: "active", mrr: 8600, health_score: 88 },
-      { id: 3, company_name: "Commerce Law Partners", industry: "Professional Services", status: "active", mrr: 5400, health_score: 85 },
-    ];
-
-    function loadClientsFromStorage() {
-      try {
-        const saved = localStorage.getItem("butler_demo_clients");
-        return saved ? JSON.parse(saved) : DEFAULT_CLIENTS;
-      } catch {
-        return DEFAULT_CLIENTS;
-      }
+    function safeJsonParse(str, fallback) {
+      try { return JSON.parse(str); } catch { return fallback; }
     }
-    function saveClientsToStorage(clients) {
-      localStorage.setItem("butler_demo_clients", JSON.stringify(clients));
+
+    // Number animation hook (smooth KPI count-up)
+    function useCountUp(target, durationMs = 650) {
+      const [value, setValue] = useState(Number(target || 0));
+      const startRef = useRef(null);
+      const fromRef = useRef(Number(target || 0));
+      const toRef = useRef(Number(target || 0));
+
+      useEffect(() => {
+        const to = Number(target || 0);
+        const from = value;
+        fromRef.current = from;
+        toRef.current = to;
+        startRef.current = null;
+
+        let raf;
+        const tick = (ts) => {
+          if (!startRef.current) startRef.current = ts;
+          const t = clamp((ts - startRef.current) / durationMs, 0, 1);
+          const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
+          const next = fromRef.current + (toRef.current - fromRef.current) * eased;
+          setValue(next);
+          if (t < 1) raf = requestAnimationFrame(tick);
+        };
+        raf = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(raf);
+        // eslint-disable-next-line
+      }, [target]);
+
+      return value;
+    }
+
+    // Normalize revenue payload from backend OR demo
+    function normalizeRevenue(raw) {
+      const r = raw || {};
+
+      // Accept multiple naming styles
+      const total =
+        r.total_revenue ?? r.totalRevenue ?? r.total ?? 0;
+
+      const mrr =
+        r.mrr ?? r.monthly_recurring_revenue ?? r.monthlyRecurringRevenue ?? 0;
+
+      const arr =
+        r.arr ?? r.annual_recurring_revenue ?? r.annualRecurringRevenue ?? 0;
+
+      const growth =
+        r.growth_rate ?? r.growthRate ?? 0.34;
+
+      // Trend points (by_period)
+      // accept: [{period_start, revenue}] OR [{period, value}] etc
+      const byPeriod = Array.isArray(r.by_period) ? r.by_period :
+                       Array.isArray(r.byPeriod) ? r.byPeriod : [];
+
+      const trend = byPeriod.map((p, idx) => ({
+        period_start: p.period_start ?? p.period ?? p.label ?? `P${idx+1}`,
+        revenue: Number(p.revenue ?? p.value ?? 0)
+      })).filter(x => Number.isFinite(x.revenue));
+
+      // Sources pie
+      const bySource = Array.isArray(r.by_source) ? r.by_source :
+                       Array.isArray(r.bySource) ? r.bySource : [];
+
+      const sources = bySource.map((s, idx) => ({
+        source: s.source ?? s.name ?? s.channel ?? `Source ${idx+1}`,
+        revenue: Number(s.revenue ?? s.value ?? 0),
+        percentage: s.percentage ?? null
+      })).filter(x => Number.isFinite(x.revenue));
+
+      return {
+        total_revenue: Number(total || 0),
+        mrr: Number(mrr || 0),
+        arr: Number(arr || 0),
+        growth_rate: Number(growth || 0),
+        by_period: trend,
+        by_source: sources
+      };
+    }
+
+    // Build demo revenue summary from demo entries (local)
+    function buildSummaryFromEntries(entries) {
+      const total = entries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+      // naive MRR/ARR for demo: treat recurring entries as monthly
+      const recurringMonthly = entries
+        .filter(e => e.type === "recurring")
+        .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+      const mrr = recurringMonthly;
+      const arr = recurringMonthly * 12;
+
+      // Trend: group last 6 months
+      const now = new Date();
+      const months = [];
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        months.push({
+          key: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`,
+          label: d.toLocaleString(undefined, { month: "short" }),
+          revenue: 0
+        });
+      }
+
+      const sourcesMap = {};
+      for (const e of entries) {
+        const d = new Date(e.date);
+        const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+        const m = months.find(x => x.key === key);
+        if (m) m.revenue += Number(e.amount || 0);
+        const src = e.source || "Unknown";
+        sourcesMap[src] = (sourcesMap[src] || 0) + Number(e.amount || 0);
+      }
+
+      const by_period = months.map(m => ({ period_start: m.label, revenue: m.revenue }));
+      const by_source = Object.entries(sourcesMap).map(([source, revenue]) => ({ source, revenue }));
+
+      // demo growth: compare last month to prior
+      const last = months[months.length-1]?.revenue || 0;
+      const prev = months[months.length-2]?.revenue || 0;
+      const growth_rate = prev > 0 ? (last - prev) / prev : 0.34;
+
+      return normalizeRevenue({ total, mrr, arr, growth_rate, by_period, by_source });
     }
 
     // =========================
-    // API Helper
+    // API
     // =========================
     const api = {
       async login(email, password) {
-        const response = await fetch(`${API_URL}/auth/token`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
+        const res = await fetch(`${API_BASE}/auth/token`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password })
         });
-        if (!response.ok) throw new Error('Login failed');
-        return response.json();
+        if (!res.ok) throw new Error("Login failed");
+        return res.json();
       },
 
       async get(endpoint, token) {
-        const response = await fetch(`${API_URL}${endpoint}`, {
+        const res = await fetch(`${API_BASE}${endpoint}`, {
           headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+          }
         });
-        if (!response.ok) throw new Error('API request failed');
-        return response.json();
+        if (!res.ok) throw new Error(`GET ${endpoint} failed`);
+        return res.json();
       },
 
       async post(endpoint, data, token) {
-        const response = await fetch(`${API_URL}${endpoint}`, {
-          method: 'POST',
+        const res = await fetch(`${API_BASE}${endpoint}`, {
+          method: "POST",
           headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
           },
-          body: JSON.stringify(data),
+          body: JSON.stringify(data)
         });
-        if (!response.ok) throw new Error('API request failed');
-        return response.json();
-      },
+        if (!res.ok) throw new Error(`POST ${endpoint} failed`);
+        return res.json();
+      }
     };
 
     // =========================
-    // Login Component
+    // DEMO STORAGE
+    // =========================
+    const LS_MODE = "butler_mode"; // "demo" or "live"
+    const LS_DEMO_ENTRIES = "butler_demo_revenue_entries";
+    const LS_TOKEN = "token";
+    const LS_USER = "user";
+
+    function defaultDemoEntries() {
+      const now = new Date();
+      const mk = (offsetDays, amount, source, type="one_time") => {
+        const d = new Date(now);
+        d.setDate(d.getDate() - offsetDays);
+        return {
+          id: crypto?.randomUUID?.() || String(Math.random()),
+          date: d.toISOString().slice(0,10),
+          amount,
+          source,
+          type,
+          note: ""
+        };
+      };
+      return [
+        mk(3,  42000, "SEO", "one_time"),
+        mk(14, 18000, "Paid Ads", "one_time"),
+        mk(24, 12500, "Referrals", "recurring"),
+        mk(38, 9800,  "Paid Ads", "recurring"),
+        mk(52, 21000, "Direct", "one_time"),
+        mk(68, 15500, "SEO", "recurring"),
+      ];
+    }
+
+    function loadDemoEntries() {
+      const saved = localStorage.getItem(LS_DEMO_ENTRIES);
+      const parsed = saved ? safeJsonParse(saved, null) : null;
+      if (Array.isArray(parsed) && parsed.length) return parsed;
+      const seed = defaultDemoEntries();
+      localStorage.setItem(LS_DEMO_ENTRIES, JSON.stringify(seed));
+      return seed;
+    }
+
+    function saveDemoEntries(entries) {
+      localStorage.setItem(LS_DEMO_ENTRIES, JSON.stringify(entries));
+    }
+
+    // =========================
+    // UI COMPONENTS
+    // =========================
+    function Toast({ text }) {
+      if (!text) return null;
+      return (
+        <div className="toast">
+          <div className="toastDot" />
+          <div className="toastText">{text}</div>
+        </div>
+      );
+    }
+
+    function Modal({ open, title, children, onClose }) {
+      if (!open) return null;
+      return (
+        <div className="modalBackdrop" onMouseDown={onClose}>
+          <div className="modal" onMouseDown={(e)=>e.stopPropagation()}>
+            <div className="modalHeader">
+              <div className="modalTitle">{title}</div>
+              <button className="btn" onClick={onClose}>Close</button>
+            </div>
+            {children}
+          </div>
+        </div>
+      );
+    }
+
+    Modal.propTypes = {
+      open: PropTypes.bool,
+      title: PropTypes.string,
+      children: PropTypes.node,
+      onClose: PropTypes.func
+    };
+
+    // =========================
+    // LOGIN
     // =========================
     function LoginPage({ onLogin }) {
-      const [email, setEmail] = useState('demo@butlerco.com');
-      const [password, setPassword] = useState('demo123');
+      const [email, setEmail] = useState("demo@butlerco.com");
+      const [password, setPassword] = useState("demo123");
       const [loading, setLoading] = useState(false);
-      const [error, setError] = useState('');
+      const [error, setError] = useState("");
 
-      const handleSubmit = async (e) => {
+      const submit = async (e) => {
         e.preventDefault();
         setLoading(true);
-        setError('');
+        setError("");
         try {
           const data = await api.login(email, password);
-          onLogin(data.access_token, data.user || { email, firstName: "Demo" });
+          onLogin(data.access_token, data.user || { email });
         } catch (err) {
-          setError('Invalid credentials. Try demo@butlerco.com / demo123');
+          setError("Invalid credentials. Try demo@butlerco.com / demo123");
         } finally {
           setLoading(false);
         }
       };
 
       return (
-        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div style={{ maxWidth: '420px', width: '100%', background: 'rgba(255,255,255,0.03)', padding: '40px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-              <div style={{ width: '60px', height: '60px', background: 'linear-gradient(135deg, #0047FF, #00D9FF)', borderRadius: '12px', margin: '0 auto 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>📊</div>
-              <h1 style={{ fontSize: '24px', marginBottom: '8px' }}>Butler & Co</h1>
-              <p style={{ color: '#8B92A8', fontSize: '14px' }}>Revenue Intelligence Platform</p>
+        <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div className="card" style={{ maxWidth: 420, width: "100%", padding: 36 }}>
+            <div style={{ textAlign: "center", marginBottom: 24 }}>
+              <div style={{
+                width: 64, height: 64,
+                background: "linear-gradient(135deg, #0047FF, #00D9FF)",
+                borderRadius: 14,
+                margin: "0 auto 14px",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 30
+              }}>📊</div>
+              <div style={{ fontSize: 24, fontWeight: 900 }}>Butler & Co</div>
+              <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>Revenue Intelligence Platform</div>
             </div>
 
-            {error && (
-              <div style={{ background: 'rgba(255,51,102,0.1)', border: '1px solid #FF3366', padding: '12px', borderRadius: '8px', marginBottom: '18px', fontSize: '14px' }}>
-                {error}
-              </div>
-            )}
+            {error && <div className="alert">{error}</div>}
 
-            <form onSubmit={handleSubmit}>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: '#8B92A8' }}>Email</label>
+            <form onSubmit={submit}>
+              <div className="field">
+                <div className="label">Email</div>
                 <input
+                  className="input"
                   type="email"
-                  autoComplete="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: '14px' }}
+                  onChange={(e)=>setEmail(e.target.value)}
+                  autoComplete="email"
                   required
                 />
               </div>
 
-              <div style={{ marginBottom: '22px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: '#8B92A8' }}>Password</label>
+              <div className="field">
+                <div className="label">Password</div>
                 <input
+                  className="input"
                   type="password"
-                  autoComplete="current-password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: '14px' }}
+                  onChange={(e)=>setPassword(e.target.value)}
+                  autoComplete="current-password"
                   required
                 />
               </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #0047FF, #00D9FF)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '16px', fontWeight: 700, opacity: loading ? 0.7 : 1 }}
-              >
-                {loading ? 'Signing in...' : 'Sign In'}
+              <button className="btn btnPrimary" style={{ width: "100%", padding: 14, fontSize: 15 }} disabled={loading}>
+                {loading ? "Signing in..." : "Sign In"}
               </button>
             </form>
 
-            <div style={{ marginTop: '18px', padding: '14px', background: 'rgba(0,217,255,0.05)', border: '1px solid rgba(0,217,255,0.2)', borderRadius: '8px', fontSize: '12px', color: '#8B92A8' }}>
-              <strong style={{ color: '#00D9FF' }}>Demo Account:</strong><br />
-              Email: demo@butlerco.com<br />
-              Password: demo123
+            <div style={{ marginTop: 16, padding: 14, borderRadius: 12, border: "1px solid rgba(0,217,255,0.22)", background: "rgba(0,217,255,0.06)" }}>
+              <div style={{ color: "#7BEFFF", fontWeight: 900, fontSize: 12 }}>Demo Account</div>
+              <div className="muted small" style={{ marginTop: 6, lineHeight: 1.4 }}>
+                Email: demo@butlerco.com<br/>
+                Password: demo123
+              </div>
             </div>
           </div>
         </div>
       );
     }
 
+    LoginPage.propTypes = { onLogin: PropTypes.func };
+
     // =========================
-    // Dashboard
+    // DASHBOARD
     // =========================
     function Dashboard({ token, user, onLogout }) {
-      const [activeView, setActiveView] = useState('overview');
+      const [activeView, setActiveView] = useState("overview");
       const [loading, setLoading] = useState(true);
+      const [mode, setMode] = useState(localStorage.getItem(LS_MODE) || "demo"); // demo|live
+      const [toast, setToast] = useState("");
+      const [errorBanner, setErrorBanner] = useState("");
 
-      // Demo/Live toggle
-      const [mode, setMode] = useState(localStorage.getItem("butler_mode") || "demo");
-
-      // Data
-      const [revenueData, setRevenueData] = useState(null);
+      const [revenueSummary, setRevenueSummary] = useState(null);
       const [insights, setInsights] = useState([]);
-      const [clients, setClients] = useState(loadClientsFromStorage());
+      const [clients, setClients] = useState([]);
 
-      // Persist clients for demo mode
-      useEffect(() => { saveClientsToStorage(clients); }, [clients]);
+      const [demoEntries, setDemoEntries] = useState(loadDemoEntries());
+      const [showAddRevenue, setShowAddRevenue] = useState(false);
+      const [refreshing, setRefreshing] = useState(false);
 
-      // Persist mode
-      useEffect(() => { localStorage.setItem("butler_mode", mode); }, [mode]);
+      // Persist demo entries
+      useEffect(() => { saveDemoEntries(demoEntries); }, [demoEntries]);
 
-      const isDemo = mode === "demo";
+      // Toast auto-hide
+      useEffect(() => {
+        if (!toast) return;
+        const t = setTimeout(() => setToast(""), 2400);
+        return () => clearTimeout(t);
+      }, [toast]);
 
-      useEffect(() => { loadData(); }, [mode]);
+      useEffect(() => {
+        loadAll(true);
+        // eslint-disable-next-line
+      }, []);
 
-      const loadData = async () => {
-        setLoading(true);
+      const apiLabel = `${API_BASE.replace("/api/v1","")}/api/v1`;
+
+      async function loadAll(initial=false) {
+        if (!initial) setRefreshing(true);
+        setErrorBanner("");
+
         try {
-          if (isDemo) {
-            setRevenueData(DEMO_REVENUE);
-            setInsights(DEMO_INSIGHTS);
-            setClients(loadClientsFromStorage());
-            return;
+          if (mode === "demo") {
+            // DEMO: summary derived from entries + demo insights + demo clients
+            const summary = buildSummaryFromEntries(demoEntries);
+            setRevenueSummary(summary);
+
+            setInsights([
+              { id: 1, type: "opportunity", impact: "HIGH", confidence: 92, title: "SEO is driving profitable growth", description: "SEO revenue share is strong. Increase content velocity + internal linking to expand compounding returns." },
+              { id: 2, type: "warning", impact: "MEDIUM", confidence: 84, title: "Paid Ads efficiency drift detected", description: "Paid Ads entries show higher volatility. Review CAC and tighten targeting for stability." },
+              { id: 3, type: "success", impact: "HIGH", confidence: 90, title: "Recurring revenue base is healthy", description: "Recurring entries are building predictable MRR. Add upsell bundles to lift ARR." }
+            ]);
+
+            setClients([
+              { id: 1, company_name: "TechCorp Industries", industry: "IT Services", status: "active", mrr: 12500, health_score: 92 },
+              { id: 2, company_name: "BluePeak Manufacturing", industry: "Manufacturing", status: "active", mrr: 9800, health_score: 88 },
+              { id: 3, company_name: "Summit Staffing Group", industry: "Staffing", status: "active", mrr: 15500, health_score: 91 }
+            ]);
+
+            setToast("Demo data loaded.");
+          } else {
+            // LIVE: pull from backend
+            const [rev, ins, cls] = await Promise.all([
+              api.get("/revenue/summary", token),
+              api.get("/insights/latest?limit=5", token).catch(()=>({ data: { insights: [] } })),
+              api.get("/clients", token).catch(()=>({ data: [] }))
+            ]);
+
+            const normalized = normalizeRevenue(rev?.data || rev);
+
+            // If backend returns empty values (0), keep chart placeholders but do not break UI
+            setRevenueSummary(normalized);
+
+            setInsights(ins?.data?.insights || []);
+            setClients(Array.isArray(cls?.data) ? cls.data : []);
+            setToast("Live data synced.");
           }
-
-          // LIVE MODE: try API; if missing pieces, fallback to DEMO_REVENUE shape so UI never shows blank.
-          const [revenue, insightsData, clientsData] = await Promise.allSettled([
-            api.get('/revenue/summary', token),
-            api.get('/insights/latest?limit=5', token),
-            api.get('/clients', token),
-          ]);
-
-          const liveRevenueRaw = revenue.status === "fulfilled" ? revenue.value?.data : null;
-          const liveInsightsRaw = insightsData.status === "fulfilled" ? insightsData.value?.data : null;
-          const liveClientsRaw = clientsData.status === "fulfilled" ? clientsData.value?.data : null;
-
-          // Normalize revenue keys so UI never shows $0 again
-          const normalizedRevenue = normalizeRevenue(liveRevenueRaw);
-
-          setRevenueData(normalizedRevenue);
-          setInsights(Array.isArray(liveInsightsRaw?.insights) ? liveInsightsRaw.insights : DEMO_INSIGHTS);
-          setClients(Array.isArray(liveClientsRaw) && liveClientsRaw.length ? liveClientsRaw : loadClientsFromStorage());
-
-        } catch (err) {
-          console.error("Load failed:", err);
-          // Hard fallback
-          setRevenueData(DEMO_REVENUE);
-          setInsights(DEMO_INSIGHTS);
-          setClients(loadClientsFromStorage());
+        } catch (e) {
+          console.error(e);
+          setErrorBanner("Could not load data. If you are in LIVE mode, your backend might be sleeping or the token may be expired. Try Refresh, or switch to Demo.");
         } finally {
           setLoading(false);
+          setRefreshing(false);
         }
-      };
+      }
 
-      const handleRefresh = () => loadData();
+      function toggleMode() {
+        const next = mode === "demo" ? "live" : "demo";
+        setMode(next);
+        localStorage.setItem(LS_MODE, next);
+        setToast(next === "demo" ? "Switched to Demo mode." : "Switched to Live mode.");
+        // reload after mode switch
+        setLoading(true);
+        setTimeout(() => loadAll(true), 150);
+      }
 
-      const toggleMode = () => setMode((m) => (m === "demo" ? "live" : "demo"));
+      async function addRevenueEntry(entry) {
+        if (mode === "demo") {
+          const next = [{ ...entry, id: crypto?.randomUUID?.() || String(Math.random()) }, ...demoEntries];
+          setDemoEntries(next);
+          // immediately recompute demo summary for smooth feel
+          setRevenueSummary(buildSummaryFromEntries(next));
+          setToast("Revenue entry saved (Demo).");
+          return;
+        }
+
+        // LIVE: try to post to backend. Endpoint may differ in your backend — adjust if needed.
+        // Common guesses: /revenue/entries or /revenue/entry
+        const payload = {
+          date: entry.date,
+          amount: Number(entry.amount),
+          source: entry.source,
+          type: entry.type,
+          note: entry.note || ""
+        };
+
+        try {
+          // Try the most likely endpoint first:
+          await api.post("/revenue/entries", payload, token);
+          setToast("Revenue entry created (Live).");
+        } catch (e1) {
+          try {
+            // Fallback attempt:
+            await api.post("/revenue/entry", payload, token);
+            setToast("Revenue entry created (Live).");
+          } catch (e2) {
+            console.error(e2);
+            setErrorBanner("Live revenue entry POST failed. Your backend might use a different endpoint. Tell me your backend route for creating revenue entries and I’ll wire it perfectly.");
+            return;
+          }
+        }
+
+        // Reload live summary after create
+        loadAll();
+      }
 
       if (loading) {
         return (
           <div className="loading">
             <div className="spinner"></div>
-            <div>Loading platform data...</div>
+            <div style={{ fontWeight: 900 }}>Loading platform...</div>
+            <div className="muted small mono">Connecting: {API_BASE}</div>
           </div>
         );
       }
 
       return (
-        <div style={{ padding: '24px', minHeight: '100vh' }}>
+        <div className="shell">
           {/* Header */}
-          <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <div>
-              <h1 style={{ fontSize: '32px', marginBottom: '8px' }}>Revenue Intelligence Platform</h1>
-              <p style={{ color: '#8B92A8' }}>Welcome back, {user?.firstName || user?.email || "Demo"}</p>
+          <div className="row" style={{ marginBottom: 12 }}>
+            <div className="grow">
+              <div style={{ fontSize: 34, fontWeight: 950, letterSpacing: .2 }}>Revenue Intelligence Platform</div>
+              <div className="muted" style={{ marginTop: 6 }}>
+                Welcome back, <span style={{ color: "#D8DCEF", fontWeight: 900 }}>{user?.firstName || user?.email || "User"}</span>
+              </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-              <span style={{
-                padding: '8px 12px',
-                borderRadius: '999px',
-                border: '1px solid rgba(255,255,255,0.12)',
-                background: isDemo ? 'rgba(0,217,255,0.10)' : 'rgba(0,255,136,0.10)',
-                color: isDemo ? '#00D9FF' : '#00FF88',
-                fontSize: '12px',
-                fontWeight: 800,
-                letterSpacing: '0.5px'
-              }}>
-                {isDemo ? "DEMO MODE" : "LIVE MODE"}
-              </span>
+            <div className="row">
+              <div className={"pill " + (mode === "demo" ? "pillDemo" : "pillLive")}>
+                {mode === "demo" ? "DEMO MODE" : "LIVE MODE"}
+              </div>
 
-              <button
-                onClick={handleRefresh}
-                style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: '#fff', fontSize: '14px', fontWeight: 700 }}
-              >
-                ↻ Refresh
+              <button className="btn" onClick={() => loadAll()} disabled={refreshing}>
+                {refreshing ? "Refreshing..." : "↻ Refresh"}
               </button>
 
-              <button
-                onClick={toggleMode}
-                style={{ padding: '10px 14px', background: 'rgba(0,71,255,0.12)', border: '1px solid rgba(0,71,255,0.35)', borderRadius: '10px', color: '#fff', fontSize: '14px', fontWeight: 800 }}
-              >
-                {isDemo ? "Switch to Live" : "Switch to Demo"}
+              <button className="btn" onClick={toggleMode}>
+                {mode === "demo" ? "Switch to Live" : "Switch to Demo"}
               </button>
 
-              <button
-                onClick={onLogout}
-                style={{ padding: '10px 14px', background: 'rgba(255,51,102,0.12)', border: '1px solid rgba(255,51,102,0.35)', borderRadius: '10px', color: '#FF3366', fontSize: '14px', fontWeight: 800 }}
-              >
+              <button className="btn btnDanger" onClick={onLogout}>
                 Sign Out
               </button>
             </div>
           </div>
 
+          <div className="row" style={{ marginBottom: 10 }}>
+            <div className="muted small">
+              Tip: {mode === "demo" ? "Demo mode saves changes in your browser (localStorage)." : "Live mode pulls from your backend."}
+            </div>
+            <div className="grow"></div>
+            <div className="muted small mono">API: {apiLabel}</div>
+          </div>
+
+          {errorBanner && <div className="alert">{errorBanner}</div>}
+
           {/* Navigation */}
-          <div style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '22px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-            {['overview', 'insights', 'clients'].map(view => (
+          <div className="nav">
+            {["overview", "insights", "clients"].map(v => (
               <button
-                key={view}
-                onClick={() => setActiveView(view)}
-                style={{
-                  padding: '12px 18px',
-                  background: activeView === view ? 'rgba(0,71,255,0.12)' : 'transparent',
-                  border: '1px solid rgba(255,255,255,0.10)',
-                  borderBottom: activeView === view ? '2px solid #0047FF' : '2px solid transparent',
-                  borderRadius: '12px',
-                  color: activeView === view ? '#EAF1FF' : '#8B92A8',
-                  fontSize: '14px',
-                  fontWeight: 800,
-                  textTransform: 'capitalize'
-                }}
+                key={v}
+                className={"navBtn " + (activeView === v ? "navBtnActive" : "")}
+                onClick={() => setActiveView(v)}
               >
-                {view}
+                {v}
               </button>
             ))}
           </div>
 
           {/* Content */}
-          {activeView === 'overview' && (
+          {activeView === "overview" && (
             <OverviewView
-              data={revenueData}
-              apiUrl={API_URL}
-              isDemo={isDemo}
+              data={revenueSummary}
+              mode={mode}
+              onAddRevenue={() => setShowAddRevenue(true)}
             />
           )}
-          {activeView === 'insights' && <InsightsView insights={insights} />}
-          {activeView === 'clients' && <ClientsView clients={clients} />}
+
+          {activeView === "insights" && <InsightsView insights={insights} />}
+
+          {activeView === "clients" && <ClientsView clients={clients} />}
+
+          {/* Add Revenue Modal */}
+          <AddRevenueModal
+            open={showAddRevenue}
+            onClose={() => setShowAddRevenue(false)}
+            onSave={async (entry) => {
+              await addRevenueEntry(entry);
+              setShowAddRevenue(false);
+            }}
+          />
+
+          <Toast text={toast} />
         </div>
       );
     }
 
-    // =========================
-    // Normalize Revenue (prevents $0 forever)
-    // Accepts any backend shape and returns UI shape
-    // =========================
-    function normalizeRevenue(raw) {
-      if (!raw || typeof raw !== "object") return DEMO_REVENUE;
-
-      const total_revenue =
-        numOrNull(raw.total_revenue) ??
-        numOrNull(raw.totalRevenue) ??
-        numOrNull(raw.total) ??
-        DEMO_REVENUE.total_revenue;
-
-      const mrr =
-        numOrNull(raw.mrr) ??
-        numOrNull(raw.monthly_recurring_revenue) ??
-        numOrNull(raw.monthlyRecurringRevenue) ??
-        DEMO_REVENUE.mrr;
-
-      const arr =
-        numOrNull(raw.arr) ??
-        numOrNull(raw.annual_recurring_revenue) ??
-        numOrNull(raw.annualRecurringRevenue) ??
-        DEMO_REVENUE.arr;
-
-      const previous_period_revenue =
-        numOrNull(raw.previous_period_revenue) ??
-        numOrNull(raw.previousPeriodRevenue) ??
-        DEMO_REVENUE.previous_period_revenue;
-
-      const growth_rate =
-        numOrNull(raw.growth_rate) ??
-        numOrNull(raw.growthRate) ??
-        DEMO_REVENUE.growth_rate;
-
-      const by_period =
-        Array.isArray(raw.by_period) && raw.by_period.length ? raw.by_period :
-        Array.isArray(raw.byPeriod) && raw.byPeriod.length ? raw.byPeriod :
-        DEMO_REVENUE.by_period;
-
-      const by_source =
-        Array.isArray(raw.by_source) && raw.by_source.length ? raw.by_source :
-        Array.isArray(raw.bySource) && raw.bySource.length ? raw.bySource :
-        DEMO_REVENUE.by_source;
-
-      return { total_revenue, mrr, arr, previous_period_revenue, growth_rate, by_period, by_source };
-    }
-
-    function numOrNull(v) {
-      const n = Number(v);
-      return Number.isFinite(n) ? n : null;
-    }
+    Dashboard.propTypes = {
+      token: PropTypes.string,
+      user: PropTypes.object,
+      onLogout: PropTypes.func
+    };
 
     // =========================
-    // Overview View
+    // OVERVIEW VIEW
     // =========================
-    function OverviewView({ data, apiUrl, isDemo }) {
-      const COLORS = ['#0047FF', '#00D9FF', '#00FF88', '#FFB800'];
-      if (!data) return <div>No data available</div>;
+    function OverviewView({ data, mode, onAddRevenue }) {
+      const safe = data || normalizeRevenue({});
+      const animatedTotal = useCountUp(safe.total_revenue, 700);
+      const animatedMrr = useCountUp(safe.mrr, 700);
+      const animatedArr = useCountUp(safe.arr, 700);
+      const animatedGrowth = useCountUp((safe.growth_rate || 0) * 100, 700);
+
+      const COLORS = ["#0047FF", "#00D9FF", "#00FF88", "#FFB800", "#FF3366"];
+
+      const hasTrend = Array.isArray(safe.by_period) && safe.by_period.length > 0 && safe.by_period.some(p => p.revenue > 0);
+      const hasSource = Array.isArray(safe.by_source) && safe.by_source.length > 0 && safe.by_source.some(s => s.revenue > 0);
 
       return (
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '18px' }}>
-            <button
-              onClick={() => alert(isDemo ? "Demo: Add Revenue Entry coming next (saves to browser)!" : "Live: wire this to backend POST /revenue/entry")}
-              style={{
-                padding: '12px 16px',
-                background: 'linear-gradient(135deg, #0047FF, #00D9FF)',
-                border: 'none',
-                borderRadius: '12px',
-                color: '#fff',
-                fontSize: '14px',
-                fontWeight: 900
-              }}
-            >
+          <div className="row" style={{ marginBottom: 14 }}>
+            <button className="btn btnPrimary" onClick={onAddRevenue}>
               + Add Revenue Entry
             </button>
-
-            <div style={{ color: '#8B92A8', fontSize: '12px' }}>
-              Tip: {isDemo ? "Demo mode saves changes in your browser (localStorage)." : "Live mode pulls from your backend."}
-              <span style={{ marginLeft: '14px', color: '#8B92A8' }}>API: {apiUrl}</span>
+            <div className="muted small">
+              {mode === "demo" ? "Add entries to see charts update instantly." : "Creates an entry in your backend (if endpoint exists)."}
             </div>
           </div>
 
           {/* KPI Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '22px' }}>
-            <KpiCard
-              label="Total Revenue"
-              value={`$${Math.round(data.total_revenue || 0).toLocaleString()}`}
-              sub="Executive snapshot"
-              accent="#00FF88"
-              foot={`↗ +${Math.round(((data.growth_rate || 0.34) * 100))}% vs last period`}
-            />
-            <KpiCard
-              label="Monthly Recurring Revenue"
-              value={`$${Math.round(data.mrr || 0).toLocaleString()}`}
-              sub="Stability indicator"
-              accent="#00FF88"
-              foot="↗ Trending up"
-            />
-            <KpiCard
-              label="Annual Recurring Revenue"
-              value={`$${Math.round(data.arr || 0).toLocaleString()}`}
-              sub="Projected run-rate"
-              accent="#00D9FF"
-              foot="Projected growth"
-            />
-            <KpiCard
-              label="Growth Rate"
-              value={data.growth_rate != null ? `${(data.growth_rate * 100).toFixed(1)}%` : '0.0%'}
-              sub="Compared to previous period"
-              accent="#00FF88"
-              foot="Month over month"
-            />
+          <div className="gridKpi">
+            <div className="kpi">
+              <div className="kpiLabel">Total Revenue</div>
+              <div className="kpiValue">${fmtMoney(animatedTotal)}</div>
+              <div className="kpiSub good">↗ +{(safe.growth_rate * 100).toFixed(1)}% vs last period</div>
+            </div>
+
+            <div className="kpi">
+              <div className="kpiLabel">Monthly Recurring Revenue</div>
+              <div className="kpiValue">${fmtMoney(animatedMrr)}</div>
+              <div className="kpiSub good">↗ Trending up</div>
+            </div>
+
+            <div className="kpi">
+              <div className="kpiLabel">Annual Recurring Revenue</div>
+              <div className="kpiValue">${fmtMoney(animatedArr)}</div>
+              <div className="kpiSub info">Projected run-rate</div>
+            </div>
+
+            <div className="kpi">
+              <div className="kpiLabel">Growth Rate</div>
+              <div className="kpiValue">{animatedGrowth.toFixed(1)}%</div>
+              <div className="kpiSub good">Month over month</div>
+            </div>
           </div>
 
-          {/* Revenue Trend */}
-          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '18px', marginBottom: '18px' }}>
-            <h3 style={{ marginBottom: '14px', fontSize: '18px' }}>Revenue Trend</h3>
+          {/* Charts */}
+          <div className="twoCol">
+            <div className="card panel">
+              <div className="panelTitle">Revenue Trend</div>
+              {!hasTrend ? (
+                <div className="muted" style={{ padding: 18, border: "1px dashed rgba(255,255,255,0.14)", borderRadius: 12 }}>
+                  No trend data yet.
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={320}>
+                  <AreaChart data={safe.by_period}>
+                    <defs>
+                      <linearGradient id="revFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#00D9FF" stopOpacity={0.28} />
+                        <stop offset="95%" stopColor="#00D9FF" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                    <XAxis dataKey="period_start" stroke="#8B92A8" />
+                    <YAxis stroke="#8B92A8" />
+                    <Tooltip
+                      contentStyle={{
+                        background: "rgba(10, 14, 26, 0.95)",
+                        border: "1px solid rgba(255,255,255,0.12)",
+                        borderRadius: 10
+                      }}
+                      formatter={(v)=>[`$${fmtMoney(v)}`, "Revenue"]}
+                    />
+                    <Area type="monotone" dataKey="revenue" stroke="#00D9FF" fill="url(#revFill)" strokeWidth={2} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
+            </div>
 
-            {Array.isArray(data.by_period) && data.by_period.length > 0 ? (
-              <ResponsiveContainer width="100%" height={320}>
-                <AreaChart data={data.by_period}>
-                  <defs>
-                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#00D9FF" stopOpacity={0.30} />
-                      <stop offset="95%" stopColor="#00D9FF" stopOpacity={0.00} />
-                    </linearGradient>
-                  </defs>
-
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                  <XAxis dataKey="period_start" stroke="#8B92A8" />
-                  <YAxis stroke="#8B92A8" />
-                  <Tooltip
-                    contentStyle={{
-                      background: 'rgba(10, 14, 26, 0.95)',
-                      border: '1px solid rgba(255,255,255,0.10)',
-                      borderRadius: '10px'
-                    }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="revenue"
-                    stroke="#00D9FF"
-                    fill="url(#colorRevenue)"
-                    isAnimationActive={true}
-                    animationDuration={900}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            ) : (
-              <div style={{ height: 320, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8B92A8', border: '1px dashed rgba(255,255,255,0.12)', borderRadius: '12px' }}>
-                No trend data yet.
-              </div>
-            )}
-          </div>
-
-          {/* Revenue by Source */}
-          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '18px' }}>
-            <h3 style={{ marginBottom: '14px', fontSize: '18px' }}>Revenue by Source</h3>
-
-            {Array.isArray(data.by_source) && data.by_source.length > 0 ? (
-              <ResponsiveContainer width="100%" height={320}>
-                <PieChart>
-                  <Pie
-                    data={data.by_source}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ source, percentage }) => `${source} ${percentage}%`}
-                    outerRadius={110}
-                    dataKey="revenue"
-                    isAnimationActive={true}
-                    animationDuration={900}
-                  >
-                    {data.by_source.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      background: 'rgba(10, 14, 26, 0.95)',
-                      border: '1px solid rgba(255,255,255,0.10)',
-                      borderRadius: '10px'
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <div style={{ height: 320, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8B92A8', border: '1px dashed rgba(255,255,255,0.12)', borderRadius: '12px' }}>
-                No source breakdown yet.
-              </div>
-            )}
+            <div className="card panel">
+              <div className="panelTitle">Revenue by Source</div>
+              {!hasSource ? (
+                <div className="muted" style={{ padding: 18, border: "1px dashed rgba(255,255,255,0.14)", borderRadius: 12 }}>
+                  No source breakdown yet.
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={320}>
+                  <PieChart>
+                    <Pie
+                      data={safe.by_source}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={110}
+                      dataKey="revenue"
+                      labelLine={false}
+                      label={({ source, percent }) => `${source} ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {safe.by_source.map((_, i) => (
+                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        background: "rgba(10, 14, 26, 0.95)",
+                        border: "1px solid rgba(255,255,255,0.12)",
+                        borderRadius: 10
+                      }}
+                      formatter={(v, _, p)=>[`$${fmtMoney(v)}`, p?.payload?.source || "Source"]}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </div>
           </div>
         </div>
       );
     }
 
-    function KpiCard({ label, value, sub, foot, accent }) {
-      return (
-        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '18px' }}>
-          <div style={{ color: '#8B92A8', fontSize: '13px', marginBottom: '8px' }}>{label}</div>
-          <div style={{ fontSize: '32px', fontWeight: 900, marginBottom: '6px' }}>{value}</div>
-          <div style={{ color: '#8B92A8', fontSize: '12px', marginBottom: '10px' }}>{sub}</div>
-          <div style={{ color: accent || '#00FF88', fontSize: '13px', fontWeight: 800 }}>{foot}</div>
-        </div>
-      );
-    }
+    OverviewView.propTypes = {
+      data: PropTypes.object,
+      mode: PropTypes.string,
+      onAddRevenue: PropTypes.func
+    };
 
     // =========================
-    // Insights View
+    // INSIGHTS VIEW
     // =========================
     function InsightsView({ insights }) {
       return (
         <div>
-          <h2 style={{ fontSize: '24px', marginBottom: '18px' }}>AI-Powered Insights</h2>
+          <div style={{ fontSize: 24, fontWeight: 950, marginBottom: 16 }}>AI-Powered Insights</div>
 
-          {(!insights || insights.length === 0) ? (
-            <div style={{ textAlign: 'center', padding: '60px', color: '#8B92A8' }}>
-              No insights available yet. Check back soon!
+          {!insights || insights.length === 0 ? (
+            <div className="muted" style={{ padding: 28, textAlign: "center" }}>
+              No insights available yet.
             </div>
           ) : (
-            <div style={{ display: 'grid', gap: '16px' }}>
-              {insights.map(insight => (
-                <div
-                  key={insight.id}
-                  style={{
-                    background: 'rgba(255,255,255,0.03)',
-                    border: `1px solid ${insight.type === 'opportunity' ? '#00D9FF' : insight.type === 'warning' ? '#FFB800' : '#00FF88'}`,
-                    borderLeft: `4px solid ${insight.type === 'opportunity' ? '#00D9FF' : insight.type === 'warning' ? '#FFB800' : '#00FF88'}`,
-                    borderRadius: '14px',
-                    padding: '18px'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', gap: '12px', flexWrap: 'wrap' }}>
-                    <div>
-                      <span style={{
-                        background: `${insight.type === 'opportunity' ? 'rgba(0,217,255,0.10)' : insight.type === 'warning' ? 'rgba(255,184,0,0.10)' : 'rgba(0,255,136,0.10)'}`,
-                        color: `${insight.type === 'opportunity' ? '#00D9FF' : insight.type === 'warning' ? '#FFB800' : '#00FF88'}`,
-                        padding: '4px 10px',
-                        borderRadius: '999px',
-                        fontSize: '12px',
-                        fontWeight: 900,
-                        textTransform: 'uppercase'
+            <div style={{ display: "grid", gap: 14 }}>
+              {insights.map((ins) => {
+                const type = ins.type || "success";
+                const border =
+                  type === "opportunity" ? "rgba(0,217,255,0.35)" :
+                  type === "warning" ? "rgba(255,184,0,0.35)" :
+                  "rgba(0,255,136,0.30)";
+
+                const left =
+                  type === "opportunity" ? "#00D9FF" :
+                  type === "warning" ? "#FFB800" :
+                  "#00FF88";
+
+                return (
+                  <div key={ins.id} className="card" style={{ padding: 18, borderColor: border, borderLeft: `4px solid ${left}` }}>
+                    <div className="row" style={{ justifyContent: "space-between", marginBottom: 10 }}>
+                      <div className="row">
+                        <span className="pill" style={{
+                          borderColor: border,
+                          background: "rgba(255,255,255,0.02)",
+                          color: left
+                        }}>
+                          {String(type).toUpperCase()}
+                        </span>
+                        <span className="muted small" style={{ fontWeight: 900 }}>
+                          {ins.impact || "MEDIUM"} IMPACT
+                        </span>
+                      </div>
+
+                      <div style={{
+                        padding: "8px 12px",
+                        borderRadius: 12,
+                        background: "rgba(0,217,255,0.08)",
+                        border: "1px solid rgba(0,217,255,0.18)",
+                        textAlign: "center",
+                        minWidth: 88
                       }}>
-                        {insight.type}
-                      </span>
-                      <span style={{ marginLeft: '10px', color: '#8B92A8', fontSize: '12px', fontWeight: 700 }}>
-                        {insight.impact} IMPACT
-                      </span>
+                        <div style={{ fontSize: 18, fontWeight: 950, color: "#00D9FF" }}>{ins.confidence || 80}%</div>
+                        <div className="muted" style={{ fontSize: 10, fontWeight: 900 }}>CONFIDENCE</div>
+                      </div>
                     </div>
 
-                    <div style={{ textAlign: 'center', padding: '8px 12px', background: 'rgba(0,217,255,0.10)', borderRadius: '12px', border: '1px solid rgba(0,217,255,0.25)' }}>
-                      <div style={{ fontSize: '18px', fontWeight: 900, color: '#00D9FF' }}>{insight.confidence}%</div>
-                      <div style={{ fontSize: '10px', color: '#8B92A8', fontWeight: 800 }}>CONFIDENCE</div>
+                    <div style={{ fontSize: 16, fontWeight: 950, marginBottom: 6 }}>
+                      {ins.title || "Insight"}
+                    </div>
+                    <div className="muted" style={{ lineHeight: 1.55 }}>
+                      {ins.description || "No description."}
                     </div>
                   </div>
-
-                  <h4 style={{ fontSize: '18px', marginBottom: '8px' }}>{insight.title}</h4>
-                  <p style={{ color: '#8B92A8', lineHeight: 1.6 }}>{insight.description}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
       );
     }
 
+    InsightsView.propTypes = { insights: PropTypes.array };
+
     // =========================
-    // Clients View
+    // CLIENTS VIEW
     // =========================
     function ClientsView({ clients }) {
       return (
         <div>
-          <h2 style={{ fontSize: '24px', marginBottom: '18px' }}>Client Portfolio</h2>
+          <div style={{ fontSize: 24, fontWeight: 950, marginBottom: 16 }}>Client Portfolio</div>
 
-          {(!clients || clients.length === 0) ? (
-            <div style={{ textAlign: 'center', padding: '60px', color: '#8B92A8' }}>
-              No clients yet. Start adding clients to track their performance!
+          {!clients || clients.length === 0 ? (
+            <div className="muted" style={{ padding: 28, textAlign: "center" }}>
+              No clients available yet.
             </div>
           ) : (
-            <div style={{ display: 'grid', gap: '14px' }}>
-              {clients.map(client => (
-                <div
-                  key={client.id}
-                  style={{
-                    background: 'rgba(255,255,255,0.03)',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    borderRadius: '14px',
-                    padding: '18px'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '14px', gap: '12px', flexWrap: 'wrap' }}>
-                    <div>
-                      <h4 style={{ fontSize: '18px', marginBottom: '4px' }}>{client.company_name || client.name}</h4>
-                      <span style={{ color: '#8B92A8', fontSize: '14px' }}>{client.industry}</span>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: '22px', fontWeight: 900, marginBottom: '4px' }}>
-                        ${Number(client.mrr || client.monthlyRevenue || 0).toLocaleString()}
+            <div style={{ display: "grid", gap: 12 }}>
+              {clients.map((c) => {
+                const status = (c.status || "").toLowerCase();
+                const active = status === "active" || status === "ACTIVE".toLowerCase();
+                return (
+                  <div key={c.id} className="card" style={{ padding: 18 }}>
+                    <div className="row" style={{ justifyContent: "space-between", marginBottom: 12 }}>
+                      <div>
+                        <div style={{ fontSize: 16, fontWeight: 950 }}>{c.company_name || c.name || "Client"}</div>
+                        <div className="muted small" style={{ marginTop: 4 }}>{c.industry || "—"}</div>
                       </div>
-                      <div style={{ fontSize: '12px', color: '#8B92A8' }}>Monthly Recurring</div>
-                    </div>
-                  </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                    <div>
-                      <div style={{ fontSize: '12px', color: '#8B92A8', marginBottom: '8px' }}>Status</div>
-                      <span style={{
-                        background: (client.status || "").toLowerCase() === 'active' ? 'rgba(0,255,136,0.10)' : 'rgba(255,184,0,0.10)',
-                        color: (client.status || "").toLowerCase() === 'active' ? '#00FF88' : '#FFB800',
-                        padding: '4px 10px',
-                        borderRadius: '999px',
-                        fontSize: '12px',
-                        fontWeight: 900,
-                        textTransform: 'uppercase'
-                      }}>
-                        {client.status || "active"}
-                      </span>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 22, fontWeight: 950 }}>${fmtMoney(c.mrr || c.monthlyRevenue || 0)}</div>
+                        <div className="muted small">Monthly Recurring</div>
+                      </div>
                     </div>
-                    <div>
-                      <div style={{ fontSize: '12px', color: '#8B92A8', marginBottom: '8px' }}>Health Score</div>
-                      <div style={{ fontSize: '18px', fontWeight: 900, color: '#00FF88' }}>
-                        {Math.round(Number(client.health_score || client.healthScore || 85))}%
+
+                    <div className="row" style={{ justifyContent: "space-between" }}>
+                      <span className={"pill " + (active ? "pillLive" : "pillDemo")} style={{ padding: "6px 12px" }}>
+                        {active ? "ACTIVE" : (c.status || "INACTIVE")}
+                      </span>
+
+                      <div className="row" style={{ gap: 10 }}>
+                        <div className="muted small" style={{ fontWeight: 900 }}>Health</div>
+                        <div style={{ fontWeight: 950, color: "#00FF88" }}>{(c.health_score || c.healthScore || 85)}%</div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
       );
     }
 
+    ClientsView.propTypes = { clients: PropTypes.array };
+
     // =========================
-    // App
+    // ADD REVENUE MODAL
+    // =========================
+    function AddRevenueModal({ open, onClose, onSave }) {
+      const today = new Date().toISOString().slice(0,10);
+
+      const [date, setDate] = useState(today);
+      const [amount, setAmount] = useState("");
+      const [source, setSource] = useState("SEO");
+      const [type, setType] = useState("one_time");
+      const [note, setNote] = useState("");
+      const [saving, setSaving] = useState(false);
+
+      useEffect(() => {
+        if (!open) return;
+        setDate(today);
+        setAmount("");
+        setSource("SEO");
+        setType("one_time");
+        setNote("");
+        setSaving(false);
+        // eslint-disable-next-line
+      }, [open]);
+
+      async function submit() {
+        const amt = Number(amount);
+        if (!date || !Number.isFinite(amt) || amt <= 0) return;
+
+        setSaving(true);
+        await onSave({ date, amount: amt, source, type, note });
+        setSaving(false);
+      }
+
+      return (
+        <Modal open={open} title="Add Revenue Entry" onClose={onClose}>
+          <div className="modalBody">
+            <div className="field">
+              <div className="label">Date</div>
+              <input className="input" type="date" value={date} onChange={(e)=>setDate(e.target.value)} />
+            </div>
+
+            <div className="field">
+              <div className="label">Amount</div>
+              <input
+                className="input"
+                type="number"
+                value={amount}
+                onChange={(e)=>setAmount(e.target.value)}
+                placeholder="e.g. 12500"
+                min="0"
+                inputMode="numeric"
+              />
+            </div>
+
+            <div className="field">
+              <div className="label">Source</div>
+              <select className="select" value={source} onChange={(e)=>setSource(e.target.value)}>
+                <option>SEO</option>
+                <option>Paid Ads</option>
+                <option>Direct</option>
+                <option>Referrals</option>
+                <option>Partnerships</option>
+                <option>Other</option>
+              </select>
+            </div>
+
+            <div className="field">
+              <div className="label">Type</div>
+              <select className="select" value={type} onChange={(e)=>setType(e.target.value)}>
+                <option value="one_time">One-time</option>
+                <option value="recurring">Recurring (Monthly)</option>
+              </select>
+            </div>
+
+            <div className="field">
+              <div className="label">Note (optional)</div>
+              <input className="input" value={note} onChange={(e)=>setNote(e.target.value)} placeholder="e.g. New client retainer / upsell / renewal" />
+            </div>
+          </div>
+
+          <div className="modalFooter">
+            <button className="btn" onClick={onClose}>Cancel</button>
+            <button className="btn btnPrimary" onClick={submit} disabled={saving || !amount || Number(amount) <= 0}>
+              {saving ? "Saving..." : "Save Entry"}
+            </button>
+          </div>
+        </Modal>
+      );
+    }
+
+    AddRevenueModal.propTypes = {
+      open: PropTypes.bool,
+      onClose: PropTypes.func,
+      onSave: PropTypes.func
+    };
+
+    // =========================
+    // APP
     // =========================
     function App() {
-      const [token, setToken] = useState(localStorage.getItem('token'));
-      const [user, setUser] = useState(JSON.parse(localStorage.getItem('user') || 'null'));
+      const [token, setToken] = useState(localStorage.getItem(LS_TOKEN));
+      const [user, setUser] = useState(safeJsonParse(localStorage.getItem(LS_USER), null));
 
-      const handleLogin = (newToken, newUser) => {
-        setToken(newToken);
-        setUser(newUser);
-        localStorage.setItem('token', newToken);
-        localStorage.setItem('user', JSON.stringify(newUser));
-      };
+      function handleLogin(t, u) {
+        setToken(t);
+        setUser(u);
+        localStorage.setItem(LS_TOKEN, t);
+        localStorage.setItem(LS_USER, JSON.stringify(u));
+      }
 
-      const handleLogout = () => {
+      function handleLogout() {
         setToken(null);
         setUser(null);
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-      };
+        localStorage.removeItem(LS_TOKEN);
+        localStorage.removeItem(LS_USER);
+      }
 
       if (!token) return <LoginPage onLogin={handleLogin} />;
+
       return <Dashboard token={token} user={user} onLogout={handleLogout} />;
     }
 
-    // Render
-    const root = ReactDOM.createRoot(document.getElementById('root'));
+    const root = ReactDOM.createRoot(document.getElementById("root"));
     root.render(<App />);
   </script>
 </body>
