@@ -2,187 +2,49 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Butler & Co Revenue Intelligence Platform</title>
 
-  <!-- Kill favicon.ico 404 -->
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%8A%3C/text%3E%3C/svg%3E">
-
-  <!-- React (UMD) -->
+  <!-- React -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 
-  <!-- Recharts UMD needs PropTypes available -->
+  <!-- PropTypes (required by Recharts UMD sometimes) -->
   <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
+
+  <!-- Recharts -->
   <script src="https://cdn.jsdelivr.net/npm/recharts@2.5.0/umd/Recharts.min.js"></script>
 
-  <!-- Babel for in-browser JSX (fine for demos) -->
+  <!-- Babel (for in-browser JSX) -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
       background: linear-gradient(135deg, #0A0E1A 0%, #1A1F2E 100%);
-      color:#fff;
-      min-height:100vh;
+      color: #fff;
+      min-height: 100vh;
     }
-    #root { min-height:100vh; }
-
     .loading {
-      display:flex; align-items:center; justify-content:center;
-      min-height:100vh; flex-direction:column; gap:16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      flex-direction: column;
+      gap: 20px;
     }
     .spinner {
-      width:56px; height:56px;
-      border:4px solid rgba(0,71,255,.12);
-      border-top:4px solid #0047FF;
-      border-radius:50%;
-      animation:spin 1s linear infinite;
+      width: 60px;
+      height: 60px;
+      border: 4px solid rgba(0, 71, 255, 0.1);
+      border-top: 4px solid #0047FF;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
     }
-    @keyframes spin { to { transform:rotate(360deg); } }
-
-    .shell { padding:24px; min-height:100vh; }
-    .header {
-      margin-bottom:18px;
-      display:flex; justify-content:space-between; align-items:flex-start; gap:16px;
-    }
-    .title h1 { font-size:32px; margin-bottom:6px; }
-    .title p { color:#8B92A8; font-size:14px; }
-
-    .topActions { display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
-    .pill {
-      padding:8px 14px;
-      border-radius:999px;
-      font-size:12px;
-      font-weight:700;
-      letter-spacing:.4px;
-      border:1px solid rgba(255,255,255,.12);
-      background: rgba(255,255,255,.05);
-      color:#fff;
-    }
-    .pill.demo { border-color: rgba(0,217,255,.35); color:#00D9FF; background: rgba(0,217,255,.08); }
-    .pill.live { border-color: rgba(0,255,136,.35); color:#00FF88; background: rgba(0,255,136,.08); }
-
-    .btn {
-      cursor:pointer;
-      border:1px solid rgba(255,255,255,.12);
-      background: rgba(255,255,255,.06);
-      color:#fff;
-      padding:10px 14px;
-      border-radius:10px;
-      font-size:13px;
-      font-weight:700;
-      transition: transform .08s ease, opacity .2s ease;
-      user-select:none;
-    }
-    .btn:hover { opacity:.95; }
-    .btn:active { transform: translateY(1px); }
-    .btn.primary {
-      border:none;
-      background: linear-gradient(135deg, #0047FF, #00D9FF);
-    }
-    .btn.danger {
-      border:1px solid rgba(255,51,102,.35);
-      background: rgba(255,51,102,.08);
-      color:#FF6B8F;
-    }
-
-    .nav {
-      border-bottom:1px solid rgba(255,255,255,.10);
-      margin-bottom:18px;
-      display:flex; gap:8px; flex-wrap:wrap;
-    }
-    .tab {
-      cursor:pointer;
-      padding:10px 18px;
-      background:transparent;
-      border:none;
-      border-bottom:2px solid transparent;
-      color:#8B92A8;
-      font-weight:800;
-      font-size:13px;
-      text-transform:capitalize;
-    }
-    .tab.active { color:#00D9FF; border-bottom-color:#00D9FF; }
-
-    .rowMeta {
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      gap:12px;
-      margin: 10px 0 18px;
-      flex-wrap:wrap;
-      color:#8B92A8;
-      font-size:12px;
-    }
-
-    .gridKpis {
-      display:grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap:16px;
-      margin-bottom:18px;
-    }
-    .card {
-      background: rgba(255,255,255,.03);
-      border:1px solid rgba(255,255,255,.08);
-      border-radius:14px;
-      padding:18px;
-    }
-    .kpiLabel { color:#8B92A8; font-size:13px; margin-bottom:8px; }
-    .kpiValue { font-size:34px; font-weight:900; margin-bottom:6px; }
-    .kpiSub { font-size:12px; color:#8B92A8; }
-    .good { color:#00FF88; font-weight:800; }
-    .info { color:#00D9FF; font-weight:800; }
-
-    .gridCharts {
-      display:grid;
-      grid-template-columns: 1.3fr .9fr;
-      gap:16px;
-    }
-    @media (max-width: 980px) { .gridCharts { grid-template-columns: 1fr; } }
-
-    .chartTitle { font-size:16px; font-weight:900; margin-bottom:10px; }
-
-    .emptyState {
-      text-align:center;
-      padding:56px 18px;
-      color:#8B92A8;
-      border:1px dashed rgba(255,255,255,.14);
-      border-radius:14px;
-      background: rgba(255,255,255,.02);
-    }
-
-    .list { display:grid; gap:12px; }
-    .insight {
-      border-left:4px solid #00FF88;
-      padding:16px;
-      border-radius:14px;
-      background: rgba(255,255,255,.03);
-      border:1px solid rgba(255,255,255,.08);
-    }
-    .badge {
-      display:inline-block;
-      padding:4px 10px;
-      border-radius:999px;
-      font-size:11px;
-      font-weight:900;
-      letter-spacing:.4px;
-      text-transform:uppercase;
-      margin-right:10px;
-    }
-
-    .clientRow {
-      display:flex;
-      justify-content:space-between;
-      align-items:flex-start;
-      gap:14px;
-      flex-wrap:wrap;
-    }
-    .clientName { font-size:16px; font-weight:900; margin-bottom:4px; }
-    .muted { color:#8B92A8; font-size:13px; }
-    .rightMeta { text-align:right; min-width:200px; }
-    .bigMoney { font-size:20px; font-weight:900; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    button { cursor: pointer; font-family: inherit; }
+    input { font-family: inherit; }
   </style>
 </head>
 
@@ -190,437 +52,254 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useEffect, useMemo, useState } = React;
+    const { useState, useEffect, useMemo } = React;
     const {
-      ResponsiveContainer,
-      AreaChart, Area,
-      XAxis, YAxis, CartesianGrid, Tooltip,
+      AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
       PieChart, Pie, Cell
     } = Recharts;
 
-    // ---------------------------
-    // Config
-    // ---------------------------
-    const API_BASE = "https://butler-platform-backend.onrender.com/api/v1";
+    // =========================
+    // CONFIG
+    // =========================
+    const API_URL = 'https://butler-platform-backend.onrender.com/api/v1';
 
-    const LS = {
-      token: "butler_token",
-      user: "butler_user",
-      mode: "butler_mode",                 // "demo" | "live"
-      demoRevenue: "butler_demo_revenue",
-      demoClients: "butler_demo_clients",
-      demoInsights: "butler_demo_insights"
-    };
-
-    const safeJSON = (value, fallback) => {
-      try { return JSON.parse(value); } catch { return fallback; }
-    };
-
-    const money = (n) => {
-      const num = Number(n || 0);
-      return num.toLocaleString(undefined, { maximumFractionDigits: 1 });
-    };
-
-    // ---------------------------
-    // Demo data (stable)
-    // ---------------------------
-    const DEFAULT_DEMO_REVENUE = {
+    // =========================
+    // DEMO DATA (MATCHES UI KEYS)
+    // =========================
+    const DEMO_REVENUE = {
       total_revenue: 295422,
       mrr: 25109,
       arr: 301304,
       previous_period_revenue: 220000,
       growth_rate: 0.34,
       by_period: [
-        { period_start: "Jan", revenue: 65000 },
-        { period_start: "Feb", revenue: 62000 },
+        { period_start: "Jan", revenue: 52000 },
+        { period_start: "Feb", revenue: 56000 },
         { period_start: "Mar", revenue: 60000 },
-        { period_start: "Apr", revenue: 58500 },
-        { period_start: "May", revenue: 57500 },
-        { period_start: "Jun", revenue: 56000 },
+        { period_start: "Apr", revenue: 64000 },
+        { period_start: "May", revenue: 68000 },
+        { period_start: "Jun", revenue: 72000 },
       ],
       by_source: [
         { source: "SEO", revenue: 127000, percentage: 43 },
-        { source: "Paid Ads", revenue: 44000, percentage: 15 },
-        { source: "Direct", revenue: 54000, percentage: 18 },
-        { source: "Referrals", revenue: 70422, percentage: 24 },
-      ]
+        { source: "Paid Ads", revenue: 44300, percentage: 15 },
+        { source: "Direct", revenue: 53600, percentage: 18 },
+        { source: "Referrals", revenue: 70500, percentage: 24 },
+      ],
     };
 
-    const DEFAULT_DEMO_CLIENTS = [
-      { id: 1, company_name: "TechCorp Industries", industry: "IT Services", status: "ACTIVE", mrr: 12500, health_score: 92 },
-      { id: 2, company_name: "Orlando Manufacturing Group", industry: "Manufacturing", status: "ACTIVE", mrr: 8600, health_score: 88 },
+    const DEMO_INSIGHTS = [
+      { id: 1, type: "opportunity", impact: "HIGH", confidence: 92, title: "SEO is driving strongest ROI", description: "Organic search contributes the largest share of revenue. Scale content + technical fixes to push incremental MRR." },
+      { id: 2, type: "warning", impact: "MED", confidence: 81, title: "Paid Ads efficiency plateau", description: "Paid spend is steady but marginal returns are flattening. Refresh creatives and tighten audiences to protect CAC." },
+      { id: 3, type: "success", impact: "HIGH", confidence: 88, title: "Referral channel accelerating", description: "Referral revenue is growing faster than baseline. Introduce partner incentives and track lead-to-close velocity." },
     ];
 
-    const DEFAULT_DEMO_INSIGHTS = [
-      { id: 1, type: "opportunity", impact: "HIGH", confidence: 92, title: "Upsell window detected", description: "Client engagement and retention signals indicate strong expansion potential this month." },
-      { id: 2, type: "warning", impact: "MEDIUM", confidence: 79, title: "Campaign volatility risk", description: "Paid performance is showing variance; recommend tightening targeting and budget pacing." },
-      { id: 3, type: "success", impact: "HIGH", confidence: 88, title: "SEO momentum accelerating", description: "Organic visibility and conversions are trending up; prioritize content & link velocity." },
+    const DEFAULT_CLIENTS = [
+      { id: 1, company_name: "TechCorp Industries", industry: "IT Services", status: "active", mrr: 12500, health_score: 92 },
+      { id: 2, company_name: "ProManufacture Co", industry: "Manufacturing", status: "active", mrr: 8600, health_score: 88 },
+      { id: 3, company_name: "Commerce Law Partners", industry: "Professional Services", status: "active", mrr: 5400, health_score: 85 },
     ];
 
-    function loadLS(key, fallback) {
-      const raw = localStorage.getItem(key);
-      return raw ? safeJSON(raw, fallback) : fallback;
+    function loadClientsFromStorage() {
+      try {
+        const saved = localStorage.getItem("butler_demo_clients");
+        return saved ? JSON.parse(saved) : DEFAULT_CLIENTS;
+      } catch {
+        return DEFAULT_CLIENTS;
+      }
     }
-    function saveLS(key, value) {
-      localStorage.setItem(key, JSON.stringify(value));
+    function saveClientsToStorage(clients) {
+      localStorage.setItem("butler_demo_clients", JSON.stringify(clients));
     }
 
-    // ---------------------------
-    // API helper (safe)
-    // ---------------------------
+    // =========================
+    // API Helper
+    // =========================
     const api = {
       async login(email, password) {
-        const res = await fetch(`${API_BASE}/auth/token`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password })
+        const response = await fetch(`${API_URL}/auth/token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
         });
-        if (!res.ok) throw new Error("Login failed");
-        return res.json();
+        if (!response.ok) throw new Error('Login failed');
+        return response.json();
       },
+
       async get(endpoint, token) {
-        const res = await fetch(`${API_BASE}${endpoint}`, {
-          headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" }
+        const response = await fetch(`${API_URL}${endpoint}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
         });
-        if (!res.ok) throw new Error(`GET ${endpoint} failed`);
-        return res.json();
-      }
+        if (!response.ok) throw new Error('API request failed');
+        return response.json();
+      },
+
+      async post(endpoint, data, token) {
+        const response = await fetch(`${API_URL}${endpoint}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(data),
+        });
+        if (!response.ok) throw new Error('API request failed');
+        return response.json();
+      },
     };
 
-    // ---------------------------
-    // Login Page
-    // ---------------------------
+    // =========================
+    // Login Component
+    // =========================
     function LoginPage({ onLogin }) {
-      const [email, setEmail] = useState("demo@butlerco.com");
-      const [password, setPassword] = useState("demo123");
+      const [email, setEmail] = useState('demo@butlerco.com');
+      const [password, setPassword] = useState('demo123');
       const [loading, setLoading] = useState(false);
-      const [error, setError] = useState("");
+      const [error, setError] = useState('');
 
-      const submit = async (e) => {
+      const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
-        setError("");
+        setError('');
         try {
           const data = await api.login(email, password);
-          onLogin(data.access_token, data.user || { email });
+          onLogin(data.access_token, data.user || { email, firstName: "Demo" });
         } catch (err) {
-          setError("Login failed. Try demo@butlerco.com / demo123 (or switch to DEMO mode).");
+          setError('Invalid credentials. Try demo@butlerco.com / demo123');
         } finally {
           setLoading(false);
         }
       };
 
       return (
-        <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
-          <div style={{ maxWidth:420, width:"100%", background:"rgba(255,255,255,0.03)", padding:36, borderRadius:16, border:"1px solid rgba(255,255,255,0.1)" }}>
-            <div style={{ textAlign:"center", marginBottom:22 }}>
-              <div style={{ width:58, height:58, background:"linear-gradient(135deg, #0047FF, #00D9FF)", borderRadius:12, margin:"0 auto 14px", display:"flex", alignItems:"center", justifyContent:"center", fontSize:26 }}>📊</div>
-              <h1 style={{ fontSize:22, marginBottom:6 }}>Butler & Co</h1>
-              <p style={{ color:"#8B92A8", fontSize:13 }}>Revenue Intelligence Platform</p>
+        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ maxWidth: '420px', width: '100%', background: 'rgba(255,255,255,0.03)', padding: '40px', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+              <div style={{ width: '60px', height: '60px', background: 'linear-gradient(135deg, #0047FF, #00D9FF)', borderRadius: '12px', margin: '0 auto 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>📊</div>
+              <h1 style={{ fontSize: '24px', marginBottom: '8px' }}>Butler & Co</h1>
+              <p style={{ color: '#8B92A8', fontSize: '14px' }}>Revenue Intelligence Platform</p>
             </div>
 
             {error && (
-              <div style={{ background:"rgba(255,51,102,0.1)", border:"1px solid #FF3366", padding:12, borderRadius:10, marginBottom:16, fontSize:13 }}>
+              <div style={{ background: 'rgba(255,51,102,0.1)', border: '1px solid #FF3366', padding: '12px', borderRadius: '8px', marginBottom: '18px', fontSize: '14px' }}>
                 {error}
               </div>
             )}
 
-            <form onSubmit={submit}>
-              <div style={{ marginBottom:14 }}>
-                <label style={{ display:"block", marginBottom:8, fontSize:13, color:"#8B92A8" }}>Email</label>
+            <form onSubmit={handleSubmit}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: '#8B92A8' }}>Email</label>
                 <input
                   type="email"
-                  autoComplete="username"
+                  autoComplete="email"
                   value={email}
-                  onChange={(e)=>setEmail(e.target.value)}
-                  style={{ width:"100%", padding:12, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:10, color:"#fff", fontSize:14 }}
+                  onChange={(e) => setEmail(e.target.value)}
+                  style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: '14px' }}
                   required
                 />
               </div>
 
-              <div style={{ marginBottom:18 }}>
-                <label style={{ display:"block", marginBottom:8, fontSize:13, color:"#8B92A8" }}>Password</label>
+              <div style={{ marginBottom: '22px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', color: '#8B92A8' }}>Password</label>
                 <input
                   type="password"
                   autoComplete="current-password"
                   value={password}
-                  onChange={(e)=>setPassword(e.target.value)}
-                  style={{ width:"100%", padding:12, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:10, color:"#fff", fontSize:14 }}
+                  onChange={(e) => setPassword(e.target.value)}
+                  style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff', fontSize: '14px' }}
                   required
                 />
               </div>
 
-              <button className="btn primary" type="submit" disabled={loading} style={{ width:"100%", opacity: loading ? .7 : 1 }}>
-                {loading ? "Signing in..." : "Sign In"}
+              <button
+                type="submit"
+                disabled={loading}
+                style={{ width: '100%', padding: '14px', background: 'linear-gradient(135deg, #0047FF, #00D9FF)', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '16px', fontWeight: 700, opacity: loading ? 0.7 : 1 }}
+              >
+                {loading ? 'Signing in...' : 'Sign In'}
               </button>
             </form>
 
-            <div style={{ marginTop:16, padding:14, background:"rgba(0,217,255,0.05)", border:"1px solid rgba(0,217,255,0.2)", borderRadius:12, fontSize:12, color:"#8B92A8" }}>
-              <strong style={{ color:"#00D9FF" }}>Tip:</strong> If LIVE login fails, switch to DEMO mode on the dashboard after you log in once, or we can auto-force DEMO mode.
+            <div style={{ marginTop: '18px', padding: '14px', background: 'rgba(0,217,255,0.05)', border: '1px solid rgba(0,217,255,0.2)', borderRadius: '8px', fontSize: '12px', color: '#8B92A8' }}>
+              <strong style={{ color: '#00D9FF' }}>Demo Account:</strong><br />
+              Email: demo@butlerco.com<br />
+              Password: demo123
             </div>
           </div>
         </div>
       );
     }
 
-    // ---------------------------
-    // Overview / Insights / Clients
-    // ---------------------------
-    function OverviewView({ data }) {
-      if (!data) return <div className="emptyState">No revenue data available.</div>;
-
-      const COLORS = ["#0047FF", "#00D9FF", "#00FF88", "#FFB800"];
-
-      const growthText = (data.growth_rate != null)
-        ? `${(Number(data.growth_rate) * 100).toFixed(1)}%`
-        : "34.0%";
-
-      return (
-        <div>
-          <div className="gridKpis">
-            <div className="card">
-              <div className="kpiLabel">Total Revenue</div>
-              <div className="kpiValue">${money(data.total_revenue)}</div>
-              <div className="kpiSub"><span className="good">↗</span> Executive snapshot</div>
-            </div>
-
-            <div className="card">
-              <div className="kpiLabel">Monthly Recurring Revenue</div>
-              <div className="kpiValue">${money(data.mrr)}</div>
-              <div className="kpiSub"><span className="good">↗</span> Stability indicator</div>
-            </div>
-
-            <div className="card">
-              <div className="kpiLabel">Annual Recurring Revenue</div>
-              <div className="kpiValue">${money(data.arr)}</div>
-              <div className="kpiSub"><span className="info">●</span> Projected run-rate</div>
-            </div>
-
-            <div className="card">
-              <div className="kpiLabel">Growth Rate</div>
-              <div className="kpiValue"><span className="good">{growthText}</span></div>
-              <div className="kpiSub">Compared to previous period</div>
-            </div>
-          </div>
-
-          <div className="gridCharts">
-            <div className="card">
-              <div className="chartTitle">Revenue Trend</div>
-              {Array.isArray(data.by_period) && data.by_period.length > 0 ? (
-                <ResponsiveContainer width="100%" height={280}>
-                  <AreaChart data={data.by_period}>
-                    <defs>
-                      <linearGradient id="revFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#00D9FF" stopOpacity={0.28} />
-                        <stop offset="95%" stopColor="#00D9FF" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                    <XAxis dataKey="period_start" stroke="#8B92A8" />
-                    <YAxis stroke="#8B92A8" />
-                    <Tooltip contentStyle={{ background:"rgba(10,14,26,.95)", border:"1px solid rgba(255,255,255,.1)", borderRadius:10 }} />
-                    <Area type="monotone" dataKey="revenue" stroke="#00D9FF" fill="url(#revFill)" strokeWidth={2} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="emptyState">No trend data yet.</div>
-              )}
-            </div>
-
-            <div className="card">
-              <div className="chartTitle">Revenue by Source</div>
-              {Array.isArray(data.by_source) && data.by_source.length > 0 ? (
-                <ResponsiveContainer width="100%" height={280}>
-                  <PieChart>
-                    <Pie
-                      data={data.by_source}
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={96}
-                      dataKey="revenue"
-                      labelLine={false}
-                      label={({ source, percentage }) => `${source} ${percentage || ""}%`}
-                    >
-                      {data.by_source.map((_, idx) => (
-                        <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip contentStyle={{ background:"rgba(10,14,26,.95)", border:"1px solid rgba(255,255,255,.1)", borderRadius:10 }} />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="emptyState">No source breakdown yet.</div>
-              )}
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    function InsightsView({ insights }) {
-      if (!insights || insights.length === 0) {
-        return <div className="emptyState">No insights yet. Check back soon.</div>;
-      }
-
-      const styleFor = (type) => {
-        if (type === "opportunity") return { border:"#00D9FF", bg:"rgba(0,217,255,.10)", text:"#00D9FF" };
-        if (type === "warning") return { border:"#FFB800", bg:"rgba(255,184,0,.10)", text:"#FFB800" };
-        return { border:"#00FF88", bg:"rgba(0,255,136,.10)", text:"#00FF88" };
-      };
-
-      return (
-        <div className="list">
-          {insights.map(i => {
-            const s = styleFor(i.type);
-            return (
-              <div className="insight" key={i.id} style={{ borderLeftColor:s.border }}>
-                <div style={{ display:"flex", justifyContent:"space-between", gap:12, flexWrap:"wrap", marginBottom:10 }}>
-                  <div>
-                    <span className="badge" style={{ background:s.bg, color:s.text, border:`1px solid ${s.border}55` }}>{i.type}</span>
-                    <span className="muted">{i.impact} IMPACT</span>
-                  </div>
-                  <div className="pill" style={{ borderColor:"rgba(0,217,255,.25)", color:"#00D9FF" }}>
-                    {i.confidence}% CONFIDENCE
-                  </div>
-                </div>
-                <div style={{ fontSize:17, fontWeight:900, marginBottom:6 }}>{i.title}</div>
-                <div className="muted" style={{ lineHeight:1.55 }}>{i.description}</div>
-              </div>
-            );
-          })}
-        </div>
-      );
-    }
-
-    function ClientsView({ clients }) {
-      if (!clients || clients.length === 0) {
-        return <div className="emptyState">No clients yet. Add clients to track performance.</div>;
-      }
-
-      const normStatus = (s) => String(s || "").toUpperCase();
-
-      return (
-        <div className="list">
-          {clients.map(c => {
-            const status = normStatus(c.status);
-            const active = status === "ACTIVE";
-            return (
-              <div className="card" key={c.id}>
-                <div className="clientRow">
-                  <div>
-                    <div className="clientName">{c.company_name || c.name || "Client"}</div>
-                    <div className="muted">{c.industry || "—"}</div>
-                  </div>
-
-                  <div className="rightMeta">
-                    <div className="bigMoney">${money(c.mrr || c.monthlyRevenue || 0)}</div>
-                    <div className="muted">Monthly Recurring</div>
-                  </div>
-                </div>
-
-                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginTop:14 }}>
-                  <div>
-                    <div className="muted" style={{ fontSize:12, marginBottom:8 }}>Status</div>
-                    <span className="badge" style={{
-                      background: active ? "rgba(0,255,136,.10)" : "rgba(255,184,0,.10)",
-                      color: active ? "#00FF88" : "#FFB800",
-                      border: `1px solid ${active ? "rgba(0,255,136,.35)" : "rgba(255,184,0,.35)"}`
-                    }}>
-                      {status || "—"}
-                    </span>
-                  </div>
-                  <div>
-                    <div className="muted" style={{ fontSize:12, marginBottom:8 }}>Health Score</div>
-                    <div style={{ fontSize:18, fontWeight:900, color:"#00FF88" }}>
-                      {Number(c.health_score ?? c.healthScore ?? 85)}%
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      );
-    }
-
-    // ---------------------------
+    // =========================
     // Dashboard
-    // ---------------------------
+    // =========================
     function Dashboard({ token, user, onLogout }) {
-      const [activeView, setActiveView] = useState("overview");
+      const [activeView, setActiveView] = useState('overview');
       const [loading, setLoading] = useState(true);
 
-      // mode persisted
-      const [mode, setMode] = useState(() => localStorage.getItem(LS.mode) || "demo"); // default demo
+      // Demo/Live toggle
+      const [mode, setMode] = useState(localStorage.getItem("butler_mode") || "demo");
 
-      // state data
+      // Data
       const [revenueData, setRevenueData] = useState(null);
       const [insights, setInsights] = useState([]);
-      const [clients, setClients] = useState([]);
+      const [clients, setClients] = useState(loadClientsFromStorage());
 
-      // Load demo storage (stable)
-      const demoRevenue = useMemo(() => loadLS(LS.demoRevenue, DEFAULT_DEMO_REVENUE), []);
-      const demoClients = useMemo(() => loadLS(LS.demoClients, DEFAULT_DEMO_CLIENTS), []);
-      const demoInsights = useMemo(() => loadLS(LS.demoInsights, DEFAULT_DEMO_INSIGHTS), []);
+      // Persist clients for demo mode
+      useEffect(() => { saveClientsToStorage(clients); }, [clients]);
 
-      // persist demo edits if you later add actions
-      useEffect(() => saveLS(LS.demoRevenue, demoRevenue), []);
-      useEffect(() => saveLS(LS.demoClients, demoClients), []);
-      useEffect(() => saveLS(LS.demoInsights, demoInsights), []);
+      // Persist mode
+      useEffect(() => { localStorage.setItem("butler_mode", mode); }, [mode]);
 
-      const setModeSafe = (next) => {
-        const val = next === "live" ? "live" : "demo";
-        setMode(val);
-        localStorage.setItem(LS.mode, val);
-      };
+      const isDemo = mode === "demo";
+
+      useEffect(() => { loadData(); }, [mode]);
 
       const loadData = async () => {
         setLoading(true);
-
-        // DEMO mode: instant
-        if (mode === "demo") {
-          setRevenueData(loadLS(LS.demoRevenue, DEFAULT_DEMO_REVENUE));
-          setInsights(loadLS(LS.demoInsights, DEFAULT_DEMO_INSIGHTS));
-          setClients(loadLS(LS.demoClients, DEFAULT_DEMO_CLIENTS));
-          setLoading(false);
-          return;
-        }
-
-        // LIVE mode: try API, fallback to demo if API fails
         try {
-          const [revRes, insRes, cliRes] = await Promise.all([
-            api.get("/revenue/summary", token),
-            api.get("/insights/latest?limit=5", token),
-            api.get("/clients", token),
+          if (isDemo) {
+            setRevenueData(DEMO_REVENUE);
+            setInsights(DEMO_INSIGHTS);
+            setClients(loadClientsFromStorage());
+            return;
+          }
+
+          // LIVE MODE: try API; if missing pieces, fallback to DEMO_REVENUE shape so UI never shows blank.
+          const [revenue, insightsData, clientsData] = await Promise.allSettled([
+            api.get('/revenue/summary', token),
+            api.get('/insights/latest?limit=5', token),
+            api.get('/clients', token),
           ]);
 
-          const rev = (revRes && revRes.data && Object.keys(revRes.data).length)
-            ? revRes.data
-            : loadLS(LS.demoRevenue, DEFAULT_DEMO_REVENUE);
+          const liveRevenueRaw = revenue.status === "fulfilled" ? revenue.value?.data : null;
+          const liveInsightsRaw = insightsData.status === "fulfilled" ? insightsData.value?.data : null;
+          const liveClientsRaw = clientsData.status === "fulfilled" ? clientsData.value?.data : null;
 
-          const ins = (insRes && insRes.data && Array.isArray(insRes.data.insights))
-            ? insRes.data.insights
-            : loadLS(LS.demoInsights, DEFAULT_DEMO_INSIGHTS);
+          // Normalize revenue keys so UI never shows $0 again
+          const normalizedRevenue = normalizeRevenue(liveRevenueRaw);
 
-          const cls = (cliRes && cliRes.data && Array.isArray(cliRes.data))
-            ? cliRes.data
-            : loadLS(LS.demoClients, DEFAULT_DEMO_CLIENTS);
+          setRevenueData(normalizedRevenue);
+          setInsights(Array.isArray(liveInsightsRaw?.insights) ? liveInsightsRaw.insights : DEMO_INSIGHTS);
+          setClients(Array.isArray(liveClientsRaw) && liveClientsRaw.length ? liveClientsRaw : loadClientsFromStorage());
 
-          setRevenueData(rev);
-          setInsights(ins);
-          setClients(cls);
-        } catch (e) {
-          console.warn("LIVE mode failed, falling back to DEMO:", e);
-          setModeSafe("demo");
-          setRevenueData(loadLS(LS.demoRevenue, DEFAULT_DEMO_REVENUE));
-          setInsights(loadLS(LS.demoInsights, DEFAULT_DEMO_INSIGHTS));
-          setClients(loadLS(LS.demoClients, DEFAULT_DEMO_CLIENTS));
+        } catch (err) {
+          console.error("Load failed:", err);
+          // Hard fallback
+          setRevenueData(DEMO_REVENUE);
+          setInsights(DEMO_INSIGHTS);
+          setClients(loadClientsFromStorage());
         } finally {
           setLoading(false);
         }
       };
 
-      useEffect(() => { loadData(); }, [mode]);
+      const handleRefresh = () => loadData();
+
+      const toggleMode = () => setMode((m) => (m === "demo" ? "live" : "demo"));
 
       if (loading) {
         return (
@@ -631,97 +310,452 @@
         );
       }
 
-      const displayName = user?.firstName || user?.email || "Demo";
-
       return (
-        <div className="shell">
-          <div className="header">
-            <div className="title">
-              <h1>Revenue Intelligence Platform</h1>
-              <p>Welcome back, {displayName}</p>
+        <div style={{ padding: '24px', minHeight: '100vh' }}>
+          {/* Header */}
+          <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <div>
+              <h1 style={{ fontSize: '32px', marginBottom: '8px' }}>Revenue Intelligence Platform</h1>
+              <p style={{ color: '#8B92A8' }}>Welcome back, {user?.firstName || user?.email || "Demo"}</p>
             </div>
 
-            <div className="topActions">
-              <span className={`pill ${mode === "demo" ? "demo" : "live"}`}>
-                {mode === "demo" ? "DEMO MODE" : "LIVE MODE"}
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{
+                padding: '8px 12px',
+                borderRadius: '999px',
+                border: '1px solid rgba(255,255,255,0.12)',
+                background: isDemo ? 'rgba(0,217,255,0.10)' : 'rgba(0,255,136,0.10)',
+                color: isDemo ? '#00D9FF' : '#00FF88',
+                fontSize: '12px',
+                fontWeight: 800,
+                letterSpacing: '0.5px'
+              }}>
+                {isDemo ? "DEMO MODE" : "LIVE MODE"}
               </span>
 
-              <button className="btn" onClick={loadData}>↻ Refresh</button>
+              <button
+                onClick={handleRefresh}
+                style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: '#fff', fontSize: '14px', fontWeight: 700 }}
+              >
+                ↻ Refresh
+              </button>
 
-              {mode === "demo" ? (
-                <button className="btn" onClick={() => setModeSafe("live")}>Switch to Live</button>
-              ) : (
-                <button className="btn" onClick={() => setModeSafe("demo")}>Switch to Demo</button>
-              )}
+              <button
+                onClick={toggleMode}
+                style={{ padding: '10px 14px', background: 'rgba(0,71,255,0.12)', border: '1px solid rgba(0,71,255,0.35)', borderRadius: '10px', color: '#fff', fontSize: '14px', fontWeight: 800 }}
+              >
+                {isDemo ? "Switch to Live" : "Switch to Demo"}
+              </button>
 
-              <button className="btn danger" onClick={onLogout}>Sign Out</button>
+              <button
+                onClick={onLogout}
+                style={{ padding: '10px 14px', background: 'rgba(255,51,102,0.12)', border: '1px solid rgba(255,51,102,0.35)', borderRadius: '10px', color: '#FF3366', fontSize: '14px', fontWeight: 800 }}
+              >
+                Sign Out
+              </button>
             </div>
           </div>
 
-          <div className="nav">
-            {["overview","insights","clients"].map(v => (
+          {/* Navigation */}
+          <div style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', marginBottom: '22px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {['overview', 'insights', 'clients'].map(view => (
               <button
-                key={v}
-                className={`tab ${activeView === v ? "active" : ""}`}
-                onClick={() => setActiveView(v)}
+                key={view}
+                onClick={() => setActiveView(view)}
+                style={{
+                  padding: '12px 18px',
+                  background: activeView === view ? 'rgba(0,71,255,0.12)' : 'transparent',
+                  border: '1px solid rgba(255,255,255,0.10)',
+                  borderBottom: activeView === view ? '2px solid #0047FF' : '2px solid transparent',
+                  borderRadius: '12px',
+                  color: activeView === view ? '#EAF1FF' : '#8B92A8',
+                  fontSize: '14px',
+                  fontWeight: 800,
+                  textTransform: 'capitalize'
+                }}
               >
-                {v}
+                {view}
               </button>
             ))}
           </div>
 
-          <div className="rowMeta">
-            <div>
-              <button className="btn primary" onClick={() => alert("Next: Add Revenue Entry modal (we can build this).")}>
-                + Add Revenue Entry
-              </button>
-              <span style={{ marginLeft:12 }}>
-                Tip: Demo mode saves changes in your browser (localStorage).
-              </span>
-            </div>
-            <div>
-              API: <span className="muted">{API_BASE}</span>
-            </div>
-          </div>
-
-          {activeView === "overview" && <OverviewView data={revenueData} />}
-          {activeView === "insights" && <InsightsView insights={insights} />}
-          {activeView === "clients" && <ClientsView clients={clients} />}
+          {/* Content */}
+          {activeView === 'overview' && (
+            <OverviewView
+              data={revenueData}
+              apiUrl={API_URL}
+              isDemo={isDemo}
+            />
+          )}
+          {activeView === 'insights' && <InsightsView insights={insights} />}
+          {activeView === 'clients' && <ClientsView clients={clients} />}
         </div>
       );
     }
 
-    // ---------------------------
-    // App
-    // ---------------------------
-    function App() {
-      const [token, setToken] = useState(localStorage.getItem(LS.token));
-      const [user, setUser] = useState(() => safeJSON(localStorage.getItem(LS.user) || "null", null));
+    // =========================
+    // Normalize Revenue (prevents $0 forever)
+    // Accepts any backend shape and returns UI shape
+    // =========================
+    function normalizeRevenue(raw) {
+      if (!raw || typeof raw !== "object") return DEMO_REVENUE;
 
-      const onLogin = (t, u) => {
-        setToken(t);
-        setUser(u);
-        localStorage.setItem(LS.token, t);
-        localStorage.setItem(LS.user, JSON.stringify(u));
-      };
+      const total_revenue =
+        numOrNull(raw.total_revenue) ??
+        numOrNull(raw.totalRevenue) ??
+        numOrNull(raw.total) ??
+        DEMO_REVENUE.total_revenue;
 
-      const onLogout = () => {
-        setToken(null);
-        setUser(null);
-        localStorage.removeItem(LS.token);
-        localStorage.removeItem(LS.user);
-      };
+      const mrr =
+        numOrNull(raw.mrr) ??
+        numOrNull(raw.monthly_recurring_revenue) ??
+        numOrNull(raw.monthlyRecurringRevenue) ??
+        DEMO_REVENUE.mrr;
 
-      // If no token, show login (you can still run DEMO once logged in)
-      if (!token) return <LoginPage onLogin={onLogin} />;
+      const arr =
+        numOrNull(raw.arr) ??
+        numOrNull(raw.annual_recurring_revenue) ??
+        numOrNull(raw.annualRecurringRevenue) ??
+        DEMO_REVENUE.arr;
 
-      return <Dashboard token={token} user={user} onLogout={onLogout} />;
+      const previous_period_revenue =
+        numOrNull(raw.previous_period_revenue) ??
+        numOrNull(raw.previousPeriodRevenue) ??
+        DEMO_REVENUE.previous_period_revenue;
+
+      const growth_rate =
+        numOrNull(raw.growth_rate) ??
+        numOrNull(raw.growthRate) ??
+        DEMO_REVENUE.growth_rate;
+
+      const by_period =
+        Array.isArray(raw.by_period) && raw.by_period.length ? raw.by_period :
+        Array.isArray(raw.byPeriod) && raw.byPeriod.length ? raw.byPeriod :
+        DEMO_REVENUE.by_period;
+
+      const by_source =
+        Array.isArray(raw.by_source) && raw.by_source.length ? raw.by_source :
+        Array.isArray(raw.bySource) && raw.bySource.length ? raw.bySource :
+        DEMO_REVENUE.by_source;
+
+      return { total_revenue, mrr, arr, previous_period_revenue, growth_rate, by_period, by_source };
     }
 
-    // render
-    const root = ReactDOM.createRoot(document.getElementById("root"));
+    function numOrNull(v) {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    }
+
+    // =========================
+    // Overview View
+    // =========================
+    function OverviewView({ data, apiUrl, isDemo }) {
+      const COLORS = ['#0047FF', '#00D9FF', '#00FF88', '#FFB800'];
+      if (!data) return <div>No data available</div>;
+
+      return (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '18px' }}>
+            <button
+              onClick={() => alert(isDemo ? "Demo: Add Revenue Entry coming next (saves to browser)!" : "Live: wire this to backend POST /revenue/entry")}
+              style={{
+                padding: '12px 16px',
+                background: 'linear-gradient(135deg, #0047FF, #00D9FF)',
+                border: 'none',
+                borderRadius: '12px',
+                color: '#fff',
+                fontSize: '14px',
+                fontWeight: 900
+              }}
+            >
+              + Add Revenue Entry
+            </button>
+
+            <div style={{ color: '#8B92A8', fontSize: '12px' }}>
+              Tip: {isDemo ? "Demo mode saves changes in your browser (localStorage)." : "Live mode pulls from your backend."}
+              <span style={{ marginLeft: '14px', color: '#8B92A8' }}>API: {apiUrl}</span>
+            </div>
+          </div>
+
+          {/* KPI Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '22px' }}>
+            <KpiCard
+              label="Total Revenue"
+              value={`$${Math.round(data.total_revenue || 0).toLocaleString()}`}
+              sub="Executive snapshot"
+              accent="#00FF88"
+              foot={`↗ +${Math.round(((data.growth_rate || 0.34) * 100))}% vs last period`}
+            />
+            <KpiCard
+              label="Monthly Recurring Revenue"
+              value={`$${Math.round(data.mrr || 0).toLocaleString()}`}
+              sub="Stability indicator"
+              accent="#00FF88"
+              foot="↗ Trending up"
+            />
+            <KpiCard
+              label="Annual Recurring Revenue"
+              value={`$${Math.round(data.arr || 0).toLocaleString()}`}
+              sub="Projected run-rate"
+              accent="#00D9FF"
+              foot="Projected growth"
+            />
+            <KpiCard
+              label="Growth Rate"
+              value={data.growth_rate != null ? `${(data.growth_rate * 100).toFixed(1)}%` : '0.0%'}
+              sub="Compared to previous period"
+              accent="#00FF88"
+              foot="Month over month"
+            />
+          </div>
+
+          {/* Revenue Trend */}
+          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '18px', marginBottom: '18px' }}>
+            <h3 style={{ marginBottom: '14px', fontSize: '18px' }}>Revenue Trend</h3>
+
+            {Array.isArray(data.by_period) && data.by_period.length > 0 ? (
+              <ResponsiveContainer width="100%" height={320}>
+                <AreaChart data={data.by_period}>
+                  <defs>
+                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#00D9FF" stopOpacity={0.30} />
+                      <stop offset="95%" stopColor="#00D9FF" stopOpacity={0.00} />
+                    </linearGradient>
+                  </defs>
+
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                  <XAxis dataKey="period_start" stroke="#8B92A8" />
+                  <YAxis stroke="#8B92A8" />
+                  <Tooltip
+                    contentStyle={{
+                      background: 'rgba(10, 14, 26, 0.95)',
+                      border: '1px solid rgba(255,255,255,0.10)',
+                      borderRadius: '10px'
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="revenue"
+                    stroke="#00D9FF"
+                    fill="url(#colorRevenue)"
+                    isAnimationActive={true}
+                    animationDuration={900}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div style={{ height: 320, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8B92A8', border: '1px dashed rgba(255,255,255,0.12)', borderRadius: '12px' }}>
+                No trend data yet.
+              </div>
+            )}
+          </div>
+
+          {/* Revenue by Source */}
+          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '18px' }}>
+            <h3 style={{ marginBottom: '14px', fontSize: '18px' }}>Revenue by Source</h3>
+
+            {Array.isArray(data.by_source) && data.by_source.length > 0 ? (
+              <ResponsiveContainer width="100%" height={320}>
+                <PieChart>
+                  <Pie
+                    data={data.by_source}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ source, percentage }) => `${source} ${percentage}%`}
+                    outerRadius={110}
+                    dataKey="revenue"
+                    isAnimationActive={true}
+                    animationDuration={900}
+                  >
+                    {data.by_source.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      background: 'rgba(10, 14, 26, 0.95)',
+                      border: '1px solid rgba(255,255,255,0.10)',
+                      borderRadius: '10px'
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div style={{ height: 320, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8B92A8', border: '1px dashed rgba(255,255,255,0.12)', borderRadius: '12px' }}>
+                No source breakdown yet.
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    function KpiCard({ label, value, sub, foot, accent }) {
+      return (
+        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '18px' }}>
+          <div style={{ color: '#8B92A8', fontSize: '13px', marginBottom: '8px' }}>{label}</div>
+          <div style={{ fontSize: '32px', fontWeight: 900, marginBottom: '6px' }}>{value}</div>
+          <div style={{ color: '#8B92A8', fontSize: '12px', marginBottom: '10px' }}>{sub}</div>
+          <div style={{ color: accent || '#00FF88', fontSize: '13px', fontWeight: 800 }}>{foot}</div>
+        </div>
+      );
+    }
+
+    // =========================
+    // Insights View
+    // =========================
+    function InsightsView({ insights }) {
+      return (
+        <div>
+          <h2 style={{ fontSize: '24px', marginBottom: '18px' }}>AI-Powered Insights</h2>
+
+          {(!insights || insights.length === 0) ? (
+            <div style={{ textAlign: 'center', padding: '60px', color: '#8B92A8' }}>
+              No insights available yet. Check back soon!
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: '16px' }}>
+              {insights.map(insight => (
+                <div
+                  key={insight.id}
+                  style={{
+                    background: 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${insight.type === 'opportunity' ? '#00D9FF' : insight.type === 'warning' ? '#FFB800' : '#00FF88'}`,
+                    borderLeft: `4px solid ${insight.type === 'opportunity' ? '#00D9FF' : insight.type === 'warning' ? '#FFB800' : '#00FF88'}`,
+                    borderRadius: '14px',
+                    padding: '18px'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', gap: '12px', flexWrap: 'wrap' }}>
+                    <div>
+                      <span style={{
+                        background: `${insight.type === 'opportunity' ? 'rgba(0,217,255,0.10)' : insight.type === 'warning' ? 'rgba(255,184,0,0.10)' : 'rgba(0,255,136,0.10)'}`,
+                        color: `${insight.type === 'opportunity' ? '#00D9FF' : insight.type === 'warning' ? '#FFB800' : '#00FF88'}`,
+                        padding: '4px 10px',
+                        borderRadius: '999px',
+                        fontSize: '12px',
+                        fontWeight: 900,
+                        textTransform: 'uppercase'
+                      }}>
+                        {insight.type}
+                      </span>
+                      <span style={{ marginLeft: '10px', color: '#8B92A8', fontSize: '12px', fontWeight: 700 }}>
+                        {insight.impact} IMPACT
+                      </span>
+                    </div>
+
+                    <div style={{ textAlign: 'center', padding: '8px 12px', background: 'rgba(0,217,255,0.10)', borderRadius: '12px', border: '1px solid rgba(0,217,255,0.25)' }}>
+                      <div style={{ fontSize: '18px', fontWeight: 900, color: '#00D9FF' }}>{insight.confidence}%</div>
+                      <div style={{ fontSize: '10px', color: '#8B92A8', fontWeight: 800 }}>CONFIDENCE</div>
+                    </div>
+                  </div>
+
+                  <h4 style={{ fontSize: '18px', marginBottom: '8px' }}>{insight.title}</h4>
+                  <p style={{ color: '#8B92A8', lineHeight: 1.6 }}>{insight.description}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // =========================
+    // Clients View
+    // =========================
+    function ClientsView({ clients }) {
+      return (
+        <div>
+          <h2 style={{ fontSize: '24px', marginBottom: '18px' }}>Client Portfolio</h2>
+
+          {(!clients || clients.length === 0) ? (
+            <div style={{ textAlign: 'center', padding: '60px', color: '#8B92A8' }}>
+              No clients yet. Start adding clients to track their performance!
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: '14px' }}>
+              {clients.map(client => (
+                <div
+                  key={client.id}
+                  style={{
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: '14px',
+                    padding: '18px'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '14px', gap: '12px', flexWrap: 'wrap' }}>
+                    <div>
+                      <h4 style={{ fontSize: '18px', marginBottom: '4px' }}>{client.company_name || client.name}</h4>
+                      <span style={{ color: '#8B92A8', fontSize: '14px' }}>{client.industry}</span>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '22px', fontWeight: 900, marginBottom: '4px' }}>
+                        ${Number(client.mrr || client.monthlyRevenue || 0).toLocaleString()}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#8B92A8' }}>Monthly Recurring</div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div>
+                      <div style={{ fontSize: '12px', color: '#8B92A8', marginBottom: '8px' }}>Status</div>
+                      <span style={{
+                        background: (client.status || "").toLowerCase() === 'active' ? 'rgba(0,255,136,0.10)' : 'rgba(255,184,0,0.10)',
+                        color: (client.status || "").toLowerCase() === 'active' ? '#00FF88' : '#FFB800',
+                        padding: '4px 10px',
+                        borderRadius: '999px',
+                        fontSize: '12px',
+                        fontWeight: 900,
+                        textTransform: 'uppercase'
+                      }}>
+                        {client.status || "active"}
+                      </span>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '12px', color: '#8B92A8', marginBottom: '8px' }}>Health Score</div>
+                      <div style={{ fontSize: '18px', fontWeight: 900, color: '#00FF88' }}>
+                        {Math.round(Number(client.health_score || client.healthScore || 85))}%
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // =========================
+    // App
+    // =========================
+    function App() {
+      const [token, setToken] = useState(localStorage.getItem('token'));
+      const [user, setUser] = useState(JSON.parse(localStorage.getItem('user') || 'null'));
+
+      const handleLogin = (newToken, newUser) => {
+        setToken(newToken);
+        setUser(newUser);
+        localStorage.setItem('token', newToken);
+        localStorage.setItem('user', JSON.stringify(newUser));
+      };
+
+      const handleLogout = () => {
+        setToken(null);
+        setUser(null);
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      };
+
+      if (!token) return <LoginPage onLogin={handleLogin} />;
+      return <Dashboard token={token} user={user} onLogout={handleLogout} />;
+    }
+
+    // Render
+    const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
 </body>
 </html>
-
