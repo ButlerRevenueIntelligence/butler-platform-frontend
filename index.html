@@ -392,6 +392,150 @@
     }
 
     // =========================
+    // INSIGHT ENGINE (AUTO-GENERATED INSIGHTS)
+    // =========================
+    function generateInsightsFromRevenue(rev) {
+      const r = normalizeRevenue(rev || {});
+      const total = r.total_revenue || 0;
+      const mrr = r.mrr || 0;
+      const arr = r.arr || 0;
+      const growthPct = (r.growth_rate || 0) * 100;
+
+      const sources = Array.isArray(r.by_source) ? r.by_source : [];
+      const sourceTotal = sources.reduce((s, x) => s + Number(x.revenue || 0), 0) || 1;
+
+      const topSource = sources
+        .map(s => ({ ...s, share: (Number(s.revenue || 0) / sourceTotal) * 100 }))
+        .sort((a, b) => b.share - a.share)[0];
+
+      const trend = Array.isArray(r.by_period) ? r.by_period : [];
+      const last = Number(trend[trend.length - 1]?.revenue || 0);
+      const prev = Number(trend[trend.length - 2]?.revenue || 0);
+      const mom = prev > 0 ? ((last - prev) / prev) * 100 : growthPct;
+
+      const id = () => (crypto?.randomUUID?.() || String(Math.random()));
+
+      const insights = [];
+
+      insights.push({
+        id: id(),
+        type: "success",
+        impact: growthPct >= 15 ? "HIGH" : growthPct >= 5 ? "MEDIUM" : "LOW",
+        confidence: 88,
+        title: "Executive Summary",
+        description:
+          `Revenue posture: Total $${fmtMoney(total)} | MRR $${fmtMoney(mrr)} | ARR $${fmtMoney(arr)}. ` +
+          `Growth is ${growthPct.toFixed(1)}% vs last period (MoM approx ${mom.toFixed(1)}%). ` +
+          (topSource?.source ? `Top channel: ${topSource.source} (~${topSource.share.toFixed(0)}%).` : ""),
+        actions: [
+          "Hold the winning channel steady and scale capacity",
+          "Stabilize recurring revenue (MRR) by converting one-time wins into retainers",
+          "Tighten attribution + source tracking so “Revenue by Source” becomes decision-grade"
+        ]
+      });
+
+      if (growthPct < 0) {
+        insights.push({
+          id: id(),
+          type: "warning",
+          impact: "HIGH",
+          confidence: 90,
+          title: "Growth is negative vs last period",
+          description:
+            `Growth is ${growthPct.toFixed(1)}%. This usually means churn, slowed sales velocity, or weaker lead quality.`,
+          actions: [
+            "Check churn / renewals for the last 30–60 days",
+            "Audit pipeline conversion rate and sales cycle length",
+            "Run a “top 10 accounts” retention play"
+          ]
+        });
+      } else if (growthPct < 7) {
+        insights.push({
+          id: id(),
+          type: "warning",
+          impact: "MEDIUM",
+          confidence: 86,
+          title: "Growth is modest — accelerate with a focused lever",
+          description:
+            `Growth is ${growthPct.toFixed(1)}%. You’re stable, but not compounding fast yet.`,
+          actions: [
+            "Pick 1 lever: Retention, upsells, or acquisition — don’t split focus",
+            "Create a “revenue expansion” bundle for existing clients",
+            "Increase weekly sales activity targets and track leading indicators"
+          ]
+        });
+      } else {
+        insights.push({
+          id: id(),
+          type: "opportunity",
+          impact: growthPct >= 20 ? "HIGH" : "MEDIUM",
+          confidence: 87,
+          title: "Momentum detected — scale what’s working",
+          description:
+            `Growth is ${growthPct.toFixed(1)}%. This is the window to scale capacity and lock in predictable revenue.`,
+          actions: [
+            "Increase spend/capacity in the best-performing channel",
+            "Add a weekly growth review: pipeline → revenue → churn",
+            "Build a repeatable onboarding + expansion sequence"
+          ]
+        });
+      }
+
+      if (topSource?.share >= 60) {
+        insights.push({
+          id: id(),
+          type: "warning",
+          impact: "MEDIUM",
+          confidence: 84,
+          title: "Revenue concentration risk detected",
+          description:
+            `${topSource.source} drives ~${topSource.share.toFixed(0)}% of revenue. Great when it works, risky when it dips.`,
+          actions: [
+            "Stand up a second “growth lane” (ex: Partnerships or Referrals)",
+            "Split test 2–3 acquisition channels for diversification",
+            "Build retention & upsell to stabilize revenue base"
+          ]
+        });
+      } else if (topSource?.share) {
+        insights.push({
+          id: id(),
+          type: "success",
+          impact: "MEDIUM",
+          confidence: 82,
+          title: "Healthy channel mix (no single point of failure)",
+          description:
+            `Top channel ${topSource.source} contributes ~${topSource.share.toFixed(0)}%. Mix looks reasonably diversified.`,
+          actions: [
+            "Double down on the top channel while preserving diversification",
+            "Improve source tagging consistency so decisions are cleaner"
+          ]
+        });
+      }
+
+      if (total > 0) {
+        const recurringQuality = mrr > 0 ? (mrr * 12 / Math.max(total, 1)) * 100 : 0;
+        insights.push({
+          id: id(),
+          type: recurringQuality >= 60 ? "success" : "opportunity",
+          impact: recurringQuality >= 60 ? "HIGH" : "MEDIUM",
+          confidence: 80,
+          title: recurringQuality >= 60
+            ? "Predictability is strong (recurring-heavy)"
+            : "Convert wins into recurring revenue",
+          description:
+            recurringQuality >= 60
+              ? `Recurring revenue strength is high — ARR is carrying the business.`
+              : `MRR is lagging relative to total. Convert one-time revenue into retainers to stabilize cashflow.`,
+          actions: recurringQuality >= 60
+            ? ["Protect retention (renewals)", "Add expansion offers to lift ARR further"]
+            : ["Offer a maintenance retainer after one-time work", "Bundle reporting + optimization into monthly plans"]
+        });
+      }
+
+      return insights.slice(0, 6);
+    }
+
+    // =========================
     // API
     // =========================
     const api = {
@@ -636,15 +780,12 @@
 
         try {
           if (mode === "demo") {
-            // DEMO: summary derived from entries + demo insights + demo clients
+            // DEMO: summary derived from entries + GENERATED insights + demo clients
             const summary = buildSummaryFromEntries(demoEntries);
             setRevenueSummary(summary);
 
-            setInsights([
-              { id: 1, type: "opportunity", impact: "HIGH", confidence: 92, title: "SEO is driving profitable growth", description: "SEO revenue share is strong. Increase content velocity + internal linking to expand compounding returns." },
-              { id: 2, type: "warning", impact: "MEDIUM", confidence: 84, title: "Paid Ads efficiency drift detected", description: "Paid Ads entries show higher volatility. Review CAC and tighten targeting for stability." },
-              { id: 3, type: "success", impact: "HIGH", confidence: 90, title: "Recurring revenue base is healthy", description: "Recurring entries are building predictable MRR. Add upsell bundles to lift ARR." }
-            ]);
+            // ✅ Generated insights (replaces hard-coded list)
+            setInsights(generateInsightsFromRevenue(summary));
 
             setClients([
               { id: 1, company_name: "TechCorp Industries", industry: "IT Services", status: "active", mrr: 12500, health_score: 92 },
@@ -663,10 +804,12 @@
 
             const normalized = normalizeRevenue(rev?.data || rev);
 
-            // If backend returns empty values (0), keep chart placeholders but do not break UI
             setRevenueSummary(normalized);
 
-            setInsights(ins?.data?.insights || []);
+            // ✅ If backend has no insights yet, generate from revenue summary so Insights tab is never blank
+            const liveInsights = ins?.data?.insights || [];
+            setInsights(liveInsights.length ? liveInsights : generateInsightsFromRevenue(normalized));
+
             setClients(Array.isArray(cls?.data) ? cls.data : []);
             setToast("Live data synced.");
           }
@@ -693,8 +836,10 @@
         if (mode === "demo") {
           const next = [{ ...entry, id: crypto?.randomUUID?.() || String(Math.random()) }, ...demoEntries];
           setDemoEntries(next);
-          // immediately recompute demo summary for smooth feel
-          setRevenueSummary(buildSummaryFromEntries(next));
+          // immediately recompute demo summary + insights for smooth feel
+          const summary = buildSummaryFromEntries(next);
+          setRevenueSummary(summary);
+          setInsights(generateInsightsFromRevenue(summary));
           setToast("Revenue entry saved (Demo).");
           return;
         }
@@ -959,21 +1104,74 @@
     };
 
     // =========================
-    // INSIGHTS VIEW
+    // INSIGHTS VIEW (EXEC SUMMARY + ACTIONS + COPY)
     // =========================
     function InsightsView({ insights }) {
+      const list = Array.isArray(insights) ? insights : [];
+      const exec = list.find(x => (x.title || "").toLowerCase().includes("executive summary"));
+      const rest = list.filter(x => x !== exec);
+
       return (
         <div>
-          <div style={{ fontSize: 24, fontWeight: 950, marginBottom: 16 }}>AI-Powered Insights</div>
+          <div style={{ fontSize: 24, fontWeight: 950, marginBottom: 12 }}>Revenue Intelligence</div>
+          <div className="muted" style={{ marginBottom: 16, lineHeight: 1.5 }}>
+            Executive-grade insights that translate numbers into decisions: what changed, why it matters, and what to do next.
+          </div>
 
-          {!insights || insights.length === 0 ? (
+          {exec && (
+            <div className="card" style={{ padding: 18, marginBottom: 14, border: "1px solid rgba(0,217,255,0.22)" }}>
+              <div className="row" style={{ justifyContent: "space-between", marginBottom: 10 }}>
+                <div className="pill pillDemo" style={{ borderColor: "rgba(0,217,255,0.32)" }}>
+                  EXECUTIVE SUMMARY
+                </div>
+                <button
+                  className="btn"
+                  onClick={() => navigator.clipboard?.writeText(exec.description || "")}
+                  title="Copy summary"
+                >
+                  Copy
+                </button>
+              </div>
+
+              <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 8 }}>
+                {exec.title}
+              </div>
+              <div className="muted" style={{ lineHeight: 1.6 }}>
+                {exec.description}
+              </div>
+
+              {Array.isArray(exec.actions) && exec.actions.length > 0 && (
+                <div style={{ marginTop: 14 }}>
+                  <div style={{ fontWeight: 950, marginBottom: 8 }}>Recommended Actions</div>
+                  <div style={{ display: "grid", gap: 8 }}>
+                    {exec.actions.map((a, i) => (
+                      <div
+                        key={i}
+                        style={{
+                          padding: "10px 12px",
+                          borderRadius: 12,
+                          border: "1px solid rgba(255,255,255,0.10)",
+                          background: "rgba(255,255,255,0.03)"
+                        }}
+                      >
+                        <span style={{ color: "#00FF88", fontWeight: 950, marginRight: 10 }}>→</span>
+                        <span className="muted">{a}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!rest.length ? (
             <div className="muted" style={{ padding: 28, textAlign: "center" }}>
               No insights available yet.
             </div>
           ) : (
             <div style={{ display: "grid", gap: 14 }}>
-              {insights.map((ins) => {
-                const type = ins.type || "success";
+              {rest.map((ins) => {
+                const type = (ins.type || "success").toLowerCase();
                 const border =
                   type === "opportunity" ? "rgba(0,217,255,0.35)" :
                   type === "warning" ? "rgba(255,184,0,0.35)" :
@@ -984,31 +1182,42 @@
                   type === "warning" ? "#FFB800" :
                   "#00FF88";
 
+                const confidence = ins.confidence || 80;
+
                 return (
-                  <div key={ins.id} className="card" style={{ padding: 18, borderColor: border, borderLeft: `4px solid ${left}` }}>
+                  <div
+                    key={ins.id}
+                    className="card"
+                    style={{ padding: 18, borderColor: border, borderLeft: `4px solid ${left}` }}
+                  >
                     <div className="row" style={{ justifyContent: "space-between", marginBottom: 10 }}>
                       <div className="row">
-                        <span className="pill" style={{
-                          borderColor: border,
-                          background: "rgba(255,255,255,0.02)",
-                          color: left
-                        }}>
+                        <span
+                          className="pill"
+                          style={{
+                            borderColor: border,
+                            background: "rgba(255,255,255,0.02)",
+                            color: left
+                          }}
+                        >
                           {String(type).toUpperCase()}
                         </span>
                         <span className="muted small" style={{ fontWeight: 900 }}>
-                          {ins.impact || "MEDIUM"} IMPACT
+                          {(ins.impact || "MEDIUM")} IMPACT
                         </span>
                       </div>
 
-                      <div style={{
-                        padding: "8px 12px",
-                        borderRadius: 12,
-                        background: "rgba(0,217,255,0.08)",
-                        border: "1px solid rgba(0,217,255,0.18)",
-                        textAlign: "center",
-                        minWidth: 88
-                      }}>
-                        <div style={{ fontSize: 18, fontWeight: 950, color: "#00D9FF" }}>{ins.confidence || 80}%</div>
+                      <div
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: 12,
+                          background: "rgba(0,217,255,0.08)",
+                          border: "1px solid rgba(0,217,255,0.18)",
+                          textAlign: "center",
+                          minWidth: 88
+                        }}
+                      >
+                        <div style={{ fontSize: 18, fontWeight: 950, color: "#00D9FF" }}>{confidence}%</div>
                         <div className="muted" style={{ fontSize: 10, fontWeight: 900 }}>CONFIDENCE</div>
                       </div>
                     </div>
@@ -1016,9 +1225,34 @@
                     <div style={{ fontSize: 16, fontWeight: 950, marginBottom: 6 }}>
                       {ins.title || "Insight"}
                     </div>
+
                     <div className="muted" style={{ lineHeight: 1.55 }}>
                       {ins.description || "No description."}
                     </div>
+
+                    {Array.isArray(ins.actions) && ins.actions.length > 0 && (
+                      <div style={{ marginTop: 12 }}>
+                        <div className="muted small" style={{ fontWeight: 900, marginBottom: 8 }}>
+                          What to do next
+                        </div>
+                        <div style={{ display: "grid", gap: 8 }}>
+                          {ins.actions.slice(0, 3).map((a, i) => (
+                            <div
+                              key={i}
+                              style={{
+                                padding: "10px 12px",
+                                borderRadius: 12,
+                                border: "1px solid rgba(255,255,255,0.10)",
+                                background: "rgba(255,255,255,0.03)"
+                              }}
+                            >
+                              <span style={{ color: left, fontWeight: 950, marginRight: 10 }}>→</span>
+                              <span className="muted">{a}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
