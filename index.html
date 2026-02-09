@@ -87,9 +87,19 @@
       display: inline-flex;
       align-items: center;
       gap: 8px;
+      white-space: nowrap;
     }
     .pillDemo { border-color: rgba(0,217,255,0.32); background: rgba(0,217,255,0.10); color: #7BEFFF; }
     .pillLive { border-color: rgba(0,255,136,0.28); background: rgba(0,255,136,0.10); color: #8DFFCA; }
+
+    /* Intelligence pills */
+    .pillRiskLow { border-color: rgba(0,255,136,0.28); background: rgba(0,255,136,0.10); color: #8DFFCA; }
+    .pillRiskMed { border-color: rgba(255,184,0,0.30); background: rgba(255,184,0,0.10); color: #FFE6A6; }
+    .pillRiskHigh { border-color: rgba(255,51,102,0.35); background: rgba(255,51,102,0.12); color: #FFB2C4; }
+
+    .pillOppYes { border-color: rgba(0,217,255,0.32); background: rgba(0,217,255,0.10); color: #7BEFFF; }
+    .pillOppMaybe { border-color: rgba(255,184,0,0.30); background: rgba(255,184,0,0.10); color: #FFE6A6; }
+    .pillOppNo { border-color: rgba(255,255,255,0.14); background: rgba(255,255,255,0.04); color: #8B92A8; }
 
     .nav {
       border-bottom: 1px solid rgba(255,255,255,0.10);
@@ -218,22 +228,6 @@
       flex-wrap: wrap;
     }
 
-    /* Skeleton */
-    .skeleton {
-      position: relative;
-      overflow: hidden;
-      background: rgba(255,255,255,0.05);
-      border-radius: 12px;
-    }
-    .skeleton::after {
-      content: "";
-      position: absolute; inset: 0;
-      transform: translateX(-100%);
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.09), transparent);
-      animation: shimmer 1.2s infinite;
-    }
-    @keyframes shimmer { 100% { transform: translateX(100%); } }
-
     .small { font-size: 12px; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
   </style>
@@ -246,7 +240,7 @@
     const { useEffect, useMemo, useRef, useState } = React;
     const {
       AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-      ResponsiveContainer, PieChart, Pie, Cell
+      ResponsiveContainer, PieChart, Pie, Cell, Line
     } = Recharts;
 
     // =========================
@@ -303,21 +297,11 @@
     function normalizeRevenue(raw) {
       const r = raw || {};
 
-      // Accept multiple naming styles
-      const total =
-        r.total_revenue ?? r.totalRevenue ?? r.total ?? 0;
+      const total = r.total_revenue ?? r.totalRevenue ?? r.total ?? 0;
+      const mrr = r.mrr ?? r.monthly_recurring_revenue ?? r.monthlyRecurringRevenue ?? 0;
+      const arr = r.arr ?? r.annual_recurring_revenue ?? r.annualRecurringRevenue ?? 0;
+      const growth = r.growth_rate ?? r.growthRate ?? 0.34;
 
-      const mrr =
-        r.mrr ?? r.monthly_recurring_revenue ?? r.monthlyRecurringRevenue ?? 0;
-
-      const arr =
-        r.arr ?? r.annual_recurring_revenue ?? r.annualRecurringRevenue ?? 0;
-
-      const growth =
-        r.growth_rate ?? r.growthRate ?? 0.34;
-
-      // Trend points (by_period)
-      // accept: [{period_start, revenue}] OR [{period, value}] etc
       const byPeriod = Array.isArray(r.by_period) ? r.by_period :
                        Array.isArray(r.byPeriod) ? r.byPeriod : [];
 
@@ -326,7 +310,6 @@
         revenue: Number(p.revenue ?? p.value ?? 0)
       })).filter(x => Number.isFinite(x.revenue));
 
-      // Sources pie
       const bySource = Array.isArray(r.by_source) ? r.by_source :
                        Array.isArray(r.bySource) ? r.bySource : [];
 
@@ -350,7 +333,7 @@
     function buildSummaryFromEntries(entries) {
       const total = entries.reduce((sum, e) => sum + Number(e.amount || 0), 0);
 
-      // naive MRR/ARR for demo: treat recurring entries as monthly
+      // treat recurring as monthly for demo
       const recurringMonthly = entries
         .filter(e => e.type === "recurring")
         .reduce((sum, e) => sum + Number(e.amount || 0), 0);
@@ -392,147 +375,145 @@
     }
 
     // =========================
-    // INSIGHT ENGINE (AUTO-GENERATED INSIGHTS)
+    // FORECAST (Polished)
     // =========================
-    function generateInsightsFromRevenue(rev) {
-      const r = normalizeRevenue(rev || {});
-      const total = r.total_revenue || 0;
-      const mrr = r.mrr || 0;
-      const arr = r.arr || 0;
-      const growthPct = (r.growth_rate || 0) * 100;
+    function buildForecastSeries(by_period, points = 3) {
+      if (!Array.isArray(by_period) || by_period.length < 3) {
+        return { chartData: (by_period || []).map(p => ({ ...p, actual: p.revenue, forecast: null, isForecast: false })), hasForecast: false };
+      }
 
-      const sources = Array.isArray(r.by_source) ? r.by_source : [];
-      const sourceTotal = sources.reduce((s, x) => s + Number(x.revenue || 0), 0) || 1;
+      const base = by_period.map(p => ({
+        period_start: p.period_start,
+        actual: Number(p.revenue || 0),
+        forecast: null,
+        isForecast: false
+      }));
 
-      const topSource = sources
-        .map(s => ({ ...s, share: (Number(s.revenue || 0) / sourceTotal) * 100 }))
-        .sort((a, b) => b.share - a.share)[0];
+      const vals = base.map(x => x.actual);
+      const last3 = vals.slice(-3);
+      const deltas = [last3[1]-last3[0], last3[2]-last3[1]];
+      const avgDelta = (deltas[0] + deltas[1]) / 2;
 
-      const trend = Array.isArray(r.by_period) ? r.by_period : [];
-      const last = Number(trend[trend.length - 1]?.revenue || 0);
-      const prev = Number(trend[trend.length - 2]?.revenue || 0);
-      const mom = prev > 0 ? ((last - prev) / prev) * 100 : growthPct;
-
-      const id = () => (crypto?.randomUUID?.() || String(Math.random()));
-
-      const insights = [];
-
-      insights.push({
-        id: id(),
-        type: "success",
-        impact: growthPct >= 15 ? "HIGH" : growthPct >= 5 ? "MEDIUM" : "LOW",
-        confidence: 88,
-        title: "Executive Summary",
-        description:
-          `Revenue posture: Total $${fmtMoney(total)} | MRR $${fmtMoney(mrr)} | ARR $${fmtMoney(arr)}. ` +
-          `Growth is ${growthPct.toFixed(1)}% vs last period (MoM approx ${mom.toFixed(1)}%). ` +
-          (topSource?.source ? `Top channel: ${topSource.source} (~${topSource.share.toFixed(0)}%).` : ""),
-        actions: [
-          "Hold the winning channel steady and scale capacity",
-          "Stabilize recurring revenue (MRR) by converting one-time wins into retainers",
-          "Tighten attribution + source tracking so “Revenue by Source” becomes decision-grade"
-        ]
-      });
-
-      if (growthPct < 0) {
-        insights.push({
-          id: id(),
-          type: "warning",
-          impact: "HIGH",
-          confidence: 90,
-          title: "Growth is negative vs last period",
-          description:
-            `Growth is ${growthPct.toFixed(1)}%. This usually means churn, slowed sales velocity, or weaker lead quality.`,
-          actions: [
-            "Check churn / renewals for the last 30–60 days",
-            "Audit pipeline conversion rate and sales cycle length",
-            "Run a “top 10 accounts” retention play"
-          ]
-        });
-      } else if (growthPct < 7) {
-        insights.push({
-          id: id(),
-          type: "warning",
-          impact: "MEDIUM",
-          confidence: 86,
-          title: "Growth is modest — accelerate with a focused lever",
-          description:
-            `Growth is ${growthPct.toFixed(1)}%. You’re stable, but not compounding fast yet.`,
-          actions: [
-            "Pick 1 lever: Retention, upsells, or acquisition — don’t split focus",
-            "Create a “revenue expansion” bundle for existing clients",
-            "Increase weekly sales activity targets and track leading indicators"
-          ]
-        });
-      } else {
-        insights.push({
-          id: id(),
-          type: "opportunity",
-          impact: growthPct >= 20 ? "HIGH" : "MEDIUM",
-          confidence: 87,
-          title: "Momentum detected — scale what’s working",
-          description:
-            `Growth is ${growthPct.toFixed(1)}%. This is the window to scale capacity and lock in predictable revenue.`,
-          actions: [
-            "Increase spend/capacity in the best-performing channel",
-            "Add a weekly growth review: pipeline → revenue → churn",
-            "Build a repeatable onboarding + expansion sequence"
-          ]
+      let prev = vals[vals.length - 1];
+      const forecastRows = [];
+      for (let i = 1; i <= points; i++) {
+        const next = Math.max(0, prev + avgDelta);
+        prev = next;
+        forecastRows.push({
+          period_start: `F+${i}`,
+          actual: null,
+          forecast: Number(next),
+          isForecast: true
         });
       }
 
-      if (topSource?.share >= 60) {
-        insights.push({
-          id: id(),
-          type: "warning",
-          impact: "MEDIUM",
-          confidence: 84,
-          title: "Revenue concentration risk detected",
-          description:
-            `${topSource.source} drives ~${topSource.share.toFixed(0)}% of revenue. Great when it works, risky when it dips.`,
-          actions: [
-            "Stand up a second “growth lane” (ex: Partnerships or Referrals)",
-            "Split test 2–3 acquisition channels for diversification",
-            "Build retention & upsell to stabilize revenue base"
-          ]
-        });
-      } else if (topSource?.share) {
-        insights.push({
-          id: id(),
-          type: "success",
-          impact: "MEDIUM",
-          confidence: 82,
-          title: "Healthy channel mix (no single point of failure)",
-          description:
-            `Top channel ${topSource.source} contributes ~${topSource.share.toFixed(0)}%. Mix looks reasonably diversified.`,
-          actions: [
-            "Double down on the top channel while preserving diversification",
-            "Improve source tagging consistency so decisions are cleaner"
-          ]
-        });
-      }
+      // connect last actual to first forecast by copying last actual into forecast start baseline
+      // (so dashed line starts at last known point)
+      const lastActual = base[base.length - 1];
+      const bridge = {
+        period_start: lastActual.period_start,
+        actual: lastActual.actual,
+        forecast: lastActual.actual,
+        isForecast: true,
+        _bridge: true
+      };
 
-      if (total > 0) {
-        const recurringQuality = mrr > 0 ? (mrr * 12 / Math.max(total, 1)) * 100 : 0;
-        insights.push({
-          id: id(),
-          type: recurringQuality >= 60 ? "success" : "opportunity",
-          impact: recurringQuality >= 60 ? "HIGH" : "MEDIUM",
-          confidence: 80,
-          title: recurringQuality >= 60
-            ? "Predictability is strong (recurring-heavy)"
-            : "Convert wins into recurring revenue",
-          description:
-            recurringQuality >= 60
-              ? `Recurring revenue strength is high — ARR is carrying the business.`
-              : `MRR is lagging relative to total. Convert one-time revenue into retainers to stabilize cashflow.`,
-          actions: recurringQuality >= 60
-            ? ["Protect retention (renewals)", "Add expansion offers to lift ARR further"]
-            : ["Offer a maintenance retainer after one-time work", "Bundle reporting + optimization into monthly plans"]
-        });
-      }
+      const chartData = [...base, bridge, ...forecastRows];
+      return { chartData, hasForecast: true };
+    }
 
-      return insights.slice(0, 6);
+    // =========================
+    // CLIENT INTELLIGENCE (Option B)
+    // =========================
+    function scoreClientIntelligence(client) {
+      const status = String(client?.status || "").toLowerCase();
+      const isActive = status === "active";
+      const health = Number(client?.health_score ?? client?.healthScore ?? 0);
+      const mrr = Number(client?.mrr ?? client?.monthlyRevenue ?? 0);
+
+      // Scale banding
+      let band = "micro";
+      if (mrr >= 25000) band = "enterprise";
+      else if (mrr >= 10000) band = "growth";
+      else if (mrr >= 5000) band = "starter";
+
+      // ---- Churn Risk Score (0 = low risk, 100 = high risk)
+      // Stronger, more "enterprise" weighting:
+      // - health is primary signal
+      // - inactive status spikes risk
+      // - small MRR accounts more fragile
+      // - enterprise clients churn less frequently (slightly lower base risk)
+      let churn = 0;
+
+      // health contribution
+      if (health >= 92) churn += 8;
+      else if (health >= 85) churn += 18;
+      else if (health >= 75) churn += 35;
+      else if (health >= 65) churn += 55;
+      else churn += 72;
+
+      // status contribution
+      if (!isActive) churn += 25;
+
+      // MRR fragility
+      if (mrr < 3000) churn += 18;
+      else if (mrr < 6000) churn += 10;
+      else if (mrr < 10000) churn += 6;
+
+      // band adjustment
+      if (band === "enterprise") churn -= 6;
+      if (band === "micro") churn += 6;
+
+      churn = clamp(churn, 0, 100);
+
+      let churnLevel = "LOW";
+      if (churn >= 70) churnLevel = "HIGH";
+      else if (churn >= 40) churnLevel = "MEDIUM";
+
+      // confidence: higher when health is extreme or status inactive
+      let churnConf = 72;
+      if (health >= 90 || health <= 65) churnConf += 12;
+      if (!isActive) churnConf += 10;
+      if (band === "enterprise") churnConf += 4;
+      churnConf = clamp(churnConf, 55, 95);
+
+      // ---- Expansion Opportunity Score (0 = no, 100 = very strong)
+      // Higher for strong health + active + not already huge ARR
+      let opp = 0;
+
+      if (!isActive) opp -= 15;
+
+      if (health >= 92) opp += 55;
+      else if (health >= 85) opp += 44;
+      else if (health >= 75) opp += 30;
+      else if (health >= 65) opp += 18;
+      else opp += 8;
+
+      // sweet spot for expansion: growth/starter (room to grow)
+      if (band === "starter") opp += 18;
+      if (band === "growth") opp += 22;
+      if (band === "enterprise") opp += 10; // still can expand (cross-sell), but lower % gain
+
+      // MRR ceiling: if already enterprise, keep opp modest
+      if (mrr >= 40000) opp -= 10;
+
+      opp = clamp(opp, 0, 100);
+
+      let oppLevel = "NO";
+      if (opp >= 70) oppLevel = "YES";
+      else if (opp >= 45) oppLevel = "MAYBE";
+
+      let oppConf = 70;
+      if (health >= 90) oppConf += 10;
+      if (band === "growth" || band === "starter") oppConf += 6;
+      if (!isActive) oppConf -= 10;
+      oppConf = clamp(oppConf, 50, 94);
+
+      return {
+        band,
+        churn: { score: churn, level: churnLevel, confidence: churnConf },
+        opportunity: { score: opp, level: oppLevel, confidence: oppConf }
+      };
     }
 
     // =========================
@@ -780,22 +761,24 @@
 
         try {
           if (mode === "demo") {
-            // DEMO: summary derived from entries + GENERATED insights + demo clients
             const summary = buildSummaryFromEntries(demoEntries);
             setRevenueSummary(summary);
 
-            // ✅ Generated insights (replaces hard-coded list)
-            setInsights(generateInsightsFromRevenue(summary));
+            setInsights([
+              { id: 1, type: "opportunity", impact: "HIGH", confidence: 92, title: "SEO is driving profitable growth", description: "SEO revenue share is strong. Increase content velocity + internal linking to expand compounding returns." },
+              { id: 2, type: "warning", impact: "MEDIUM", confidence: 84, title: "Paid Ads efficiency drift detected", description: "Paid Ads entries show higher volatility. Review CAC and tighten targeting for stability." },
+              { id: 3, type: "success", impact: "HIGH", confidence: 90, title: "Recurring revenue base is healthy", description: "Recurring entries are building predictable MRR. Add upsell bundles to lift ARR." }
+            ]);
 
             setClients([
               { id: 1, company_name: "TechCorp Industries", industry: "IT Services", status: "active", mrr: 12500, health_score: 92 },
-              { id: 2, company_name: "BluePeak Manufacturing", industry: "Manufacturing", status: "active", mrr: 9800, health_score: 88 },
-              { id: 3, company_name: "Summit Staffing Group", industry: "Staffing", status: "active", mrr: 15500, health_score: 91 }
+              { id: 2, company_name: "BluePeak Manufacturing", industry: "Manufacturing", status: "active", mrr: 9800, health_score: 78 },
+              { id: 3, company_name: "Summit Staffing Group", industry: "Staffing", status: "active", mrr: 15500, health_score: 88 },
+              { id: 4, company_name: "Pioneer Legal Advisors", industry: "Professional Services", status: "inactive", mrr: 4200, health_score: 62 }
             ]);
 
             setToast("Demo data loaded.");
           } else {
-            // LIVE: pull from backend
             const [rev, ins, cls] = await Promise.all([
               api.get("/revenue/summary", token),
               api.get("/insights/latest?limit=5", token).catch(()=>({ data: { insights: [] } })),
@@ -803,13 +786,9 @@
             ]);
 
             const normalized = normalizeRevenue(rev?.data || rev);
-
             setRevenueSummary(normalized);
 
-            // ✅ If backend has no insights yet, generate from revenue summary so Insights tab is never blank
-            const liveInsights = ins?.data?.insights || [];
-            setInsights(liveInsights.length ? liveInsights : generateInsightsFromRevenue(normalized));
-
+            setInsights(ins?.data?.insights || []);
             setClients(Array.isArray(cls?.data) ? cls.data : []);
             setToast("Live data synced.");
           }
@@ -827,7 +806,6 @@
         setMode(next);
         localStorage.setItem(LS_MODE, next);
         setToast(next === "demo" ? "Switched to Demo mode." : "Switched to Live mode.");
-        // reload after mode switch
         setLoading(true);
         setTimeout(() => loadAll(true), 150);
       }
@@ -836,16 +814,11 @@
         if (mode === "demo") {
           const next = [{ ...entry, id: crypto?.randomUUID?.() || String(Math.random()) }, ...demoEntries];
           setDemoEntries(next);
-          // immediately recompute demo summary + insights for smooth feel
-          const summary = buildSummaryFromEntries(next);
-          setRevenueSummary(summary);
-          setInsights(generateInsightsFromRevenue(summary));
+          setRevenueSummary(buildSummaryFromEntries(next));
           setToast("Revenue entry saved (Demo).");
           return;
         }
 
-        // LIVE: try to post to backend. Endpoint may differ in your backend — adjust if needed.
-        // Common guesses: /revenue/entries or /revenue/entry
         const payload = {
           date: entry.date,
           amount: Number(entry.amount),
@@ -855,12 +828,10 @@
         };
 
         try {
-          // Try the most likely endpoint first:
           await api.post("/revenue/entries", payload, token);
           setToast("Revenue entry created (Live).");
         } catch (e1) {
           try {
-            // Fallback attempt:
             await api.post("/revenue/entry", payload, token);
             setToast("Revenue entry created (Live).");
           } catch (e2) {
@@ -870,7 +841,6 @@
           }
         }
 
-        // Reload live summary after create
         loadAll();
       }
 
@@ -886,7 +856,6 @@
 
       return (
         <div className="shell">
-          {/* Header */}
           <div className="row" style={{ marginBottom: 12 }}>
             <div className="grow">
               <div style={{ fontSize: 34, fontWeight: 950, letterSpacing: .2 }}>Revenue Intelligence Platform</div>
@@ -924,7 +893,6 @@
 
           {errorBanner && <div className="alert">{errorBanner}</div>}
 
-          {/* Navigation */}
           <div className="nav">
             {["overview", "insights", "clients"].map(v => (
               <button
@@ -937,7 +905,6 @@
             ))}
           </div>
 
-          {/* Content */}
           {activeView === "overview" && (
             <OverviewView
               data={revenueSummary}
@@ -950,7 +917,6 @@
 
           {activeView === "clients" && <ClientsView clients={clients} />}
 
-          {/* Add Revenue Modal */}
           <AddRevenueModal
             open={showAddRevenue}
             onClose={() => setShowAddRevenue(false)}
@@ -972,7 +938,7 @@
     };
 
     // =========================
-    // OVERVIEW VIEW
+    // OVERVIEW VIEW (Forecast added)
     // =========================
     function OverviewView({ data, mode, onAddRevenue }) {
       const safe = data || normalizeRevenue({});
@@ -986,6 +952,11 @@
       const hasTrend = Array.isArray(safe.by_period) && safe.by_period.length > 0 && safe.by_period.some(p => p.revenue > 0);
       const hasSource = Array.isArray(safe.by_source) && safe.by_source.length > 0 && safe.by_source.some(s => s.revenue > 0);
 
+      const { chartData, hasForecast } = useMemo(() => {
+        if (!hasTrend) return { chartData: [], hasForecast: false };
+        return buildForecastSeries(safe.by_period, 3);
+      }, [hasTrend, safe.by_period]);
+
       return (
         <div>
           <div className="row" style={{ marginBottom: 14 }}>
@@ -995,9 +966,13 @@
             <div className="muted small">
               {mode === "demo" ? "Add entries to see charts update instantly." : "Creates an entry in your backend (if endpoint exists)."}
             </div>
+            {hasForecast && (
+              <div className="pill pillDemo" title="Forecast extends the trend using the last 3 periods.">
+                Forecast: Next 3 periods (dashed)
+              </div>
+            )}
           </div>
 
-          {/* KPI Cards */}
           <div className="gridKpi">
             <div className="kpi">
               <div className="kpiLabel">Total Revenue</div>
@@ -1024,7 +999,6 @@
             </div>
           </div>
 
-          {/* Charts */}
           <div className="twoCol">
             <div className="card panel">
               <div className="panelTitle">Revenue Trend</div>
@@ -1034,7 +1008,7 @@
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height={320}>
-                  <AreaChart data={safe.by_period}>
+                  <AreaChart data={chartData}>
                     <defs>
                       <linearGradient id="revFill" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#00D9FF" stopOpacity={0.28} />
@@ -1050,9 +1024,34 @@
                         border: "1px solid rgba(255,255,255,0.12)",
                         borderRadius: 10
                       }}
-                      formatter={(v)=>[`$${fmtMoney(v)}`, "Revenue"]}
+                      formatter={(v, name, ctx) => {
+                        const label = name === "actual" ? "Actual Revenue" : "Forecast Revenue";
+                        return [`$${fmtMoney(v)}`, label];
+                      }}
                     />
-                    <Area type="monotone" dataKey="revenue" stroke="#00D9FF" fill="url(#revFill)" strokeWidth={2} />
+
+                    {/* Actual area */}
+                    <Area
+                      type="monotone"
+                      dataKey="actual"
+                      stroke="#00D9FF"
+                      fill="url(#revFill)"
+                      strokeWidth={2}
+                      connectNulls={true}
+                    />
+
+                    {/* Forecast dashed line */}
+                    {hasForecast && (
+                      <Line
+                        type="monotone"
+                        dataKey="forecast"
+                        stroke="#7BEFFF"
+                        strokeWidth={2}
+                        strokeDasharray="6 6"
+                        dot={false}
+                        connectNulls={true}
+                      />
+                    )}
                   </AreaChart>
                 </ResponsiveContainer>
               )}
@@ -1104,74 +1103,21 @@
     };
 
     // =========================
-    // INSIGHTS VIEW (EXEC SUMMARY + ACTIONS + COPY)
+    // INSIGHTS VIEW
     // =========================
     function InsightsView({ insights }) {
-      const list = Array.isArray(insights) ? insights : [];
-      const exec = list.find(x => (x.title || "").toLowerCase().includes("executive summary"));
-      const rest = list.filter(x => x !== exec);
-
       return (
         <div>
-          <div style={{ fontSize: 24, fontWeight: 950, marginBottom: 12 }}>Revenue Intelligence</div>
-          <div className="muted" style={{ marginBottom: 16, lineHeight: 1.5 }}>
-            Executive-grade insights that translate numbers into decisions: what changed, why it matters, and what to do next.
-          </div>
+          <div style={{ fontSize: 24, fontWeight: 950, marginBottom: 16 }}>AI-Powered Insights</div>
 
-          {exec && (
-            <div className="card" style={{ padding: 18, marginBottom: 14, border: "1px solid rgba(0,217,255,0.22)" }}>
-              <div className="row" style={{ justifyContent: "space-between", marginBottom: 10 }}>
-                <div className="pill pillDemo" style={{ borderColor: "rgba(0,217,255,0.32)" }}>
-                  EXECUTIVE SUMMARY
-                </div>
-                <button
-                  className="btn"
-                  onClick={() => navigator.clipboard?.writeText(exec.description || "")}
-                  title="Copy summary"
-                >
-                  Copy
-                </button>
-              </div>
-
-              <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 8 }}>
-                {exec.title}
-              </div>
-              <div className="muted" style={{ lineHeight: 1.6 }}>
-                {exec.description}
-              </div>
-
-              {Array.isArray(exec.actions) && exec.actions.length > 0 && (
-                <div style={{ marginTop: 14 }}>
-                  <div style={{ fontWeight: 950, marginBottom: 8 }}>Recommended Actions</div>
-                  <div style={{ display: "grid", gap: 8 }}>
-                    {exec.actions.map((a, i) => (
-                      <div
-                        key={i}
-                        style={{
-                          padding: "10px 12px",
-                          borderRadius: 12,
-                          border: "1px solid rgba(255,255,255,0.10)",
-                          background: "rgba(255,255,255,0.03)"
-                        }}
-                      >
-                        <span style={{ color: "#00FF88", fontWeight: 950, marginRight: 10 }}>→</span>
-                        <span className="muted">{a}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {!rest.length ? (
+          {!insights || insights.length === 0 ? (
             <div className="muted" style={{ padding: 28, textAlign: "center" }}>
               No insights available yet.
             </div>
           ) : (
             <div style={{ display: "grid", gap: 14 }}>
-              {rest.map((ins) => {
-                const type = (ins.type || "success").toLowerCase();
+              {insights.map((ins) => {
+                const type = ins.type || "success";
                 const border =
                   type === "opportunity" ? "rgba(0,217,255,0.35)" :
                   type === "warning" ? "rgba(255,184,0,0.35)" :
@@ -1182,42 +1128,31 @@
                   type === "warning" ? "#FFB800" :
                   "#00FF88";
 
-                const confidence = ins.confidence || 80;
-
                 return (
-                  <div
-                    key={ins.id}
-                    className="card"
-                    style={{ padding: 18, borderColor: border, borderLeft: `4px solid ${left}` }}
-                  >
+                  <div key={ins.id} className="card" style={{ padding: 18, borderColor: border, borderLeft: `4px solid ${left}` }}>
                     <div className="row" style={{ justifyContent: "space-between", marginBottom: 10 }}>
                       <div className="row">
-                        <span
-                          className="pill"
-                          style={{
-                            borderColor: border,
-                            background: "rgba(255,255,255,0.02)",
-                            color: left
-                          }}
-                        >
+                        <span className="pill" style={{
+                          borderColor: border,
+                          background: "rgba(255,255,255,0.02)",
+                          color: left
+                        }}>
                           {String(type).toUpperCase()}
                         </span>
                         <span className="muted small" style={{ fontWeight: 900 }}>
-                          {(ins.impact || "MEDIUM")} IMPACT
+                          {ins.impact || "MEDIUM"} IMPACT
                         </span>
                       </div>
 
-                      <div
-                        style={{
-                          padding: "8px 12px",
-                          borderRadius: 12,
-                          background: "rgba(0,217,255,0.08)",
-                          border: "1px solid rgba(0,217,255,0.18)",
-                          textAlign: "center",
-                          minWidth: 88
-                        }}
-                      >
-                        <div style={{ fontSize: 18, fontWeight: 950, color: "#00D9FF" }}>{confidence}%</div>
+                      <div style={{
+                        padding: "8px 12px",
+                        borderRadius: 12,
+                        background: "rgba(0,217,255,0.08)",
+                        border: "1px solid rgba(0,217,255,0.18)",
+                        textAlign: "center",
+                        minWidth: 88
+                      }}>
+                        <div style={{ fontSize: 18, fontWeight: 950, color: "#00D9FF" }}>{ins.confidence || 80}%</div>
                         <div className="muted" style={{ fontSize: 10, fontWeight: 900 }}>CONFIDENCE</div>
                       </div>
                     </div>
@@ -1225,34 +1160,9 @@
                     <div style={{ fontSize: 16, fontWeight: 950, marginBottom: 6 }}>
                       {ins.title || "Insight"}
                     </div>
-
                     <div className="muted" style={{ lineHeight: 1.55 }}>
                       {ins.description || "No description."}
                     </div>
-
-                    {Array.isArray(ins.actions) && ins.actions.length > 0 && (
-                      <div style={{ marginTop: 12 }}>
-                        <div className="muted small" style={{ fontWeight: 900, marginBottom: 8 }}>
-                          What to do next
-                        </div>
-                        <div style={{ display: "grid", gap: 8 }}>
-                          {ins.actions.slice(0, 3).map((a, i) => (
-                            <div
-                              key={i}
-                              style={{
-                                padding: "10px 12px",
-                                borderRadius: 12,
-                                border: "1px solid rgba(255,255,255,0.10)",
-                                background: "rgba(255,255,255,0.03)"
-                              }}
-                            >
-                              <span style={{ color: left, fontWeight: 950, marginRight: 10 }}>→</span>
-                              <span className="muted">{a}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 );
               })}
@@ -1265,12 +1175,15 @@
     InsightsView.propTypes = { insights: PropTypes.array };
 
     // =========================
-    // CLIENTS VIEW
+    // CLIENTS VIEW (Option B Intelligence)
     // =========================
     function ClientsView({ clients }) {
       return (
         <div>
-          <div style={{ fontSize: 24, fontWeight: 950, marginBottom: 16 }}>Client Portfolio</div>
+          <div style={{ fontSize: 24, fontWeight: 950, marginBottom: 8 }}>Client Portfolio</div>
+          <div className="muted small" style={{ marginBottom: 16 }}>
+            Client Intelligence uses health + MRR + status + scale banding to produce churn risk and expansion signals.
+          </div>
 
           {!clients || clients.length === 0 ? (
             <div className="muted" style={{ padding: 28, textAlign: "center" }}>
@@ -1280,13 +1193,30 @@
             <div style={{ display: "grid", gap: 12 }}>
               {clients.map((c) => {
                 const status = (c.status || "").toLowerCase();
-                const active = status === "active" || status === "ACTIVE".toLowerCase();
+                const active = status === "active";
+
+                const intel = scoreClientIntelligence(c);
+
+                // risk pill class
+                const riskClass =
+                  intel.churn.level === "HIGH" ? "pillRiskHigh" :
+                  intel.churn.level === "MEDIUM" ? "pillRiskMed" :
+                  "pillRiskLow";
+
+                // opp pill class
+                const oppClass =
+                  intel.opportunity.level === "YES" ? "pillOppYes" :
+                  intel.opportunity.level === "MAYBE" ? "pillOppMaybe" :
+                  "pillOppNo";
+
                 return (
                   <div key={c.id} className="card" style={{ padding: 18 }}>
                     <div className="row" style={{ justifyContent: "space-between", marginBottom: 12 }}>
-                      <div>
+                      <div style={{ minWidth: 220 }}>
                         <div style={{ fontSize: 16, fontWeight: 950 }}>{c.company_name || c.name || "Client"}</div>
-                        <div className="muted small" style={{ marginTop: 4 }}>{c.industry || "—"}</div>
+                        <div className="muted small" style={{ marginTop: 4 }}>
+                          {c.industry || "—"} • <span className="mono">{intel.band.toUpperCase()}</span>
+                        </div>
                       </div>
 
                       <div style={{ textAlign: "right" }}>
@@ -1304,6 +1234,32 @@
                         <div className="muted small" style={{ fontWeight: 900 }}>Health</div>
                         <div style={{ fontWeight: 950, color: "#00FF88" }}>{(c.health_score || c.healthScore || 85)}%</div>
                       </div>
+                    </div>
+
+                    {/* Intelligence Row */}
+                    <div className="row" style={{ marginTop: 14, gap: 10 }}>
+                      <span className={"pill " + riskClass} title={`Churn score: ${intel.churn.score}/100`}>
+                        Churn Risk: {intel.churn.level} • {intel.churn.confidence}%
+                      </span>
+
+                      <span className={"pill " + oppClass} title={`Opportunity score: ${intel.opportunity.score}/100`}>
+                        Expansion: {intel.opportunity.level} • {intel.opportunity.confidence}%
+                      </span>
+
+                      <span className="pill" style={{ borderColor: "rgba(0,217,255,0.18)", background: "rgba(0,217,255,0.06)", color: "#7BEFFF" }}>
+                        AI Signal
+                      </span>
+                    </div>
+
+                    {/* Explanation microtext */}
+                    <div className="muted small" style={{ marginTop: 10, lineHeight: 1.45 }}>
+                      {intel.churn.level === "HIGH" && "⚠ Risk elevated. Recommended: executive check-in + deliver quick-win + tighten SLA."}
+                      {intel.churn.level === "MEDIUM" && "🟠 Monitor. Recommended: clarify next milestone + surface ROI snapshot."}
+                      {intel.churn.level === "LOW" && "🟢 Stable. Recommended: quarterly business review + roadmap for next 90 days."}
+                      {" "}
+                      {intel.opportunity.level === "YES" && "🚀 Expansion likely: propose upsell bundle + performance upgrade."}
+                      {intel.opportunity.level === "MAYBE" && "✨ Potential: validate needs + offer pilot add-on."}
+                      {intel.opportunity.level === "NO" && "— Focus on retention + satisfaction."}
                     </div>
                   </div>
                 );
