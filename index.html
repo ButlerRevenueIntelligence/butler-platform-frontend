@@ -2,349 +2,275 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Butler & Co Revenue Intelligence Platform</title>
 
-  <!-- React -->
+  <!-- Kill favicon.ico 404 -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%8A%3C/text%3E%3C/svg%3E">
+
+  <!-- React (UMD) -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 
-  <!-- PropTypes required by Recharts UMD -->
+  <!-- Recharts UMD needs PropTypes available -->
   <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
-
-  <!-- Recharts -->
   <script src="https://cdn.jsdelivr.net/npm/recharts@2.5.0/umd/Recharts.min.js"></script>
 
-  <!-- Babel (works on static sites) -->
+  <!-- Babel for in-browser JSX (fine for demos) -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * { margin:0; padding:0; box-sizing:border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-      background: radial-gradient(1200px 700px at 20% 10%, rgba(0,71,255,0.18), transparent 60%),
-                  radial-gradient(900px 600px at 80% 20%, rgba(0,217,255,0.12), transparent 55%),
-                  linear-gradient(135deg, #0A0E1A 0%, #141a2b 100%);
-      color: #fff;
-      min-height: 100vh;
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;
+      background: linear-gradient(135deg, #0A0E1A 0%, #1A1F2E 100%);
+      color:#fff;
+      min-height:100vh;
     }
+    #root { min-height:100vh; }
 
-    a { color: inherit; }
-
-    .container { padding: 24px; max-width: 1200px; margin: 0 auto; }
-    .row { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
-    .spacer { flex: 1; }
-
-    .card {
-      background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 14px;
-      padding: 18px;
-      backdrop-filter: blur(10px);
+    .loading {
+      display:flex; align-items:center; justify-content:center;
+      min-height:100vh; flex-direction:column; gap:16px;
     }
-
-    .kpis {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 16px;
-      margin-top: 16px;
-      margin-bottom: 18px;
+    .spinner {
+      width:56px; height:56px;
+      border:4px solid rgba(0,71,255,.12);
+      border-top:4px solid #0047FF;
+      border-radius:50%;
+      animation:spin 1s linear infinite;
     }
+    @keyframes spin { to { transform:rotate(360deg); } }
 
-    .title { font-size: 32px; font-weight: 800; letter-spacing: 0.2px; }
-    .muted { color: #8B92A8; }
-    .small { font-size: 12px; }
-    .label { font-size: 13px; color: #8B92A8; margin-bottom: 8px; }
-    .value { font-size: 34px; font-weight: 800; }
-    .chip {
-      padding: 6px 10px;
-      border-radius: 999px;
-      font-weight: 700;
-      font-size: 12px;
-      border: 1px solid rgba(255,255,255,0.12);
-      background: rgba(255,255,255,0.04);
+    .shell { padding:24px; min-height:100vh; }
+    .header {
+      margin-bottom:18px;
+      display:flex; justify-content:space-between; align-items:flex-start; gap:16px;
     }
-    .chip.demo { border-color: rgba(0,217,255,0.35); background: rgba(0,217,255,0.08); color: #00D9FF; }
-    .chip.live { border-color: rgba(0,255,136,0.35); background: rgba(0,255,136,0.08); color: #00FF88; }
+    .title h1 { font-size:32px; margin-bottom:6px; }
+    .title p { color:#8B92A8; font-size:14px; }
+
+    .topActions { display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
+    .pill {
+      padding:8px 14px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:700;
+      letter-spacing:.4px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.05);
+      color:#fff;
+    }
+    .pill.demo { border-color: rgba(0,217,255,.35); color:#00D9FF; background: rgba(0,217,255,.08); }
+    .pill.live { border-color: rgba(0,255,136,.35); color:#00FF88; background: rgba(0,255,136,.08); }
 
     .btn {
-      cursor: pointer;
-      border: 1px solid rgba(255,255,255,0.12);
-      background: rgba(255,255,255,0.05);
-      color: #fff;
-      padding: 10px 14px;
-      border-radius: 10px;
-      font-weight: 700;
-      font-size: 14px;
-      transition: transform .06s ease, opacity .15s ease;
+      cursor:pointer;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.06);
+      color:#fff;
+      padding:10px 14px;
+      border-radius:10px;
+      font-size:13px;
+      font-weight:700;
+      transition: transform .08s ease, opacity .2s ease;
+      user-select:none;
     }
-    .btn:hover { opacity: 0.92; }
+    .btn:hover { opacity:.95; }
     .btn:active { transform: translateY(1px); }
     .btn.primary {
-      border: none;
+      border:none;
       background: linear-gradient(135deg, #0047FF, #00D9FF);
     }
     .btn.danger {
-      border-color: rgba(255,51,102,0.4);
-      background: rgba(255,51,102,0.08);
-      color: #FF3366;
+      border:1px solid rgba(255,51,102,.35);
+      background: rgba(255,51,102,.08);
+      color:#FF6B8F;
     }
 
-    .tabs {
-      display: flex; gap: 8px; border-bottom: 1px solid rgba(255,255,255,0.10);
-      margin-top: 20px; margin-bottom: 18px; padding-bottom: 10px;
+    .nav {
+      border-bottom:1px solid rgba(255,255,255,.10);
+      margin-bottom:18px;
+      display:flex; gap:8px; flex-wrap:wrap;
     }
     .tab {
-      padding: 10px 14px;
-      border-radius: 10px;
-      background: transparent;
-      border: 1px solid transparent;
-      color: #8B92A8;
-      font-weight: 800;
-      text-transform: capitalize;
-      cursor: pointer;
+      cursor:pointer;
+      padding:10px 18px;
+      background:transparent;
+      border:none;
+      border-bottom:2px solid transparent;
+      color:#8B92A8;
+      font-weight:800;
+      font-size:13px;
+      text-transform:capitalize;
     }
-    .tab.active {
-      color: #00D9FF;
-      border-color: rgba(0,217,255,0.35);
-      background: rgba(0,217,255,0.08);
-    }
+    .tab.active { color:#00D9FF; border-bottom-color:#00D9FF; }
 
-    .loading {
-      min-height: 70vh;
-      display:flex; align-items:center; justify-content:center;
-      flex-direction:column; gap: 16px;
-      color: #c7cbe0;
-    }
-    .spinner {
-      width: 60px; height: 60px;
-      border: 4px solid rgba(0, 71, 255, 0.12);
-      border-top: 4px solid #00D9FF;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-    @keyframes spin { 0%{ transform: rotate(0deg);} 100%{ transform: rotate(360deg);} }
-
-    .banner {
-      margin-top: 12px;
-      padding: 12px 14px;
-      border-radius: 12px;
-      border: 1px solid rgba(255,184,0,0.25);
-      background: rgba(255,184,0,0.08);
-      color: #ffd48a;
-      font-weight: 700;
+    .rowMeta {
       display:flex;
-      gap: 10px;
+      justify-content:space-between;
       align-items:center;
-      justify-content: space-between;
+      gap:12px;
+      margin: 10px 0 18px;
+      flex-wrap:wrap;
+      color:#8B92A8;
+      font-size:12px;
     }
 
-    .grid2 { display:grid; grid-template-columns: 1.2fr 0.8fr; gap: 16px; }
-    @media (max-width: 980px) { .grid2 { grid-template-columns: 1fr; } }
+    .gridKpis {
+      display:grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap:16px;
+      margin-bottom:18px;
+    }
+    .card {
+      background: rgba(255,255,255,.03);
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:14px;
+      padding:18px;
+    }
+    .kpiLabel { color:#8B92A8; font-size:13px; margin-bottom:8px; }
+    .kpiValue { font-size:34px; font-weight:900; margin-bottom:6px; }
+    .kpiSub { font-size:12px; color:#8B92A8; }
+    .good { color:#00FF88; font-weight:800; }
+    .info { color:#00D9FF; font-weight:800; }
 
-    .modalOverlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.65);
+    .gridCharts {
+      display:grid;
+      grid-template-columns: 1.3fr .9fr;
+      gap:16px;
+    }
+    @media (max-width: 980px) { .gridCharts { grid-template-columns: 1fr; } }
+
+    .chartTitle { font-size:16px; font-weight:900; margin-bottom:10px; }
+
+    .emptyState {
+      text-align:center;
+      padding:56px 18px;
+      color:#8B92A8;
+      border:1px dashed rgba(255,255,255,.14);
+      border-radius:14px;
+      background: rgba(255,255,255,.02);
+    }
+
+    .list { display:grid; gap:12px; }
+    .insight {
+      border-left:4px solid #00FF88;
+      padding:16px;
+      border-radius:14px;
+      background: rgba(255,255,255,.03);
+      border:1px solid rgba(255,255,255,.08);
+    }
+    .badge {
+      display:inline-block;
+      padding:4px 10px;
+      border-radius:999px;
+      font-size:11px;
+      font-weight:900;
+      letter-spacing:.4px;
+      text-transform:uppercase;
+      margin-right:10px;
+    }
+
+    .clientRow {
       display:flex;
-      align-items:center;
-      justify-content:center;
-      padding: 18px;
-      z-index: 50;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:14px;
+      flex-wrap:wrap;
     }
-    .modal {
-      width: 100%;
-      max-width: 520px;
-      border-radius: 14px;
-      background: #0f1425;
-      border: 1px solid rgba(255,255,255,0.12);
-      padding: 18px;
-    }
-    .modal h3 { font-size: 18px; margin-bottom: 12px; }
-    .field { margin-bottom: 12px; }
-    .field label { display:block; font-size: 12px; color: #8B92A8; margin-bottom: 6px; }
-    .field input, .field select {
-      width:100%;
-      padding: 10px 10px;
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 10px;
-      color:#fff;
-      outline:none;
-      font-weight: 700;
-    }
-    .modalFooter { display:flex; gap: 10px; justify-content:flex-end; margin-top: 10px; }
-
-    .list { display:grid; gap: 12px; }
-    .clientTitle { font-size: 16px; font-weight: 900; margin-bottom: 2px; }
-    .pill {
-      display:inline-flex;
-      align-items:center;
-      gap: 6px;
-      padding: 6px 10px;
-      border-radius: 999px;
-      font-weight: 900;
-      font-size: 12px;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.10);
-      color:#cfd3ea;
-    }
-    .pill.ok { border-color: rgba(0,255,136,0.35); background: rgba(0,255,136,0.08); color: #00FF88; }
-    .pill.warn { border-color: rgba(255,184,0,0.35); background: rgba(255,184,0,0.08); color: #FFB800; }
-    .pill.bad { border-color: rgba(255,51,102,0.35); background: rgba(255,51,102,0.08); color: #FF3366; }
-
-    .hr { height:1px; background: rgba(255,255,255,0.08); margin: 12px 0; }
+    .clientName { font-size:16px; font-weight:900; margin-bottom:4px; }
+    .muted { color:#8B92A8; font-size:13px; }
+    .rightMeta { text-align:right; min-width:200px; }
+    .bigMoney { font-size:20px; font-weight:900; }
   </style>
 </head>
+
 <body>
   <div id="root"></div>
 
   <script type="text/babel">
     const { useEffect, useMemo, useState } = React;
     const {
-      AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+      ResponsiveContainer,
+      AreaChart, Area,
+      XAxis, YAxis, CartesianGrid, Tooltip,
       PieChart, Pie, Cell
     } = Recharts;
 
-    // -----------------------------
+    // ---------------------------
     // Config
-    // -----------------------------
-    const API_URL = "https://butler-platform-backend.onrender.com/api/v1";
+    // ---------------------------
+    const API_BASE = "https://butler-platform-backend.onrender.com/api/v1";
 
-    const STORAGE = {
-      mode: "butler_mode",
+    const LS = {
       token: "butler_token",
       user: "butler_user",
+      mode: "butler_mode",                 // "demo" | "live"
       demoRevenue: "butler_demo_revenue",
       demoClients: "butler_demo_clients",
-      demoInsights: "butler_demo_insights",
+      demoInsights: "butler_demo_insights"
     };
 
-    const COLORS = ["#0047FF", "#00D9FF", "#00FF88", "#FFB800", "#FF3366", "#9b59b6"];
+    const safeJSON = (value, fallback) => {
+      try { return JSON.parse(value); } catch { return fallback; }
+    };
 
-    // -----------------------------
-    // Helpers
-    // -----------------------------
-    function safeNumber(n, fallback = 0) {
-      const x = Number(n);
-      return Number.isFinite(x) ? x : fallback;
+    const money = (n) => {
+      const num = Number(n || 0);
+      return num.toLocaleString(undefined, { maximumFractionDigits: 1 });
+    };
+
+    // ---------------------------
+    // Demo data (stable)
+    // ---------------------------
+    const DEFAULT_DEMO_REVENUE = {
+      total_revenue: 295422,
+      mrr: 25109,
+      arr: 301304,
+      previous_period_revenue: 220000,
+      growth_rate: 0.34,
+      by_period: [
+        { period_start: "Jan", revenue: 65000 },
+        { period_start: "Feb", revenue: 62000 },
+        { period_start: "Mar", revenue: 60000 },
+        { period_start: "Apr", revenue: 58500 },
+        { period_start: "May", revenue: 57500 },
+        { period_start: "Jun", revenue: 56000 },
+      ],
+      by_source: [
+        { source: "SEO", revenue: 127000, percentage: 43 },
+        { source: "Paid Ads", revenue: 44000, percentage: 15 },
+        { source: "Direct", revenue: 54000, percentage: 18 },
+        { source: "Referrals", revenue: 70422, percentage: 24 },
+      ]
+    };
+
+    const DEFAULT_DEMO_CLIENTS = [
+      { id: 1, company_name: "TechCorp Industries", industry: "IT Services", status: "ACTIVE", mrr: 12500, health_score: 92 },
+      { id: 2, company_name: "Orlando Manufacturing Group", industry: "Manufacturing", status: "ACTIVE", mrr: 8600, health_score: 88 },
+    ];
+
+    const DEFAULT_DEMO_INSIGHTS = [
+      { id: 1, type: "opportunity", impact: "HIGH", confidence: 92, title: "Upsell window detected", description: "Client engagement and retention signals indicate strong expansion potential this month." },
+      { id: 2, type: "warning", impact: "MEDIUM", confidence: 79, title: "Campaign volatility risk", description: "Paid performance is showing variance; recommend tightening targeting and budget pacing." },
+      { id: 3, type: "success", impact: "HIGH", confidence: 88, title: "SEO momentum accelerating", description: "Organic visibility and conversions are trending up; prioritize content & link velocity." },
+    ];
+
+    function loadLS(key, fallback) {
+      const raw = localStorage.getItem(key);
+      return raw ? safeJSON(raw, fallback) : fallback;
     }
-
-    function formatMoney(n) {
-      return "$" + safeNumber(n, 0).toLocaleString();
-    }
-
-    function todayISO() {
-      const d = new Date();
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, "0");
-      const dd = String(d.getDate()).padStart(2, "0");
-      return `${yyyy}-${mm}-${dd}`;
-    }
-
-    function getLS(key, fallback) {
-      try {
-        const raw = localStorage.getItem(key);
-        return raw ? JSON.parse(raw) : fallback;
-      } catch {
-        return fallback;
-      }
-    }
-
-    function setLS(key, value) {
+    function saveLS(key, value) {
       localStorage.setItem(key, JSON.stringify(value));
     }
 
-    function normalizeRevenueFromApi(apiObj) {
-      // handles snake_case or other names
-      const total = safeNumber(apiObj?.total_revenue ?? apiObj?.totalRevenue ?? apiObj?.total, 0);
-      const mrr = safeNumber(apiObj?.mrr ?? apiObj?.monthly_recurring_revenue ?? apiObj?.monthlyRecurringRevenue ?? apiObj?.monthly, 0);
-      const arr = safeNumber(apiObj?.arr ?? apiObj?.annual_recurring_revenue ?? apiObj?.annualRecurringRevenue ?? apiObj?.annual, 0);
-
-      const prev = safeNumber(
-        apiObj?.previous_period_revenue ??
-        apiObj?.previousPeriodRevenue ??
-        apiObj?.prev_total_revenue ??
-        apiObj?.prev ??
-        0,
-        0
-      );
-
-      // growth rate can be provided or calculated
-      let growthRate = apiObj?.growth_rate;
-      if (growthRate == null) {
-        growthRate = prev > 0 ? (total - prev) / prev : null;
-      }
-      const g = (growthRate == null) ? null : safeNumber(growthRate, null);
-
-      // charts (optional)
-      const byPeriod = Array.isArray(apiObj?.by_period) ? apiObj.by_period : [];
-      const bySource = Array.isArray(apiObj?.by_source) ? apiObj.by_source : [];
-
-      return {
-        totalRevenue: total,
-        mrr,
-        arr,
-        previousPeriodRevenue: prev,
-        growthRate: (g == null || !Number.isFinite(g)) ? null : g,
-        byPeriod,
-        bySource
-      };
-    }
-
-    function buildRevenueBySourceFromEntries(entries) {
-      // super simple "source" assignment for demo
-      const sources = ["SEO", "Paid Ads", "Email", "Referrals"];
-      const totals = {};
-      for (const e of entries) {
-        const src = e.source || sources[Math.floor(Math.random() * sources.length)];
-        totals[src] = (totals[src] || 0) + safeNumber(e.amount, 0);
-      }
-      const total = Object.values(totals).reduce((a,b)=>a+b,0) || 1;
-      return Object.keys(totals).map((k)=>({
-        source: k,
-        revenue: totals[k],
-        percentage: Math.round((totals[k] / total) * 100)
-      }));
-    }
-
-    function buildRevenueByPeriod(entries) {
-      // group by month (YYYY-MM)
-      const buckets = {};
-      for (const e of entries) {
-        const date = e.date || todayISO();
-        const month = date.slice(0, 7);
-        buckets[month] = (buckets[month] || 0) + safeNumber(e.amount, 0);
-      }
-      const keys = Object.keys(buckets).sort();
-      return keys.map((k)=>({ period_start: k, revenue: buckets[k] }));
-    }
-
-    function normalizeClient(c) {
-      return {
-        id: c.id ?? cryptoRandomId(),
-        name: c.name ?? c.company_name ?? "Unnamed Client",
-        industry: c.industry ?? "Unknown",
-        status: (c.status ?? "ACTIVE").toUpperCase(),
-        mrr: safeNumber(c.mrr ?? c.monthlyRevenue ?? c.monthly_revenue ?? 0, 0),
-        healthScore: safeNumber(c.healthScore ?? c.health_score ?? 85, 85),
-        churnRisk: c.churnRisk ?? c.churn_risk ?? "Low",
-        growthTrend: c.growthTrend ?? c.growth_trend ?? "Upward",
-      };
-    }
-
-    function cryptoRandomId() {
-      // works even if crypto isn't available in some contexts
-      const r = Math.random().toString(16).slice(2);
-      return `id_${Date.now()}_${r}`;
-    }
-
-    // -----------------------------
-    // API helper
-    // -----------------------------
+    // ---------------------------
+    // API helper (safe)
+    // ---------------------------
     const api = {
       async login(email, password) {
-        const res = await fetch(`${API_URL}/auth/token`, {
+        const res = await fetch(`${API_BASE}/auth/token`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password })
@@ -352,101 +278,18 @@
         if (!res.ok) throw new Error("Login failed");
         return res.json();
       },
-
       async get(endpoint, token) {
-        const res = await fetch(`${API_URL}${endpoint}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json"
-          }
+        const res = await fetch(`${API_BASE}${endpoint}`, {
+          headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" }
         });
-        if (!res.ok) throw new Error("API request failed");
+        if (!res.ok) throw new Error(`GET ${endpoint} failed`);
         return res.json();
       }
     };
 
-    // -----------------------------
-    // Default Demo Data
-    // -----------------------------
-    const DEFAULT_DEMO = {
-      revenue: {
-        totalRevenue: 295422,
-        mrr: 25109,
-        arr: 301304,
-        previousPeriodRevenue: 220000,
-        growthRate: 0.34,
-        entries: [
-          { id: "e1", date: "2026-01-05", amount: 22000, source: "SEO" },
-          { id: "e2", date: "2026-01-12", amount: 18000, source: "Paid Ads" },
-          { id: "e3", date: "2026-01-20", amount: 26000, source: "Referrals" },
-          { id: "e4", date: "2026-02-02", amount: 31000, source: "SEO" },
-          { id: "e5", date: "2026-02-06", amount: 27000, source: "Email" }
-        ]
-      },
-      clients: [
-        { id: 1, name: "TechCorp Industries", industry: "IT Services", status: "ACTIVE", mrr: 12500, healthScore: 92, churnRisk: "Low", growthTrend: "Upward" },
-        { id: 2, name: "Apex Manufacturing", industry: "Manufacturing", status: "ACTIVE", mrr: 8600, healthScore: 88, churnRisk: "Medium", growthTrend: "Upward" },
-        { id: 3, name: "BluePeak Staffing", industry: "Staffing & Recruiting", status: "ACTIVE", mrr: 5400, healthScore: 81, churnRisk: "Low", growthTrend: "Stable" },
-      ],
-      insights: [
-        { id: "i1", type: "opportunity", impact: "HIGH", confidence: 92, title: "Retargeting can lift MRR", description: "Launching a retargeting loop to warm website visitors can increase conversions and stabilize recurring revenue." },
-        { id: "i2", type: "warning", impact: "MEDIUM", confidence: 84, title: "One client showing churn signals", description: "Health score trends indicate potential churn risk. Recommend executive check-in + revised 30-day plan." },
-        { id: "i3", type: "success", impact: "HIGH", confidence: 89, title: "SEO traction compounding", description: "Top pages are climbing. Publishing 4 supporting articles can improve rankings and increase inbound leads." },
-      ]
-    };
-
-    function initDemoStorageIfMissing() {
-      const mode = localStorage.getItem(STORAGE.mode);
-      if (!mode) localStorage.setItem(STORAGE.mode, JSON.stringify("demo"));
-
-      const demoRevenue = getLS(STORAGE.demoRevenue, null);
-      const demoClients = getLS(STORAGE.demoClients, null);
-      const demoInsights = getLS(STORAGE.demoInsights, null);
-
-      if (!demoRevenue) setLS(STORAGE.demoRevenue, DEFAULT_DEMO.revenue);
-      if (!demoClients) setLS(STORAGE.demoClients, DEFAULT_DEMO.clients);
-      if (!demoInsights) setLS(STORAGE.demoInsights, DEFAULT_DEMO.insights);
-    }
-
-    // -----------------------------
-    // Error Boundary
-    // -----------------------------
-    class ErrorBoundary extends React.Component {
-      constructor(props) {
-        super(props);
-        this.state = { hasError: false, error: null };
-      }
-      static getDerivedStateFromError(error) {
-        return { hasError: true, error };
-      }
-      componentDidCatch(error, info) {
-        console.error("UI crashed:", error, info);
-      }
-      render() {
-        if (this.state.hasError) {
-          return (
-            <div className="container">
-              <div className="card" style={{ borderColor: "rgba(255,51,102,0.35)", background: "rgba(255,51,102,0.08)" }}>
-                <div style={{ fontWeight: 900, fontSize: 18, marginBottom: 8 }}>Something crashed in the UI</div>
-                <div className="muted small" style={{ lineHeight: 1.6 }}>
-                  This usually happens from a code mismatch or unexpected API data.
-                  Refresh the page. If it continues, switch to Demo mode.
-                </div>
-                <div className="hr"></div>
-                <pre className="small" style={{ whiteSpace: "pre-wrap", color: "#ffd1db" }}>
-{String(this.state.error)}
-                </pre>
-              </div>
-            </div>
-          );
-        }
-        return this.props.children;
-      }
-    }
-
-    // -----------------------------
+    // ---------------------------
     // Login Page
-    // -----------------------------
+    // ---------------------------
     function LoginPage({ onLogin }) {
       const [email, setEmail] = useState("demo@butlerco.com");
       const [password, setPassword] = useState("demo123");
@@ -457,746 +300,428 @@
         e.preventDefault();
         setLoading(true);
         setError("");
-
         try {
           const data = await api.login(email, password);
           onLogin(data.access_token, data.user || { email });
         } catch (err) {
-          setError("Login failed. If Live mode isn’t ready, switch to Demo mode in the top right after login.");
+          setError("Login failed. Try demo@butlerco.com / demo123 (or switch to DEMO mode).");
         } finally {
           setLoading(false);
         }
       };
 
       return (
-        <div className="container" style={{ minHeight: "100vh", display:"flex", alignItems:"center", justifyContent:"center" }}>
-          <div className="card" style={{ width:"100%", maxWidth: 460, padding: 22 }}>
-            <div style={{ textAlign:"center", marginBottom: 14 }}>
-              <div style={{
-                width: 64, height: 64, margin:"0 auto 12px",
-                borderRadius: 14,
-                background: "linear-gradient(135deg, #0047FF, #00D9FF)",
-                display:"flex", alignItems:"center", justifyContent:"center",
-                fontSize: 30
-              }}>📊</div>
-              <div style={{ fontSize: 22, fontWeight: 900 }}>Butler & Co</div>
-              <div className="muted">Revenue Intelligence Platform</div>
+        <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
+          <div style={{ maxWidth:420, width:"100%", background:"rgba(255,255,255,0.03)", padding:36, borderRadius:16, border:"1px solid rgba(255,255,255,0.1)" }}>
+            <div style={{ textAlign:"center", marginBottom:22 }}>
+              <div style={{ width:58, height:58, background:"linear-gradient(135deg, #0047FF, #00D9FF)", borderRadius:12, margin:"0 auto 14px", display:"flex", alignItems:"center", justifyContent:"center", fontSize:26 }}>📊</div>
+              <h1 style={{ fontSize:22, marginBottom:6 }}>Butler & Co</h1>
+              <p style={{ color:"#8B92A8", fontSize:13 }}>Revenue Intelligence Platform</p>
             </div>
 
             {error && (
-              <div className="banner" style={{ borderColor:"rgba(255,51,102,0.35)", background:"rgba(255,51,102,0.08)", color:"#ffd1db" }}>
-                <span>⚠️ {error}</span>
+              <div style={{ background:"rgba(255,51,102,0.1)", border:"1px solid #FF3366", padding:12, borderRadius:10, marginBottom:16, fontSize:13 }}>
+                {error}
               </div>
             )}
 
-            <form onSubmit={submit} style={{ marginTop: 14 }}>
-              <div className="field">
-                <label>Email</label>
-                <input value={email} onChange={(e)=>setEmail(e.target.value)} type="email" required />
-              </div>
-              <div className="field">
-                <label>Password</label>
-                <input value={password} onChange={(e)=>setPassword(e.target.value)} type="password" required />
+            <form onSubmit={submit}>
+              <div style={{ marginBottom:14 }}>
+                <label style={{ display:"block", marginBottom:8, fontSize:13, color:"#8B92A8" }}>Email</label>
+                <input
+                  type="email"
+                  autoComplete="username"
+                  value={email}
+                  onChange={(e)=>setEmail(e.target.value)}
+                  style={{ width:"100%", padding:12, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:10, color:"#fff", fontSize:14 }}
+                  required
+                />
               </div>
 
-              <button className="btn primary" style={{ width:"100%", padding: 12 }} disabled={loading} type="submit">
+              <div style={{ marginBottom:18 }}>
+                <label style={{ display:"block", marginBottom:8, fontSize:13, color:"#8B92A8" }}>Password</label>
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e)=>setPassword(e.target.value)}
+                  style={{ width:"100%", padding:12, background:"rgba(255,255,255,0.05)", border:"1px solid rgba(255,255,255,0.1)", borderRadius:10, color:"#fff", fontSize:14 }}
+                  required
+                />
+              </div>
+
+              <button className="btn primary" type="submit" disabled={loading} style={{ width:"100%", opacity: loading ? .7 : 1 }}>
                 {loading ? "Signing in..." : "Sign In"}
               </button>
             </form>
 
-            <div className="hr"></div>
-            <div className="muted small">
-              Demo credentials are pre-filled. If Live mode isn’t ready yet, you can still run the full demo experience.
+            <div style={{ marginTop:16, padding:14, background:"rgba(0,217,255,0.05)", border:"1px solid rgba(0,217,255,0.2)", borderRadius:12, fontSize:12, color:"#8B92A8" }}>
+              <strong style={{ color:"#00D9FF" }}>Tip:</strong> If LIVE login fails, switch to DEMO mode on the dashboard after you log in once, or we can auto-force DEMO mode.
             </div>
           </div>
         </div>
       );
     }
 
-    // -----------------------------
-    // Modals
-    // -----------------------------
-    function Modal({ title, children, onClose }) {
+    // ---------------------------
+    // Overview / Insights / Clients
+    // ---------------------------
+    function OverviewView({ data }) {
+      if (!data) return <div className="emptyState">No revenue data available.</div>;
+
+      const COLORS = ["#0047FF", "#00D9FF", "#00FF88", "#FFB800"];
+
+      const growthText = (data.growth_rate != null)
+        ? `${(Number(data.growth_rate) * 100).toFixed(1)}%`
+        : "34.0%";
+
       return (
-        <div className="modalOverlay" onMouseDown={onClose}>
-          <div className="modal" onMouseDown={(e)=>e.stopPropagation()}>
-            <div className="row" style={{ marginBottom: 10 }}>
-              <h3>{title}</h3>
-              <div className="spacer"></div>
-              <button className="btn" onClick={onClose}>✕</button>
+        <div>
+          <div className="gridKpis">
+            <div className="card">
+              <div className="kpiLabel">Total Revenue</div>
+              <div className="kpiValue">${money(data.total_revenue)}</div>
+              <div className="kpiSub"><span className="good">↗</span> Executive snapshot</div>
             </div>
-            {children}
+
+            <div className="card">
+              <div className="kpiLabel">Monthly Recurring Revenue</div>
+              <div className="kpiValue">${money(data.mrr)}</div>
+              <div className="kpiSub"><span className="good">↗</span> Stability indicator</div>
+            </div>
+
+            <div className="card">
+              <div className="kpiLabel">Annual Recurring Revenue</div>
+              <div className="kpiValue">${money(data.arr)}</div>
+              <div className="kpiSub"><span className="info">●</span> Projected run-rate</div>
+            </div>
+
+            <div className="card">
+              <div className="kpiLabel">Growth Rate</div>
+              <div className="kpiValue"><span className="good">{growthText}</span></div>
+              <div className="kpiSub">Compared to previous period</div>
+            </div>
+          </div>
+
+          <div className="gridCharts">
+            <div className="card">
+              <div className="chartTitle">Revenue Trend</div>
+              {Array.isArray(data.by_period) && data.by_period.length > 0 ? (
+                <ResponsiveContainer width="100%" height={280}>
+                  <AreaChart data={data.by_period}>
+                    <defs>
+                      <linearGradient id="revFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#00D9FF" stopOpacity={0.28} />
+                        <stop offset="95%" stopColor="#00D9FF" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                    <XAxis dataKey="period_start" stroke="#8B92A8" />
+                    <YAxis stroke="#8B92A8" />
+                    <Tooltip contentStyle={{ background:"rgba(10,14,26,.95)", border:"1px solid rgba(255,255,255,.1)", borderRadius:10 }} />
+                    <Area type="monotone" dataKey="revenue" stroke="#00D9FF" fill="url(#revFill)" strokeWidth={2} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="emptyState">No trend data yet.</div>
+              )}
+            </div>
+
+            <div className="card">
+              <div className="chartTitle">Revenue by Source</div>
+              {Array.isArray(data.by_source) && data.by_source.length > 0 ? (
+                <ResponsiveContainer width="100%" height={280}>
+                  <PieChart>
+                    <Pie
+                      data={data.by_source}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={96}
+                      dataKey="revenue"
+                      labelLine={false}
+                      label={({ source, percentage }) => `${source} ${percentage || ""}%`}
+                    >
+                      {data.by_source.map((_, idx) => (
+                        <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={{ background:"rgba(10,14,26,.95)", border:"1px solid rgba(255,255,255,.1)", borderRadius:10 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="emptyState">No source breakdown yet.</div>
+              )}
+            </div>
           </div>
         </div>
       );
     }
 
-    // -----------------------------
+    function InsightsView({ insights }) {
+      if (!insights || insights.length === 0) {
+        return <div className="emptyState">No insights yet. Check back soon.</div>;
+      }
+
+      const styleFor = (type) => {
+        if (type === "opportunity") return { border:"#00D9FF", bg:"rgba(0,217,255,.10)", text:"#00D9FF" };
+        if (type === "warning") return { border:"#FFB800", bg:"rgba(255,184,0,.10)", text:"#FFB800" };
+        return { border:"#00FF88", bg:"rgba(0,255,136,.10)", text:"#00FF88" };
+      };
+
+      return (
+        <div className="list">
+          {insights.map(i => {
+            const s = styleFor(i.type);
+            return (
+              <div className="insight" key={i.id} style={{ borderLeftColor:s.border }}>
+                <div style={{ display:"flex", justifyContent:"space-between", gap:12, flexWrap:"wrap", marginBottom:10 }}>
+                  <div>
+                    <span className="badge" style={{ background:s.bg, color:s.text, border:`1px solid ${s.border}55` }}>{i.type}</span>
+                    <span className="muted">{i.impact} IMPACT</span>
+                  </div>
+                  <div className="pill" style={{ borderColor:"rgba(0,217,255,.25)", color:"#00D9FF" }}>
+                    {i.confidence}% CONFIDENCE
+                  </div>
+                </div>
+                <div style={{ fontSize:17, fontWeight:900, marginBottom:6 }}>{i.title}</div>
+                <div className="muted" style={{ lineHeight:1.55 }}>{i.description}</div>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    function ClientsView({ clients }) {
+      if (!clients || clients.length === 0) {
+        return <div className="emptyState">No clients yet. Add clients to track performance.</div>;
+      }
+
+      const normStatus = (s) => String(s || "").toUpperCase();
+
+      return (
+        <div className="list">
+          {clients.map(c => {
+            const status = normStatus(c.status);
+            const active = status === "ACTIVE";
+            return (
+              <div className="card" key={c.id}>
+                <div className="clientRow">
+                  <div>
+                    <div className="clientName">{c.company_name || c.name || "Client"}</div>
+                    <div className="muted">{c.industry || "—"}</div>
+                  </div>
+
+                  <div className="rightMeta">
+                    <div className="bigMoney">${money(c.mrr || c.monthlyRevenue || 0)}</div>
+                    <div className="muted">Monthly Recurring</div>
+                  </div>
+                </div>
+
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, marginTop:14 }}>
+                  <div>
+                    <div className="muted" style={{ fontSize:12, marginBottom:8 }}>Status</div>
+                    <span className="badge" style={{
+                      background: active ? "rgba(0,255,136,.10)" : "rgba(255,184,0,.10)",
+                      color: active ? "#00FF88" : "#FFB800",
+                      border: `1px solid ${active ? "rgba(0,255,136,.35)" : "rgba(255,184,0,.35)"}`
+                    }}>
+                      {status || "—"}
+                    </span>
+                  </div>
+                  <div>
+                    <div className="muted" style={{ fontSize:12, marginBottom:8 }}>Health Score</div>
+                    <div style={{ fontSize:18, fontWeight:900, color:"#00FF88" }}>
+                      {Number(c.health_score ?? c.healthScore ?? 85)}%
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    // ---------------------------
     // Dashboard
-    // -----------------------------
+    // ---------------------------
     function Dashboard({ token, user, onLogout }) {
       const [activeView, setActiveView] = useState("overview");
-      const [mode, setMode] = useState(getLS(STORAGE.mode, "demo"));
       const [loading, setLoading] = useState(true);
-      const [warning, setWarning] = useState("");
 
-      const [revenue, setRevenue] = useState(null); // normalized revenue object
-      const [clients, setClients] = useState([]);
+      // mode persisted
+      const [mode, setMode] = useState(() => localStorage.getItem(LS.mode) || "demo"); // default demo
+
+      // state data
+      const [revenueData, setRevenueData] = useState(null);
       const [insights, setInsights] = useState([]);
+      const [clients, setClients] = useState([]);
 
-      const [showAddClient, setShowAddClient] = useState(false);
-      const [showAddRevenue, setShowAddRevenue] = useState(false);
+      // Load demo storage (stable)
+      const demoRevenue = useMemo(() => loadLS(LS.demoRevenue, DEFAULT_DEMO_REVENUE), []);
+      const demoClients = useMemo(() => loadLS(LS.demoClients, DEFAULT_DEMO_CLIENTS), []);
+      const demoInsights = useMemo(() => loadLS(LS.demoInsights, DEFAULT_DEMO_INSIGHTS), []);
 
-      // Keep mode in storage
-      useEffect(() => {
-        setLS(STORAGE.mode, mode);
-      }, [mode]);
+      // persist demo edits if you later add actions
+      useEffect(() => saveLS(LS.demoRevenue, demoRevenue), []);
+      useEffect(() => saveLS(LS.demoClients, demoClients), []);
+      useEffect(() => saveLS(LS.demoInsights, demoInsights), []);
 
-      // ----- DEMO load/save -----
-      function loadDemoAll() {
-        const demoRevenue = getLS(STORAGE.demoRevenue, DEFAULT_DEMO.revenue);
-        const demoClients = getLS(STORAGE.demoClients, DEFAULT_DEMO.clients);
-        const demoInsights = getLS(STORAGE.demoInsights, DEFAULT_DEMO.insights);
+      const setModeSafe = (next) => {
+        const val = next === "live" ? "live" : "demo";
+        setMode(val);
+        localStorage.setItem(LS.mode, val);
+      };
 
-        // Build charts if missing
-        const entries = Array.isArray(demoRevenue.entries) ? demoRevenue.entries : [];
-        const byPeriod = buildRevenueByPeriod(entries);
-        const bySource = buildRevenueBySourceFromEntries(entries);
+      const loadData = async () => {
+        setLoading(true);
 
-        const normalized = {
-          totalRevenue: safeNumber(demoRevenue.totalRevenue ?? demoRevenue.total_revenue ?? DEFAULT_DEMO.revenue.totalRevenue, DEFAULT_DEMO.revenue.totalRevenue),
-          mrr: safeNumber(demoRevenue.mrr ?? DEFAULT_DEMO.revenue.mrr, DEFAULT_DEMO.revenue.mrr),
-          arr: safeNumber(demoRevenue.arr ?? DEFAULT_DEMO.revenue.arr, DEFAULT_DEMO.revenue.arr),
-          previousPeriodRevenue: safeNumber(demoRevenue.previousPeriodRevenue ?? DEFAULT_DEMO.revenue.previousPeriodRevenue, DEFAULT_DEMO.revenue.previousPeriodRevenue),
-          growthRate: (demoRevenue.growthRate == null)
-            ? (safeNumber(demoRevenue.previousPeriodRevenue, 0) > 0 ? (safeNumber(demoRevenue.totalRevenue,0) - safeNumber(demoRevenue.previousPeriodRevenue,0)) / safeNumber(demoRevenue.previousPeriodRevenue,1) : DEFAULT_DEMO.revenue.growthRate)
-            : safeNumber(demoRevenue.growthRate, DEFAULT_DEMO.revenue.growthRate),
-          byPeriod,
-          bySource,
-          entries
-        };
+        // DEMO mode: instant
+        if (mode === "demo") {
+          setRevenueData(loadLS(LS.demoRevenue, DEFAULT_DEMO_REVENUE));
+          setInsights(loadLS(LS.demoInsights, DEFAULT_DEMO_INSIGHTS));
+          setClients(loadLS(LS.demoClients, DEFAULT_DEMO_CLIENTS));
+          setLoading(false);
+          return;
+        }
 
-        setRevenue(normalized);
-        setClients((demoClients || []).map(normalizeClient));
-        setInsights(demoInsights || []);
-      }
-
-      function saveDemoRevenue(nextRevenue) {
-        // Save only the parts we want persistent in demo
-        setLS(STORAGE.demoRevenue, {
-          totalRevenue: nextRevenue.totalRevenue,
-          mrr: nextRevenue.mrr,
-          arr: nextRevenue.arr,
-          previousPeriodRevenue: nextRevenue.previousPeriodRevenue,
-          growthRate: nextRevenue.growthRate,
-          entries: nextRevenue.entries || []
-        });
-      }
-
-      function saveDemoClients(nextClients) {
-        setLS(STORAGE.demoClients, nextClients.map(c => ({
-          id: c.id, name: c.name, industry: c.industry, status: c.status,
-          mrr: c.mrr, healthScore: c.healthScore, churnRisk: c.churnRisk, growthTrend: c.growthTrend
-        })));
-      }
-
-      function saveDemoInsights(nextInsights) {
-        setLS(STORAGE.demoInsights, nextInsights);
-      }
-
-      // ----- LIVE load -----
-      async function loadLiveAll() {
-        setWarning("");
+        // LIVE mode: try API, fallback to demo if API fails
         try {
           const [revRes, insRes, cliRes] = await Promise.all([
             api.get("/revenue/summary", token),
             api.get("/insights/latest?limit=5", token),
-            api.get("/clients", token)
+            api.get("/clients", token),
           ]);
 
-          const revApi = revRes?.data ?? revRes ?? {};
-          const normalizedRev = normalizeRevenueFromApi(revApi);
+          const rev = (revRes && revRes.data && Object.keys(revRes.data).length)
+            ? revRes.data
+            : loadLS(LS.demoRevenue, DEFAULT_DEMO_REVENUE);
 
-          // If API doesn't provide charts, create a tiny placeholder trend so UI looks complete
-          if (!normalizedRev.byPeriod || normalizedRev.byPeriod.length === 0) {
-            normalizedRev.byPeriod = [
-              { period_start: "2026-01", revenue: Math.round(normalizedRev.totalRevenue * 0.35) },
-              { period_start: "2026-02", revenue: Math.round(normalizedRev.totalRevenue * 0.65) }
-            ];
-          }
-          if (!normalizedRev.bySource || normalizedRev.bySource.length === 0) {
-            normalizedRev.bySource = [
-              { source: "SEO", revenue: Math.round(normalizedRev.totalRevenue * 0.45), percentage: 45 },
-              { source: "Paid Ads", revenue: Math.round(normalizedRev.totalRevenue * 0.35), percentage: 35 },
-              { source: "Referrals", revenue: Math.round(normalizedRev.totalRevenue * 0.20), percentage: 20 }
-            ];
-          }
+          const ins = (insRes && insRes.data && Array.isArray(insRes.data.insights))
+            ? insRes.data.insights
+            : loadLS(LS.demoInsights, DEFAULT_DEMO_INSIGHTS);
 
-          const ins = insRes?.data?.insights || insRes?.data || [];
-          const cli = cliRes?.data?.clients || cliRes?.data || cliRes || [];
+          const cls = (cliRes && cliRes.data && Array.isArray(cliRes.data))
+            ? cliRes.data
+            : loadLS(LS.demoClients, DEFAULT_DEMO_CLIENTS);
 
-          setRevenue(normalizedRev);
-          setInsights(Array.isArray(ins) ? ins : []);
-          setClients(Array.isArray(cli) ? cli.map(normalizeClient) : []);
-
+          setRevenueData(rev);
+          setInsights(ins);
+          setClients(cls);
         } catch (e) {
-          console.error("Live load failed:", e);
-          setWarning("Live mode couldn’t load from API right now. Showing Demo data instead.");
-          loadDemoAll();
-        }
-      }
-
-      // -----------------------------
-      // loadData (IMPORTANT ORDER)
-      // -----------------------------
-      const loadData = async () => {
-        setLoading(true);
-        try {
-          if (mode === "demo") {
-            loadDemoAll();
-          } else {
-            await loadLiveAll();
-          }
+          console.warn("LIVE mode failed, falling back to DEMO:", e);
+          setModeSafe("demo");
+          setRevenueData(loadLS(LS.demoRevenue, DEFAULT_DEMO_REVENUE));
+          setInsights(loadLS(LS.demoInsights, DEFAULT_DEMO_INSIGHTS));
+          setClients(loadLS(LS.demoClients, DEFAULT_DEMO_CLIENTS));
         } finally {
           setLoading(false);
         }
       };
 
-      // ✅ useEffect AFTER loadData exists
-      useEffect(() => {
-        initDemoStorageIfMissing();
-        loadData();
-      }, [mode]);
+      useEffect(() => { loadData(); }, [mode]);
 
-      // -----------------------------
-      // Actions
-      // -----------------------------
-      function toggleMode() {
-        setMode(prev => (prev === "demo" ? "live" : "demo"));
-      }
-
-      function addClient(newClient) {
-        const next = [normalizeClient(newClient), ...clients];
-        setClients(next);
-        if (mode === "demo") saveDemoClients(next);
-      }
-
-      function addRevenueEntry(entry) {
-        // demo-only action (safe to allow in live visually, but it updates only demo storage)
-        const current = revenue || normalizeRevenueFromApi({});
-        const entries = Array.isArray(current.entries) ? current.entries : [];
-        const nextEntries = [{ id: cryptoRandomId(), ...entry }, ...entries];
-
-        // recompute totals
-        const added = safeNumber(entry.amount, 0);
-        const nextTotal = safeNumber(current.totalRevenue, 0) + added;
-
-        // keep prev period stable so growth stays meaningful
-        const prev = safeNumber(current.previousPeriodRevenue, DEFAULT_DEMO.revenue.previousPeriodRevenue);
-
-        const growth = prev > 0 ? (nextTotal - prev) / prev : null;
-
-        const byPeriod = buildRevenueByPeriod(nextEntries);
-        const bySource = buildRevenueBySourceFromEntries(nextEntries);
-
-        const nextRevenue = {
-          ...current,
-          totalRevenue: nextTotal,
-          growthRate: (growth == null || !Number.isFinite(growth)) ? null : growth,
-          byPeriod,
-          bySource,
-          entries: nextEntries
-        };
-
-        setRevenue(nextRevenue);
-        if (mode === "demo") saveDemoRevenue(nextRevenue);
-      }
-
-      // -----------------------------
-      // Render
-      // -----------------------------
       if (loading) {
         return (
-          <div className="container">
-            <div className="loading">
-              <div className="spinner"></div>
-              <div style={{ fontWeight: 900 }}>Loading platform data...</div>
-              <div className="muted small">Mode: {mode.toUpperCase()}</div>
-            </div>
+          <div className="loading">
+            <div className="spinner"></div>
+            <div>Loading platform data...</div>
           </div>
         );
       }
 
+      const displayName = user?.firstName || user?.email || "Demo";
+
       return (
-        <div className="container">
-          {/* Top Header */}
-          <div className="row" style={{ marginBottom: 14 }}>
-            <div>
-              <div className="title">Revenue Intelligence Platform</div>
-              <div className="muted">Welcome back, {user?.firstName || user?.email || "Demo"}</div>
+        <div className="shell">
+          <div className="header">
+            <div className="title">
+              <h1>Revenue Intelligence Platform</h1>
+              <p>Welcome back, {displayName}</p>
             </div>
 
-            <div className="spacer"></div>
+            <div className="topActions">
+              <span className={`pill ${mode === "demo" ? "demo" : "live"}`}>
+                {mode === "demo" ? "DEMO MODE" : "LIVE MODE"}
+              </span>
 
-            <span className={"chip " + (mode === "demo" ? "demo" : "live")}>
-              {mode === "demo" ? "DEMO MODE" : "LIVE MODE"}
-            </span>
+              <button className="btn" onClick={loadData}>↻ Refresh</button>
 
-            <button className="btn" onClick={loadData}>↻ Refresh</button>
+              {mode === "demo" ? (
+                <button className="btn" onClick={() => setModeSafe("live")}>Switch to Live</button>
+              ) : (
+                <button className="btn" onClick={() => setModeSafe("demo")}>Switch to Demo</button>
+              )}
 
-            <button className="btn" onClick={toggleMode}>
-              Switch to {mode === "demo" ? "Live" : "Demo"}
-            </button>
-
-            <button className="btn danger" onClick={onLogout}>Sign Out</button>
+              <button className="btn danger" onClick={onLogout}>Sign Out</button>
+            </div>
           </div>
 
-          {warning && (
-            <div className="banner">
-              <span>⚠️ {warning}</span>
-              <button className="btn" onClick={() => setWarning("")}>Dismiss</button>
-            </div>
-          )}
-
-          {/* Tabs */}
-          <div className="tabs">
-            {["overview", "insights", "clients"].map((t) => (
+          <div className="nav">
+            {["overview","insights","clients"].map(v => (
               <button
-                key={t}
-                className={"tab " + (activeView === t ? "active" : "")}
-                onClick={() => setActiveView(t)}
+                key={v}
+                className={`tab ${activeView === v ? "active" : ""}`}
+                onClick={() => setActiveView(v)}
               >
-                {t}
+                {v}
               </button>
             ))}
           </div>
 
-          {/* Action bar */}
-          <div className="row" style={{ marginBottom: 12 }}>
-            {activeView === "overview" && (
-              <>
-                <button className="btn primary" onClick={() => setShowAddRevenue(true)}>
-                  + Add Revenue Entry
-                </button>
-                <div className="muted small">
-                  Tip: Demo mode saves changes in your browser (localStorage).
-                </div>
-              </>
-            )}
-
-            {activeView === "clients" && (
-              <>
-                <button className="btn primary" onClick={() => setShowAddClient(true)}>
-                  + Add Client
-                </button>
-                <div className="muted small">
-                  Demo mode: client list persists even after refresh.
-                </div>
-              </>
-            )}
-
-            <div className="spacer"></div>
-
-            <div className="muted small">
-              API: {API_URL}
+          <div className="rowMeta">
+            <div>
+              <button className="btn primary" onClick={() => alert("Next: Add Revenue Entry modal (we can build this).")}>
+                + Add Revenue Entry
+              </button>
+              <span style={{ marginLeft:12 }}>
+                Tip: Demo mode saves changes in your browser (localStorage).
+              </span>
+            </div>
+            <div>
+              API: <span className="muted">{API_BASE}</span>
             </div>
           </div>
 
-          {/* Views */}
-          {activeView === "overview" && <OverviewView revenue={revenue} />}
+          {activeView === "overview" && <OverviewView data={revenueData} />}
           {activeView === "insights" && <InsightsView insights={insights} />}
           {activeView === "clients" && <ClientsView clients={clients} />}
-
-          {/* Modals */}
-          {showAddClient && (
-            <AddClientModal
-              onClose={() => setShowAddClient(false)}
-              onSave={(c) => { addClient(c); setShowAddClient(false); }}
-            />
-          )}
-
-          {showAddRevenue && (
-            <AddRevenueModal
-              onClose={() => setShowAddRevenue(false)}
-              onSave={(e) => { addRevenueEntry(e); setShowAddRevenue(false); }}
-            />
-          )}
         </div>
       );
     }
 
-    // -----------------------------
-    // Overview View
-    // -----------------------------
-    function OverviewView({ revenue }) {
-      if (!revenue) return <div className="card">No revenue data available.</div>;
-
-      const total = safeNumber(revenue.totalRevenue, 0);
-      const mrr = safeNumber(revenue.mrr, 0);
-      const arr = safeNumber(revenue.arr, 0);
-
-      // Growth rate safe
-      const g = revenue.growthRate;
-      const growthText = (g == null || !Number.isFinite(g))
-        ? "—"
-        : `${(g * 100).toFixed(1)}%`;
-
-      const growthColor = (g == null) ? "#8B92A8" : (g >= 0 ? "#00FF88" : "#FF3366");
-
-      const byPeriod = Array.isArray(revenue.byPeriod) ? revenue.byPeriod : [];
-      const bySource = Array.isArray(revenue.bySource) ? revenue.bySource : [];
-
-      return (
-        <div>
-          <div className="kpis">
-            <div className="card">
-              <div className="label">Total Revenue</div>
-              <div className="value">{formatMoney(total)}</div>
-              <div className="muted small">Executive snapshot</div>
-            </div>
-
-            <div className="card">
-              <div className="label">Monthly Recurring Revenue</div>
-              <div className="value">{formatMoney(mrr)}</div>
-              <div className="muted small">Stability indicator</div>
-            </div>
-
-            <div className="card">
-              <div className="label">Annual Recurring Revenue</div>
-              <div className="value">{formatMoney(arr)}</div>
-              <div className="muted small">Projected run-rate</div>
-            </div>
-
-            <div className="card">
-              <div className="label">Growth Rate</div>
-              <div className="value" style={{ color: growthColor }}>{growthText}</div>
-              <div className="muted small">Compared to previous period</div>
-            </div>
-          </div>
-
-          <div className="grid2">
-            <div className="card">
-              <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 12 }}>Revenue Trend</div>
-              {byPeriod.length === 0 ? (
-                <div className="muted small">No trend data available.</div>
-              ) : (
-                <ResponsiveContainer width="100%" height={320}>
-                  <AreaChart data={byPeriod}>
-                    <defs>
-                      <linearGradient id="gradRev" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#00D9FF" stopOpacity={0.30} />
-                        <stop offset="95%" stopColor="#00D9FF" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                    <XAxis dataKey="period_start" stroke="#8B92A8" />
-                    <YAxis stroke="#8B92A8" />
-                    <Tooltip
-                      contentStyle={{
-                        background: "rgba(10, 14, 26, 0.95)",
-                        border: "1px solid rgba(255,255,255,0.12)",
-                        borderRadius: "10px",
-                        color: "#fff"
-                      }}
-                      formatter={(val) => formatMoney(val)}
-                    />
-                    <Area type="monotone" dataKey="revenue" stroke="#00D9FF" fill="url(#gradRev)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-
-            <div className="card">
-              <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 12 }}>Revenue by Source</div>
-              {bySource.length === 0 ? (
-                <div className="muted small">No source breakdown available.</div>
-              ) : (
-                <ResponsiveContainer width="100%" height={320}>
-                  <PieChart>
-                    <Pie
-                      data={bySource}
-                      dataKey="revenue"
-                      nameKey="source"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={105}
-                      labelLine={false}
-                      label={({ source, percentage }) => `${source} ${percentage || ""}%`}
-                    >
-                      {bySource.map((_, i) => (
-                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        background: "rgba(10, 14, 26, 0.95)",
-                        border: "1px solid rgba(255,255,255,0.12)",
-                        borderRadius: "10px",
-                        color: "#fff"
-                      }}
-                      formatter={(val) => formatMoney(val)}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    // -----------------------------
-    // Insights View
-    // -----------------------------
-    function InsightsView({ insights }) {
-      const list = Array.isArray(insights) ? insights : [];
-      return (
-        <div>
-          <div className="row" style={{ marginBottom: 12 }}>
-            <div style={{ fontWeight: 900, fontSize: 20 }}>AI-Powered Insights</div>
-            <div className="spacer"></div>
-            <div className="muted small">Short, executive-ready recommendations</div>
-          </div>
-
-          {list.length === 0 ? (
-            <div className="card muted" style={{ padding: 20 }}>No insights available yet.</div>
-          ) : (
-            <div className="list">
-              {list.map((ins) => {
-                const type = (ins.type || "success").toLowerCase();
-                const pillClass = type === "warning" ? "warn" : (type === "opportunity" ? "ok" : "ok");
-                return (
-                  <div key={ins.id || cryptoRandomId()} className="card">
-                    <div className="row" style={{ marginBottom: 10 }}>
-                      <span className={"pill " + pillClass}>
-                        {type.toUpperCase()}
-                      </span>
-                      <span className="muted small">Impact: {ins.impact || "—"}</span>
-                      <span className="muted small">Confidence: {ins.confidence || "—"}%</span>
-                      <div className="spacer"></div>
-                    </div>
-                    <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 6 }}>
-                      {ins.title || "Insight"}
-                    </div>
-                    <div className="muted" style={{ lineHeight: 1.6 }}>
-                      {ins.description || "—"}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    // -----------------------------
-    // Clients View
-    // -----------------------------
-    function ClientsView({ clients }) {
-      const list = Array.isArray(clients) ? clients : [];
-      return (
-        <div>
-          <div className="row" style={{ marginBottom: 12 }}>
-            <div style={{ fontWeight: 900, fontSize: 20 }}>Client Portfolio</div>
-            <div className="spacer"></div>
-            <div className="muted small">{list.length} clients tracked</div>
-          </div>
-
-          {list.length === 0 ? (
-            <div className="card muted" style={{ padding: 20 }}>No clients yet.</div>
-          ) : (
-            <div className="list">
-              {list.map((c) => {
-                const status = (c.status || "ACTIVE").toUpperCase();
-                const statusClass = status === "ACTIVE" ? "ok" : (status === "PAUSED" ? "warn" : "bad");
-
-                return (
-                  <div key={c.id} className="card">
-                    <div className="row" style={{ marginBottom: 10 }}>
-                      <div>
-                        <div className="clientTitle">{c.name}</div>
-                        <div className="muted small">{c.industry}</div>
-                      </div>
-
-                      <div className="spacer"></div>
-
-                      <span className={"pill " + statusClass}>{status}</span>
-                    </div>
-
-                    <div className="row" style={{ gap: 12 }}>
-                      <div className="card" style={{ padding: 12, flex: 1 }}>
-                        <div className="muted small">MRR</div>
-                        <div style={{ fontWeight: 900, fontSize: 18 }}>{formatMoney(c.mrr)}</div>
-                      </div>
-                      <div className="card" style={{ padding: 12, flex: 1 }}>
-                        <div className="muted small">Health Score</div>
-                        <div style={{ fontWeight: 900, fontSize: 18, color: c.healthScore >= 85 ? "#00FF88" : c.healthScore >= 70 ? "#FFB800" : "#FF3366" }}>
-                          {safeNumber(c.healthScore, 0)}%
-                        </div>
-                      </div>
-                      <div className="card" style={{ padding: 12, flex: 1 }}>
-                        <div className="muted small">Churn Risk</div>
-                        <div style={{ fontWeight: 900, fontSize: 18 }}>{c.churnRisk}</div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    // -----------------------------
-    // Add Client Modal
-    // -----------------------------
-    function AddClientModal({ onClose, onSave }) {
-      const [name, setName] = useState("");
-      const [industry, setIndustry] = useState("IT Services");
-      const [status, setStatus] = useState("ACTIVE");
-      const [mrr, setMrr] = useState(5000);
-      const [healthScore, setHealthScore] = useState(85);
-
-      return (
-        <Modal title="Add Client" onClose={onClose}>
-          <div className="field">
-            <label>Client Name</label>
-            <input value={name} onChange={(e)=>setName(e.target.value)} placeholder="Example: Free Fly Apparel" />
-          </div>
-
-          <div className="field">
-            <label>Industry</label>
-            <input value={industry} onChange={(e)=>setIndustry(e.target.value)} />
-          </div>
-
-          <div className="row" style={{ gap: 12 }}>
-            <div className="field" style={{ flex: 1 }}>
-              <label>Status</label>
-              <select value={status} onChange={(e)=>setStatus(e.target.value)}>
-                <option value="ACTIVE">ACTIVE</option>
-                <option value="PAUSED">PAUSED</option>
-                <option value="AT_RISK">AT_RISK</option>
-              </select>
-            </div>
-
-            <div className="field" style={{ flex: 1 }}>
-              <label>MRR</label>
-              <input type="number" value={mrr} onChange={(e)=>setMrr(e.target.value)} />
-            </div>
-          </div>
-
-          <div className="field">
-            <label>Health Score (0–100)</label>
-            <input type="number" value={healthScore} onChange={(e)=>setHealthScore(e.target.value)} />
-          </div>
-
-          <div className="modalFooter">
-            <button className="btn" onClick={onClose}>Cancel</button>
-            <button
-              className="btn primary"
-              onClick={() => onSave({
-                id: cryptoRandomId(),
-                name: name.trim() || "New Client",
-                industry,
-                status,
-                mrr: safeNumber(mrr, 0),
-                healthScore: Math.max(0, Math.min(100, safeNumber(healthScore, 85))),
-                churnRisk: status === "AT_RISK" ? "High" : "Low",
-                growthTrend: "Upward"
-              })}
-            >
-              Save Client
-            </button>
-          </div>
-        </Modal>
-      );
-    }
-
-    // -----------------------------
-    // Add Revenue Modal
-    // -----------------------------
-    function AddRevenueModal({ onClose, onSave }) {
-      const [amount, setAmount] = useState(10000);
-      const [date, setDate] = useState(todayISO());
-      const [source, setSource] = useState("SEO");
-
-      return (
-        <Modal title="Add Revenue Entry" onClose={onClose}>
-          <div className="field">
-            <label>Amount</label>
-            <input type="number" value={amount} onChange={(e)=>setAmount(e.target.value)} />
-          </div>
-
-          <div className="field">
-            <label>Date</label>
-            <input type="date" value={date} onChange={(e)=>setDate(e.target.value)} />
-          </div>
-
-          <div className="field">
-            <label>Source</label>
-            <select value={source} onChange={(e)=>setSource(e.target.value)}>
-              <option>SEO</option>
-              <option>Paid Ads</option>
-              <option>Email</option>
-              <option>Referrals</option>
-              <option>Partnerships</option>
-            </select>
-          </div>
-
-          <div className="modalFooter">
-            <button className="btn" onClick={onClose}>Cancel</button>
-            <button
-              className="btn primary"
-              onClick={() => onSave({
-                amount: safeNumber(amount, 0),
-                date,
-                source
-              })}
-            >
-              Add Revenue
-            </button>
-          </div>
-        </Modal>
-      );
-    }
-
-    // -----------------------------
+    // ---------------------------
     // App
-    // -----------------------------
+    // ---------------------------
     function App() {
-      initDemoStorageIfMissing();
+      const [token, setToken] = useState(localStorage.getItem(LS.token));
+      const [user, setUser] = useState(() => safeJSON(localStorage.getItem(LS.user) || "null", null));
 
-      const [token, setToken] = useState(getLS(STORAGE.token, null));
-      const [user, setUser] = useState(getLS(STORAGE.user, null));
-
-      const handleLogin = (t, u) => {
+      const onLogin = (t, u) => {
         setToken(t);
         setUser(u);
-        setLS(STORAGE.token, t);
-        setLS(STORAGE.user, u);
+        localStorage.setItem(LS.token, t);
+        localStorage.setItem(LS.user, JSON.stringify(u));
       };
 
-      const handleLogout = () => {
+      const onLogout = () => {
         setToken(null);
         setUser(null);
-        localStorage.removeItem(STORAGE.token);
-        localStorage.removeItem(STORAGE.user);
+        localStorage.removeItem(LS.token);
+        localStorage.removeItem(LS.user);
       };
 
-      if (!token) return <LoginPage onLogin={handleLogin} />;
+      // If no token, show login (you can still run DEMO once logged in)
+      if (!token) return <LoginPage onLogin={onLogin} />;
 
-      return (
-        <ErrorBoundary>
-          <Dashboard token={token} user={user} onLogout={handleLogout} />
-        </ErrorBoundary>
-      );
+      return <Dashboard token={token} user={user} onLogout={onLogout} />;
     }
 
-    // Render
+    // render
     const root = ReactDOM.createRoot(document.getElementById("root"));
     root.render(<App />);
   </script>
 </body>
 </html>
+
