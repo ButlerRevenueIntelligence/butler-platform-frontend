@@ -1,0 +1,103 @@
+.authShell{
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:48px 18px;
+}
+
+.authCard{
+  width: 460px;
+  max-width: 100%;
+  background: rgba(16, 26, 58, 0.72);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 18px;
+  padding: 22px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+  backdrop-filter: blur(10px);
+}
+
+.brandRow{
+  display:flex;
+  gap:12px;
+  align-items:center;
+  margin-bottom: 14px;
+}
+
+.brandDot{
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(110,168,255,0.95), rgba(143,211,255,0.55));
+  box-shadow: 0 12px 30px rgba(110,168,255,0.25);
+}
+
+.brandTitle{
+  margin:0;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.brandSub{
+  margin:4px 0 0;
+  color: rgba(234,240,255,0.70);
+  font-size: 13px;
+}
+
+.field{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin-top: 12px;
+}
+
+.label{
+  font-size: 13px;
+  color: rgba(234,240,255,0.75);
+}
+
+.input{
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.06);
+  color: rgba(234,240,255,0.95);
+  padding: 12px 12px;
+  border-radius: 12px;
+  outline: none;
+}
+
+.input:focus{
+  border-color: rgba(143,211,255,0.45);
+  box-shadow: 0 0 0 4px rgba(110,168,255,0.12);
+}
+
+.primaryBtn{
+  width:100%;
+  margin-top: 16px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: linear-gradient(135deg, rgba(110,168,255,0.85), rgba(143,211,255,0.35));
+  color: rgba(255,255,255,0.95);
+  padding: 12px 14px;
+  border-radius: 12px;
+  cursor:pointer;
+  font-weight: 700;
+}
+
+.primaryBtn:hover{
+  filter: brightness(1.04);
+}
+
+.helperRow{
+  margin-top: 12px;
+  color: rgba(234,240,255,0.70);
+  font-size: 13px;
+}
+
+.errBox{
+  margin-top: 12px;
+  border: 1px solid rgba(255,140,140,0.35);
+  background: rgba(255,140,140,0.10);
+  color: rgba(255,220,220,0.95);
+  padding: 10px 12px;
+  border-radius: 12px;
+}

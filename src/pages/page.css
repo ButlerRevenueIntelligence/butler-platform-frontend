@@ -1,0 +1,304 @@
+.shell{
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:48px 18px;
+}
+
+.wrap{
+  width: 980px;
+  max-width: 100%;
+}
+
+.topbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  margin-bottom:16px;
+}
+
+.h1{
+  font-size:48px;
+  line-height:1.05;
+  margin:0;
+  letter-spacing:-0.02em;
+}
+
+.sub{
+  margin:8px 0 0;
+  color: var(--muted);
+  font-size:14px;
+}
+
+.btn{
+  border:1px solid var(--stroke);
+  background: rgba(255,255,255,0.06);
+  color: var(--text);
+  padding:10px 14px;
+  border-radius:12px;
+  cursor:pointer;
+}
+.btn:hover{
+  background: rgba(255,255,255,0.10);
+}
+
+.grid{
+  display:grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap:16px;
+  margin-top:18px;
+}
+
+@media (max-width: 900px){
+  .grid{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.card{
+  background: var(--panel);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius);
+  padding:18px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
+}
+
+.label{
+  color: var(--muted);
+  font-size:13px;
+  margin:0 0 8px;
+}
+
+.value{
+  font-size:28px;
+  font-weight:700;
+  margin:0;
+}
+
+.section{
+  margin-top:16px;
+  display:grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap:16px;
+}
+
+@media (max-width: 900px){
+  .section{ grid-template-columns: 1fr; }
+}
+
+.list{
+  margin:0;
+  padding-left:18px;
+  color: var(--muted);
+}
+.small{
+  color: rgba(234,240,255,0.55);
+  font-size:12px;
+  margin-top:10px;
+}
+.clientForm {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.clientForm input,
+.clientForm select {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: none;
+}
+
+.filterRow {
+  margin: 15px 0;
+  display: flex;
+  gap: 10px;
+}
+
+.clientTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.clientTable th,
+.clientTable td {
+  padding: 12px;
+  text-align: left;
+}
+
+.clientTable tr {
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.status {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.status.Active { background: #1f3f2e; }
+.status.AtRisk { background: #4a1f1f; }
+.status.Expansion { background: #1f2f4a; }
+
+.healthBar {
+  position: relative;
+  background: rgba(255,255,255,0.1);
+  border-radius: 6px;
+  height: 20px;
+}
+
+.healthFill {
+  background: linear-gradient(90deg, #00ff99, #00ccff);
+  height: 100%;
+  border-radius: 6px;
+}
+/* ===============================
+   ENTERPRISE VISUAL POLISH
+================================= */
+
+/* Smooth global transitions */
+* {
+  transition: all 0.25s ease;
+}
+
+/* Page background depth */
+.page {
+  background:
+    radial-gradient(circle at 15% 20%, rgba(0,255,255,0.08), transparent 40%),
+    radial-gradient(circle at 85% 75%, rgba(0,120,255,0.08), transparent 40%),
+    linear-gradient(160deg, #05070f, #0b1020 40%, #060913);
+  min-height: 100vh;
+  padding: 30px;
+  color: #e6f1ff;
+}
+/* Header sticky effect */
+.dashHeader {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  backdrop-filter: blur(12px);
+  background: rgba(15, 23, 42, 0.6);
+  padding-bottom: 20px;
+}
+
+/* KPI Card upgrade */
+.kpiCard {
+  background: rgba(10, 15, 30, 0.9);
+  border: 1px solid rgba(0, 200, 255, 0.15);
+  border-radius: 10px;
+  padding: 22px;
+  box-shadow:
+    0 0 30px rgba(0, 200, 255, 0.08),
+    inset 0 0 40px rgba(0, 200, 255, 0.03);
+}
+
+.kpiCard:hover {
+  transform: translateY(-6px);
+  box-shadow:
+    0 0 40px rgba(0, 200, 255, 0.4),
+    inset 0 0 60px rgba(0, 200, 255, 0.06);
+}
+
+/* KPI value glow */
+.kpiValue {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-shadow: 0 0 12px rgba(0, 200, 255, 0.6);
+}
+.kpiValue.green {
+  color: #00ff88;
+  text-shadow:
+    0 0 10px rgba(0,255,150,0.7),
+    0 0 25px rgba(0,255,150,0.5);
+}
+/* Panels */
+.panel {
+  background: rgba(8, 12, 25, 0.95);
+  border: 1px solid rgba(0, 200, 255, 0.1);
+  border-radius: 8px;
+  padding: 22px;
+  box-shadow:
+    0 0 30px rgba(0, 120, 255, 0.08),
+    inset 0 0 50px rgba(0, 120, 255, 0.02);
+}
+
+.panel:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 0 45px rgba(0, 200, 255, 0.25),
+    inset 0 0 60px rgba(0, 200, 255, 0.04);
+}
+
+/* Chart container */
+.chartWrap {
+  padding-top: 10px;
+}
+
+/* Buttons */
+.pill {
+  background: linear-gradient(90deg, #0066ff, #00c6ff);
+  border: none;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 0 20px rgba(0, 150, 255, 0.4);
+}
+
+.pill:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 30px rgba(0, 200, 255, 0.8);
+}
+
+.pill.ghost {
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: none;
+}
+
+/* Signals text */
+.signalLine {
+  margin: 6px 0;
+}
+
+.green {
+  color: #00ff9d;
+}
+
+/* Executive brief */
+.brief {
+  margin-top: 25px;
+}
+
+.briefList li {
+  margin-bottom: 6px;
+}
+
+/* AI Insight Cards */
+.insightCard {
+  background: rgba(255, 255, 255, 0.03);
+  padding: 18px;
+  border-radius: 12px;
+  margin-bottom: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.insightCard:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 0 25px rgba(0, 255, 200, 0.15);
+}
+
+.insightTag {
+  font-size: 11px;
+  padding: 4px 8px;
+  background: rgba(0, 200, 255, 0.2);
+  border-radius: 6px;
+  margin-right: 8px;
+}
+
+.insightConf {
+  font-size: 11px;
+  opacity: 0.8;
+}
