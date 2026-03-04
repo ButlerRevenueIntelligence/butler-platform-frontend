@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:5001/api";
+const API_BASE = import.meta.env.VITE_API_BASE || "https://atlas-backend.onrender.com/api";
 
 // -------------------- Token + Org helpers --------------------
 export function getToken() {
@@ -32,8 +32,9 @@ export function setActiveOrgName(name) {
 
 export function logout() {
   clearToken();
+  clearUser();          // ✅ add this
   setActiveOrgId("");
-  setActiveOrgName(""); // ✅ clear name too
+  setActiveOrgName("");
 }
 
 // -------------------- Core request helpers --------------------
@@ -72,6 +73,25 @@ export const apiPatch = (path, payload) => request(path, { method: "PATCH", body
 export const apiDelete = (path) => request(path, { method: "DELETE" });
 
 export const listPartners = () => apiGet(`/partners`);
+
+// -------------------- User helpers (plan/perms) --------------------
+export function getUser() {
+  try {
+    const raw = localStorage.getItem("butler_user");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setUser(user) {
+  if (!user) localStorage.removeItem("butler_user");
+  else localStorage.setItem("butler_user", JSON.stringify(user));
+}
+
+export function clearUser() {
+  localStorage.removeItem("butler_user");
+}
 
 // -------------------- Auth --------------------
 export const signup = (payload) => apiPost("/auth/signup", payload);

@@ -5,7 +5,7 @@ import {
   switchOrg,
   setActiveOrgId,
   getActiveOrgId,
-  setActiveOrgName, // ✅ pull from api.js (single source of truth)
+  setActiveOrgName,
 } from "../api";
 
 export default function OrgSwitcher({ onSwitched }) {
@@ -21,28 +21,26 @@ export default function OrgSwitcher({ onSwitched }) {
       setErr("");
 
       const res = await getMyOrgs();
-      const items = res?.orgs || [];
-      const list = Array.isArray(items) ? items : [];
+      const list = Array.isArray(res?.orgs) ? res.orgs : [];
       setOrgs(list);
 
       const current = getActiveOrgId();
 
       // If there's no active org yet, pick the first one.
       if (!current && list.length) {
-        const firstOrgId = list[0]?.orgId;
-        const firstOrgName = list[0]?.orgName;
+        const firstOrgId = list[0]?._id;
+        const firstOrgName = list[0]?.name;
 
         if (firstOrgId) {
           setActiveOrgId(firstOrgId);
-          setActive(firstOrgId);
+          setActive(String(firstOrgId));
           setActiveOrgName(firstOrgName || "");
+          if (typeof onSwitched === "function") onSwitched();
         }
       } else {
         setActive(current || "");
-
-        // Ensure active_org_name is synced (in case it was missing)
-        const found = list.find((o) => String(o.orgId) === String(current));
-        if (found?.orgName) setActiveOrgName(found.orgName);
+        const found = list.find((o) => String(o._id) === String(current));
+        if (found?.name) setActiveOrgName(found.name);
       }
     } catch (e) {
       setErr(e?.message || "Failed to load workspaces");
@@ -61,22 +59,19 @@ export default function OrgSwitcher({ onSwitched }) {
     setActive(orgId);
     if (!orgId) return;
 
-    const picked = orgs.find((o) => String(o.orgId) === String(orgId));
+    const picked = orgs.find((o) => String(o._id) === String(orgId));
 
     try {
       setSwitching(true);
       setErr("");
 
-      // validate membership (server)
+      // server validates membership
       await switchOrg(orgId);
 
-      // set client-side active org for x-org-id header
+      // client stores active org (x-org-id header comes from api.js)
       setActiveOrgId(orgId);
+      setActiveOrgName(picked?.name || "");
 
-      // ✅ store name for header display
-      setActiveOrgName(picked?.orgName || "");
-
-      // tell parent (Dashboard) to reload
       if (typeof onSwitched === "function") onSwitched();
     } catch (e2) {
       setErr(e2?.message || "Failed to switch workspace");
@@ -111,8 +106,8 @@ export default function OrgSwitcher({ onSwitched }) {
         </option>
 
         {orgs.map((o) => (
-          <option key={o.orgId} value={o.orgId}>
-            {o.orgName} ({o.role})
+          <option key={o._id} value={o._id}>
+            {o.name}
           </option>
         ))}
       </select>

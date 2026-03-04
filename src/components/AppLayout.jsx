@@ -1,7 +1,13 @@
 // frontend/src/components/AppLayout.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { logout, getActiveOrgId, getActiveOrgName } from "../api";
+import {
+  logout,
+  getActiveOrgId,
+  getActiveOrgName,
+  getUser, // ✅ use this instead of reading storage manually
+} from "../api";
+import { hasPerm } from "../utils/permissions";
 
 const linkStyle = ({ isActive }) => ({
   padding: "10px 12px",
@@ -11,8 +17,12 @@ const linkStyle = ({ isActive }) => ({
   fontSize: 12,
   letterSpacing: 0.6,
   color: "#EAF0FF",
-  border: isActive ? "1px solid rgba(124,92,255,0.55)" : "1px solid rgba(255,255,255,0.10)",
-  background: isActive ? "rgba(124,92,255,0.18)" : "rgba(255,255,255,0.04)",
+  border: isActive
+    ? "1px solid rgba(124,92,255,0.55)"
+    : "1px solid rgba(255,255,255,0.10)",
+  background: isActive
+    ? "rgba(124,92,255,0.18)"
+    : "rgba(255,255,255,0.04)",
 });
 
 const pill = {
@@ -31,24 +41,42 @@ const pill = {
 export default function AppLayout() {
   const nav = useNavigate();
 
-  // Org label (name preferred, id fallback)
-  const orgId = getActiveOrgId();
-  const [workspaceLabel, setWorkspaceLabel] = useState(() => getActiveOrgName() || orgId || "—");
+  // ✅ Read user dynamically (so permissions always reflect login)
+  const [permissions, setPermissions] = useState(() => {
+    const u = getUser();
+    return u?.permissions || u?.perms || [];
+  });
 
-  // keep label fresh if OrgSwitcher updates localStorage
+  const orgId = getActiveOrgId();
+  const [workspaceLabel, setWorkspaceLabel] = useState(
+    () => getActiveOrgName() || orgId || "—"
+  );
+
+  // Sync on storage changes (logout, login, org switch, etc.)
   useEffect(() => {
-    const sync = () => setWorkspaceLabel(getActiveOrgName() || getActiveOrgId() || "—");
+    const sync = () => {
+      const u = getUser();
+      setPermissions(u?.permissions || u?.perms || []);
+      setWorkspaceLabel(getActiveOrgName() || getActiveOrgId() || "—");
+    };
+
     sync();
 
-    // storage event fires across tabs; we still sync once on mount above
     const onStorage = (e) => {
-      if (e.key === "active_org_id" || e.key === "active_org_name") sync();
+      if (
+        e.key === "butler_user" ||
+        e.key === "active_org_id" ||
+        e.key === "active_org_name"
+      ) {
+        sync();
+      }
     };
+
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  // --- Global Mode visuals ---
+  // Clock
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
@@ -57,19 +85,14 @@ export default function AppLayout() {
 
   const localTime = useMemo(() => {
     try {
-      return now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      return now.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
     } catch {
       return "";
     }
   }, [now]);
-
-  const localTz = useMemo(() => {
-    try {
-      return Intl.DateTimeFormat().resolvedOptions().timeZone || "";
-    } catch {
-      return "";
-    }
-  }, []);
 
   const hqTime = useMemo(() => {
     try {
@@ -82,6 +105,14 @@ export default function AppLayout() {
       return "";
     }
   }, [now]);
+
+  const localTz = useMemo(() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+    } catch {
+      return "";
+    }
+  }, []);
 
   return (
     <div style={{ minHeight: "100vh", background: "#070B18" }}>
@@ -105,43 +136,64 @@ export default function AppLayout() {
             alignItems: "center",
           }}
         >
+          {/* Left Side */}
           <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
             <div style={{ display: "grid", lineHeight: 1.1 }}>
               <div style={{ fontWeight: 1000, letterSpacing: 0.8, color: "#EAF0FF" }}>
                 Atlas Revenue AI
               </div>
-              <div style={{ fontSize: 11, opacity: 0.78, color: "#EAF0FF", marginTop: 3 }}>
+              <div style={{ fontSize: 11, opacity: 0.78, marginTop: 3 }}>
                 Global Command Center
               </div>
             </div>
 
-            {/* Empire Nav */}
+            {/* 🔐 Tier-Gated Navigation */}
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <NavLink to="/dashboard" style={linkStyle}>
-                Overview
-              </NavLink>
-              <NavLink to="/revenue-intel" style={linkStyle}>
-                Command Center
-              </NavLink>
-              <NavLink to="/pipeline" style={linkStyle}>
-                Deal Room
-              </NavLink>
-              <NavLink to="/metrics" style={linkStyle}>
-                Market Signals
-              </NavLink>
-              <NavLink to="/clients" style={linkStyle}>
-                Accounts
-              </NavLink>
-              <NavLink to="/partners" style={linkStyle}>
-                Partners
-              </NavLink>
-              <NavLink to="/workspaces" style={linkStyle}>
-                Global HQ
-              </NavLink>
+              {hasPerm(permissions, "dashboard.view") && (
+                <NavLink to="/dashboard" style={linkStyle}>
+                  Overview
+                </NavLink>
+              )}
+
+              {hasPerm(permissions, "command_center.view") && (
+                <NavLink to="/revenue-intel" style={linkStyle}>
+                  Command Center
+                </NavLink>
+              )}
+
+              {hasPerm(permissions, "deal_room.view") && (
+                <NavLink to="/pipeline" style={linkStyle}>
+                  Deal Room
+                </NavLink>
+              )}
+
+              {hasPerm(permissions, "market_signals.view") && (
+                <NavLink to="/metrics" style={linkStyle}>
+                  Market Signals
+                </NavLink>
+              )}
+
+              {hasPerm(permissions, "clients.view") && (
+                <NavLink to="/clients" style={linkStyle}>
+                  Accounts
+                </NavLink>
+              )}
+
+              {hasPerm(permissions, "partners.manage") && (
+                <NavLink to="/partners" style={linkStyle}>
+                  Partners
+                </NavLink>
+              )}
+
+              {hasPerm(permissions, "admin.audit") && (
+                <NavLink to="/workspaces" style={linkStyle}>
+                  Global HQ
+                </NavLink>
+              )}
             </div>
           </div>
 
-          {/* Global Mode status */}
+          {/* Right Side */}
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
             <div style={pill}>
               <span
@@ -150,7 +202,6 @@ export default function AppLayout() {
                   height: 8,
                   borderRadius: 999,
                   background: "#22C55E",
-                  boxShadow: "0 0 0 4px rgba(34,197,94,0.10)",
                 }}
               />
               <span style={{ fontWeight: 900 }}>Systems Online</span>
@@ -166,7 +217,7 @@ export default function AppLayout() {
 
             <div style={pill}>
               Local: <b>{localTime || "—"}</b>
-              {localTz ? <span style={{ opacity: 0.8 }}> • {localTz}</span> : null}
+              {localTz ? <span> • {localTz}</span> : null}
             </div>
 
             <button

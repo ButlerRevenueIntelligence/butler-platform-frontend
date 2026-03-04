@@ -20,6 +20,7 @@ import Workspaces from "./pages/Workspaces.jsx";
 
 import RevenueIntel from "./pages/RevenueIntel.jsx";
 import AppLayout from "./components/AppLayout.jsx";
+import RequirePerm from "./components/RequirePerm.jsx";
 
 function isAuthenticated() {
   return !!localStorage.getItem("butler_token");
@@ -78,6 +79,19 @@ export default function App() {
           </RequireAuth>
         }
       >
+      
+       <Route path="/pipeline" element={
+         <RequirePerm perm="deal_room.view">
+           <Pipeline />
+         </RequirePerm>
+       } />
+
+      <Route path="/accounts" element={
+        <RequirePerm perm="partners.manage">
+          <Partners />
+        </RequirePerm>
+      } />
+
         {/* ✅ Make Revenue Intel the first/primary route in the protected app */}
         <Route path="/revenue-intel" element={<RevenueIntel />} />
 

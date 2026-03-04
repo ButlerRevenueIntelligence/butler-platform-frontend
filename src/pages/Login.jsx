@@ -4,9 +4,10 @@ import { useNavigate, Link, useLocation, useSearchParams } from "react-router-do
 import {
   login,
   setToken,
+  setUser, // ✅ NEW
   setActiveOrgId,
   setActiveOrgName,
-  getInvite, // uses /api base + auth headers logic consistently
+  getInvite,
 } from "../api";
 
 function useQuery() {
@@ -19,8 +20,8 @@ export default function Login() {
   const query = useQuery();
   const [params] = useSearchParams();
 
-  const emailFromQuery = query.get("email"); // /login?email=you@company.com
-  const inviteToken = query.get("invite"); // /login?invite=TOKEN (optional)
+  const emailFromQuery = query.get("email");
+  const inviteToken = query.get("invite");
 
   const [email, setEmail] = useState(emailFromQuery || "");
   const [password, setPassword] = useState("");
@@ -40,7 +41,7 @@ export default function Login() {
     if (emailFromQuery) setEmail(emailFromQuery);
   }, [emailFromQuery]);
 
-  // Optional: if you pass invite token to login page, fetch invite and prefill email
+  // Optional: if invite token passed, fetch invite and prefill email
   useEffect(() => {
     if (!inviteToken) return;
 
@@ -49,10 +50,8 @@ export default function Login() {
       setErr("");
 
       try {
-        // ✅ Use your api helper (avoids API_BASE mismatches)
         const data = await getInvite(inviteToken);
 
-        // support either {ok:true, invite:{...}} or {invite:{...}}
         const ok = data?.ok ?? true;
         const invite = data?.invite ?? data;
 
@@ -78,7 +77,7 @@ export default function Login() {
     try {
       const res = await login({ email, password });
 
-      // ✅ IMPORTANT: persist token so route guards don’t bounce you back to /login
+      // ✅ Token
       const token =
         res?.token ||
         res?.accessToken ||
@@ -86,22 +85,47 @@ export default function Login() {
         res?.data?.accessToken ||
         "";
 
-      if (!token) {
-        throw new Error("Login succeeded but no token was returned.");
-      }
+      if (!token) throw new Error("Login succeeded but no token was returned.");
 
       setToken(token);
 
-      // ✅ Optional: if backend returns org/workspace info, store it for header display
+      // ✅ User (this is what contains plan/perms for tiered access control)
+      const user =
+        res?.user ||
+        res?.data?.user ||
+        null;
+
+      if (user) {
+        setUser(user); // ✅ stores butler_user with perms/plan/role
+      } else {
+        // not fatal, but tiered access won't work without it
+        setUser(null);
+      }
+
+      // ✅ Org context (prefer user.orgId)
       const orgId =
-        res?.orgId || res?.activeOrgId || res?.workspaceId || res?.data?.orgId || "";
+        user?.orgId ||
+        res?.orgId ||
+        res?.activeOrgId ||
+        res?.workspaceId ||
+        res?.data?.orgId ||
+        "";
+
+      // ✅ Org name (optional)
       const orgName =
-        res?.orgName || res?.workspaceName || res?.data?.orgName || "";
+        user?.orgName ||
+        user?.organizationName ||
+        user?.company ||
+        res?.orgName ||
+        res?.workspaceName ||
+        res?.data?.orgName ||
+        "";
 
       if (orgId) setActiveOrgId(orgId);
       if (orgName) setActiveOrgName(orgName);
 
-      nav("/dashboard", { replace: true });
+      // ✅ Go to primary route
+      nav("/revenue-intel", { replace: true });
     } catch (e2) {
       setErr(e2?.message || "Login failed");
     } finally {
