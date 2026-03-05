@@ -5,7 +5,7 @@ import {
   logout,
   getActiveOrgId,
   getActiveOrgName,
-  getUser, // ✅ use this instead of reading storage manually
+  getUser,
 } from "../api";
 import { hasPerm } from "../utils/permissions";
 
@@ -41,7 +41,6 @@ const pill = {
 export default function AppLayout() {
   const nav = useNavigate();
 
-  // ✅ Read user dynamically (so permissions always reflect login)
   const [permissions, setPermissions] = useState(() => {
     const u = getUser();
     return u?.permissions || u?.perms || [];
@@ -52,7 +51,6 @@ export default function AppLayout() {
     () => getActiveOrgName() || orgId || "—"
   );
 
-  // Sync on storage changes (logout, login, org switch, etc.)
   useEffect(() => {
     const sync = () => {
       const u = getUser();
@@ -85,10 +83,7 @@ export default function AppLayout() {
 
   const localTime = useMemo(() => {
     try {
-      return now.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
+      return now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     } catch {
       return "";
     }
@@ -113,6 +108,13 @@ export default function AppLayout() {
       return "";
     }
   }, []);
+
+  // ✅ FAIL-OPEN NAV:
+  // If perms are missing/empty (common early on), show everything so UI isn't "missing".
+  const can = (perm) => {
+    if (!Array.isArray(permissions) || permissions.length === 0) return true;
+    return hasPerm(permissions, perm);
+  };
 
   return (
     <div style={{ minHeight: "100vh", background: "#070B18" }}>
@@ -147,45 +149,45 @@ export default function AppLayout() {
               </div>
             </div>
 
-            {/* 🔐 Tier-Gated Navigation */}
+            {/* ✅ Navigation */}
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {hasPerm(permissions, "dashboard.view") && (
+              {can("dashboard.view") && (
                 <NavLink to="/dashboard" style={linkStyle}>
                   Overview
                 </NavLink>
               )}
 
-              {hasPerm(permissions, "command_center.view") && (
+              {can("command_center.view") && (
                 <NavLink to="/revenue-intel" style={linkStyle}>
                   Command Center
                 </NavLink>
               )}
 
-              {hasPerm(permissions, "deal_room.view") && (
+              {can("deal_room.view") && (
                 <NavLink to="/pipeline" style={linkStyle}>
                   Deal Room
                 </NavLink>
               )}
 
-              {hasPerm(permissions, "market_signals.view") && (
+              {can("market_signals.view") && (
                 <NavLink to="/metrics" style={linkStyle}>
                   Market Signals
                 </NavLink>
               )}
 
-              {hasPerm(permissions, "clients.view") && (
+              {can("clients.view") && (
                 <NavLink to="/clients" style={linkStyle}>
                   Accounts
                 </NavLink>
               )}
 
-              {hasPerm(permissions, "partners.manage") && (
+              {can("partners.manage") && (
                 <NavLink to="/partners" style={linkStyle}>
                   Partners
                 </NavLink>
               )}
 
-              {hasPerm(permissions, "admin.audit") && (
+              {can("admin.audit") && (
                 <NavLink to="/workspaces" style={linkStyle}>
                   Global HQ
                 </NavLink>
