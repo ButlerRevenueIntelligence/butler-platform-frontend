@@ -74,7 +74,6 @@ export default function AppLayout() {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  // Clock
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
@@ -109,13 +108,6 @@ export default function AppLayout() {
     }
   }, []);
 
-  // ✅ FAIL-OPEN NAV:
-  // If perms are missing/empty (common early on), show everything so UI isn't "missing".
-  const can = (perm) => {
-    if (!Array.isArray(permissions) || permissions.length === 0) return true;
-    return hasPerm(permissions, perm);
-  };
-
   return (
     <div style={{ minHeight: "100vh", background: "#070B18" }}>
       <div
@@ -138,7 +130,6 @@ export default function AppLayout() {
             alignItems: "center",
           }}
         >
-          {/* Left Side */}
           <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
             <div style={{ display: "grid", lineHeight: 1.1 }}>
               <div style={{ fontWeight: 1000, letterSpacing: 0.8, color: "#EAF0FF" }}>
@@ -149,63 +140,55 @@ export default function AppLayout() {
               </div>
             </div>
 
-            {/* ✅ Navigation */}
+            {/* ✅ NAV now matches real routes */}
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {can("dashboard.view") && (
-                <NavLink to="/dashboard" style={linkStyle}>
+              {hasPerm(permissions, "dashboard.view") && (
+                <NavLink to="/overview" style={linkStyle}>
                   Overview
                 </NavLink>
               )}
 
-              {can("command_center.view") && (
-                <NavLink to="/revenue-intel" style={linkStyle}>
+              {hasPerm(permissions, "command_center.view") && (
+                <NavLink to="/command-center" style={linkStyle}>
                   Command Center
                 </NavLink>
               )}
 
-              {can("deal_room.view") && (
-                <NavLink to="/pipeline" style={linkStyle}>
+              {hasPerm(permissions, "deal_room.view") && (
+                <NavLink to="/deal-room" style={linkStyle}>
                   Deal Room
                 </NavLink>
               )}
 
-              {can("market_signals.view") && (
-                <NavLink to="/metrics" style={linkStyle}>
+              {hasPerm(permissions, "market_signals.view") && (
+                <NavLink to="/market-signals" style={linkStyle}>
                   Market Signals
                 </NavLink>
               )}
 
-              {can("clients.view") && (
-                <NavLink to="/clients" style={linkStyle}>
+              {hasPerm(permissions, "clients.view") && (
+                <NavLink to="/accounts" style={linkStyle}>
                   Accounts
                 </NavLink>
               )}
 
-              {can("partners.manage") && (
+              {hasPerm(permissions, "partners.manage") && (
                 <NavLink to="/partners" style={linkStyle}>
                   Partners
                 </NavLink>
               )}
 
-              {can("admin.audit") && (
-                <NavLink to="/workspaces" style={linkStyle}>
+              {hasPerm(permissions, "admin.audit") && (
+                <NavLink to="/global-hq" style={linkStyle}>
                   Global HQ
                 </NavLink>
               )}
             </div>
           </div>
 
-          {/* Right Side */}
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
             <div style={pill}>
-              <span
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 999,
-                  background: "#22C55E",
-                }}
-              />
+              <span style={{ width: 8, height: 8, borderRadius: 999, background: "#22C55E" }} />
               <span style={{ fontWeight: 900 }}>Systems Online</span>
             </div>
 
