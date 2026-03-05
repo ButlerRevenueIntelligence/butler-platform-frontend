@@ -1,10 +1,15 @@
 // frontend/src/pages/Login.jsx
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, Link, useLocation, useSearchParams } from "react-router-dom";
+import {
+  useNavigate,
+  Link,
+  useLocation,
+  useSearchParams,
+} from "react-router-dom";
 import {
   login,
   setToken,
-  setUser, // ✅ NEW
+  setUser,
   setActiveOrgId,
   setActiveOrgName,
   getInvite,
@@ -14,6 +19,23 @@ function useQuery() {
   const { search } = useLocation();
   return useMemo(() => new URLSearchParams(search), [search]);
 }
+
+// ✅ helper: normalize Mongo ObjectId-ish shapes to string
+const oid = (v) => {
+  if (!v) return "";
+  if (typeof v === "string") return v;
+  if (typeof v === "object") {
+    if (v.$oid) return v.$oid; // Mongo Extended JSON
+    if (v.id) return v.id;
+    if (v._id) return typeof v._id === "string" ? v._id : v._id?.$oid || "";
+    try {
+      return String(v);
+    } catch {
+      return "";
+    }
+  }
+  return "";
+};
 
 export default function Login() {
   const nav = useNavigate();
@@ -77,7 +99,7 @@ export default function Login() {
     try {
       const res = await login({ email, password });
 
-      // ✅ Token
+      // ✅ Token (support multiple shapes)
       const token =
         res?.token ||
         res?.accessToken ||
@@ -87,29 +109,42 @@ export default function Login() {
 
       if (!token) throw new Error("Login succeeded but no token was returned.");
 
-      setToken(token);
+      // ✅ persist token in BOTH app helpers + localStorage
+      try {
+        setToken(token);
+      } catch (_) {}
 
-      // ✅ User (this is what contains plan/perms for tiered access control)
-      const user =
-        res?.user ||
-        res?.data?.user ||
-        null;
+      localStorage.setItem("token", token);
+      localStorage.setItem("butler_token", token);
+
+      // ✅ User
+      const user = res?.user || res?.data?.user || null;
+
+      try {
+        setUser(user || null);
+      } catch (_) {}
 
       if (user) {
-        setUser(user); // ✅ stores butler_user with perms/plan/role
+        localStorage.setItem("user", JSON.stringify(user));
+        localStorage.setItem("butler_user", JSON.stringify(user));
       } else {
-        // not fatal, but tiered access won't work without it
-        setUser(null);
+        localStorage.removeItem("user");
+        localStorage.removeItem("butler_user");
       }
 
-      // ✅ Org context (prefer user.orgId)
-      const orgId =
+      // ✅ Org context (normalize ObjectId-like shapes)
+      const orgIdRaw =
         user?.orgId ||
+        user?.activeOrgId ||
         res?.orgId ||
         res?.activeOrgId ||
         res?.workspaceId ||
         res?.data?.orgId ||
+        res?.data?.activeOrgId ||
+        res?.data?.workspaceId ||
         "";
+
+      const orgId = oid(orgIdRaw);
 
       // ✅ Org name (optional)
       const orgName =
@@ -119,10 +154,25 @@ export default function Login() {
         res?.orgName ||
         res?.workspaceName ||
         res?.data?.orgName ||
+        res?.data?.workspaceName ||
         "";
 
-      if (orgId) setActiveOrgId(orgId);
-      if (orgName) setActiveOrgName(orgName);
+      // ✅ persist org context in BOTH app helpers + localStorage
+      if (orgId) {
+        try {
+          setActiveOrgId(orgId);
+        } catch (_) {}
+        localStorage.setItem("activeOrgId", orgId);
+        localStorage.setItem("butler_active_org_id", orgId);
+      }
+
+      if (orgName) {
+        try {
+          setActiveOrgName(orgName);
+        } catch (_) {}
+        localStorage.setItem("activeOrgName", orgName);
+        localStorage.setItem("butler_active_org_name", orgName);
+      }
 
       // ✅ Go to primary route
       nav("/revenue-intel", { replace: true });
@@ -171,7 +221,9 @@ export default function Login() {
 
           {err && (
             <div style={styles.errBox}>
-              <b style={{ display: "block", marginBottom: 4 }}>Couldn’t sign in</b>
+              <b style={{ display: "block", marginBottom: 4 }}>
+                Couldn’t sign in
+              </b>
               <span style={{ opacity: 0.9 }}>{err}</span>
             </div>
           )}
@@ -182,7 +234,10 @@ export default function Login() {
 
           <div style={styles.bottomRow}>
             <span style={{ opacity: 0.8 }}>No account?</span>{" "}
-            <Link to="/signup" style={{ color: "rgba(234,240,255,0.92)", fontWeight: 800 }}>
+            <Link
+              to="/signup"
+              style={{ color: "rgba(234,240,255,0.92)", fontWeight: 800 }}
+            >
               Create one
             </Link>
           </div>
