@@ -3,11 +3,14 @@ import { Routes, Route, Navigate } from "react-router-dom";
 
 import Signup from "./pages/Signup.jsx";
 import Login from "./pages/Login.jsx";
-import Dashboard from "./pages/Dashboard.jsx";
+
+// Pages
+import Dashboard from "./pages/Dashboard.jsx";        // Overview
+import RevenueIntel from "./pages/RevenueIntel.jsx";  // Command Center
+import Pipeline from "./pages/Pipeline.jsx";          // Deal Room
+import Metrics from "./pages/Metrics.jsx";            // Market Signals
 import Partners from "./pages/Partners.jsx";
 
-import Metrics from "./pages/Metrics.jsx";
-import Pipeline from "./pages/Pipeline.jsx";
 import Clients from "./pages/Clients.jsx";
 import ClientDetail from "./pages/ClientDetail.jsx";
 
@@ -18,7 +21,6 @@ import AcceptInvite from "./pages/AcceptInvite.jsx";
 import Invites from "./pages/Invites.jsx";
 import Workspaces from "./pages/Workspaces.jsx";
 
-import RevenueIntel from "./pages/RevenueIntel.jsx";
 import AppLayout from "./components/AppLayout.jsx";
 import RequirePerm from "./components/RequirePerm.jsx";
 
@@ -32,8 +34,8 @@ function RequireAuth({ children }) {
 }
 
 function RedirectIfAuth({ children }) {
-  // ✅ if already logged in, send to the new command center
-  if (isAuthenticated()) return <Navigate to="/revenue-intel" replace />;
+  // ✅ if already logged in, send to Overview
+  if (isAuthenticated()) return <Navigate to="/overview" replace />;
   return children;
 }
 
@@ -45,7 +47,7 @@ export default function App() {
         path="/"
         element={
           isAuthenticated() ? (
-            <Navigate to="/revenue-intel" replace />
+            <Navigate to="/overview" replace />
           ) : (
             <Navigate to="/login" replace />
           )
@@ -79,41 +81,56 @@ export default function App() {
           </RequireAuth>
         }
       >
-      
-       <Route path="/pipeline" element={
-         <RequirePerm perm="deal_room.view">
-           <Pipeline />
-         </RequirePerm>
-       } />
+        {/* ✅ Primary navigation routes (what you want in the UI) */}
+        <Route path="/overview" element={<Dashboard />} />
 
-      <Route path="/accounts" element={
-        <RequirePerm perm="partners.manage">
-          <Partners />
-        </RequirePerm>
-      } />
+        <Route
+          path="/command-center"
+          element={<RevenueIntel />}
+        />
 
-        {/* ✅ Make Revenue Intel the first/primary route in the protected app */}
-        <Route path="/revenue-intel" element={<RevenueIntel />} />
+        <Route
+          path="/deal-room"
+          element={
+            <RequirePerm perm="deal_room.view">
+              <Pipeline />
+            </RequirePerm>
+          }
+        />
 
-        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/market-signals" element={<Metrics />} />
+
+        <Route
+          path="/partners"
+          element={
+            <RequirePerm perm="partners.manage">
+              <Partners />
+            </RequirePerm>
+          }
+        />
+
+        {/* Keep existing pages */}
         <Route path="/workspaces" element={<Workspaces />} />
         <Route path="/invites" element={<Invites />} />
-        <Route path="/metrics" element={<Metrics />} />
-        <Route path="/pipeline" element={<Pipeline />} />
-        <Route path="/partners" element={<Partners />} />
 
         <Route path="/clients" element={<Clients />} />
         <Route path="/clients/:id" element={<ClientDetail />} />
 
         <Route path="/accounts" element={<Accounts />} />
         <Route path="/accounts/:id" element={<AccountDetail />} />
+
+        {/* ✅ Backward-compatible redirects (so old links still work) */}
+        <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
+        <Route path="/revenue-intel" element={<Navigate to="/command-center" replace />} />
+        <Route path="/pipeline" element={<Navigate to="/deal-room" replace />} />
+        <Route path="/metrics" element={<Navigate to="/market-signals" replace />} />
       </Route>
 
       {/* FALLBACK */}
       <Route
         path="*"
         element={
-          <Navigate to={isAuthenticated() ? "/revenue-intel" : "/login"} replace />
+          <Navigate to={isAuthenticated() ? "/overview" : "/login"} replace />
         }
       />
     </Routes>
