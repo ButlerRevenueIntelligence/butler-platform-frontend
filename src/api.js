@@ -1,24 +1,18 @@
 // src/api.js
 
-/**
- * ✅ API Base (Render/Vite)
- * - Uses VITE_API_URL (recommended) or VITE_API_BASE
- * - Ensures the final base ALWAYS ends with "/api"
- * - Prevents double "/api/api"
- */
-function buildApiBase() {
-  const raw =
-    import.meta.env.VITE_API_URL ||
-    import.meta.env.VITE_API_BASE ||
-    "https://atlas-revenue-backend.onrender.com"; // fallback (NO /api)
-
-  const trimmed = String(raw).trim().replace(/\/+$/, ""); // remove trailing slashes
-
-  // If env already ends with /api, keep it; otherwise append /api
-  return trimmed.endsWith("/api") ? trimmed : `${trimmed}/api`;
+// Build a safe API base that ALWAYS ends with /api
+function buildApiBase(raw) {
+  const cleaned = String(raw || "").trim().replace(/\/+$/, "");
+  if (!cleaned) return "https://atlas-revenue-backend.onrender.com/api"; // fallback
+  return cleaned.endsWith("/api") ? cleaned : `${cleaned}/api`;
 }
 
-const API_BASE = buildApiBase();
+// ✅ Prefer VITE_API_URL (Render env var), fallback to VITE_API_BASE, then fallback hardcoded
+const API_BASE = buildApiBase(
+  import.meta.env.VITE_API_URL ||
+    import.meta.env.VITE_API_BASE ||
+    "https://atlas-revenue-backend.onrender.com/api"
+);
 
 // -------------------- Token + Org helpers --------------------
 export function getToken() {
@@ -50,7 +44,7 @@ export function setActiveOrgName(name) {
   else localStorage.setItem("active_org_name", String(name));
 }
 
-// -------------------- User helpers (plan/perms) --------------------
+// -------------------- User helpers --------------------
 export function getUser() {
   try {
     const raw = localStorage.getItem("butler_user");
@@ -59,12 +53,10 @@ export function getUser() {
     return null;
   }
 }
-
 export function setUser(user) {
   if (!user) localStorage.removeItem("butler_user");
   else localStorage.setItem("butler_user", JSON.stringify(user));
 }
-
 export function clearUser() {
   localStorage.removeItem("butler_user");
 }
@@ -84,26 +76,21 @@ async function request(path, options = {}) {
   const headers = { ...(options.headers || {}) };
   const isFormData = options.body instanceof FormData;
 
-  // Only set JSON content-type when not uploading FormData
-  if (!isFormData && !headers["Content-Type"]) {
-    headers["Content-Type"] = "application/json";
-  }
-
+  if (!isFormData && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
   if (token) headers.Authorization = `Bearer ${token}`;
   if (orgId) headers["x-org-id"] = orgId;
 
-  // ✅ Ensure path always starts with "/"
   const cleanPath = path?.startsWith("/") ? path : `/${path}`;
 
   const res = await fetch(`${API_BASE}${cleanPath}`, {
     ...options,
     headers,
-    credentials: "include", // ✅ important if backend uses cookies/sessions (safe even if you don't)
+    // safe to include even if you’re not using cookies
+    credentials: "include",
   });
 
   const text = await res.text();
   let data = null;
-
   try {
     data = text ? JSON.parse(text) : null;
   } catch {
@@ -112,10 +99,10 @@ async function request(path, options = {}) {
 
   if (!res.ok) {
     const msg =
-      (data && (data.message || data.error)) || `Request failed (${res.status})`;
+      (data && (data.message || data.error)) ||
+      `Request failed (${res.status})`;
     throw new Error(msg);
   }
-
   return data;
 }
 
@@ -127,8 +114,6 @@ export const apiPut = (path, payload) =>
 export const apiPatch = (path, payload) =>
   request(path, { method: "PATCH", body: JSON.stringify(payload || {}) });
 export const apiDelete = (path) => request(path, { method: "DELETE" });
-
-export const listPartners = () => apiGet("/partners");
 
 // -------------------- Auth --------------------
 export const signup = (payload) => apiPost("/auth/signup", payload);
@@ -150,13 +135,11 @@ export const getMetricsDaily = (params = {}) => {
   const suffix = qs.toString() ? `?${qs.toString()}` : "";
   return apiGet(`/metrics/daily${suffix}`);
 };
-
 export const getMetricsSummary = (days = 30) =>
   apiGet(`/metrics/summary?days=${encodeURIComponent(days)}`);
 
 // -------------------- Insights --------------------
-export const generateInsights = (payload) =>
-  apiPost("/insights/generate", payload);
+export const generateInsights = (payload) => apiPost("/insights/generate", payload);
 
 // -------------------- Orgs / Workspaces --------------------
 export const getMyOrgs = () => apiGet("/org/mine");
@@ -165,11 +148,8 @@ export const switchOrg = (orgId) => apiPost("/org/switch", { orgId });
 // -------------------- Invites --------------------
 export const createInvite = (email, role = "analyst") =>
   apiPost("/invites", { email, role });
-
 export const listInvites = () => apiGet("/invites");
-export const getInvite = (token) =>
-  apiGet(`/invites/${encodeURIComponent(token)}`);
-
+export const getInvite = (token) => apiGet(`/invites/${encodeURIComponent(token)}`);
 export const acceptInvite = (token) =>
   apiPost(`/invites/${encodeURIComponent(token)}/accept`, {});
 
@@ -177,8 +157,7 @@ export const acceptInvite = (token) =>
 export const getClients = () => apiGet("/clients");
 export const getClient = (id) => apiGet(`/clients/${id}`);
 export const createClient = (payload) => apiPost("/clients", payload);
-export const updateClient = (id, payload) =>
-  apiPut(`/clients/${id}`, payload);
+export const updateClient = (id, payload) => apiPut(`/clients/${id}`, payload);
 export const deleteClient = (id) => apiDelete(`/clients/${id}`);
 
 // -------------------- Deals (Pipeline) --------------------
@@ -201,13 +180,11 @@ export const getDealActivity = (id) => apiGet(`/deals/${id}/activity`);
 export const logDealActivity = (id, payload) =>
   apiPost(`/deals/${id}/activity`, payload);
 
-// -------------------- Deal Intel (priorities/autopilot) --------------------
+// -------------------- Deal Intel --------------------
 export const getPriorities = (limit = 10) =>
   apiGet(`/deal-intel/priorities?limit=${encodeURIComponent(limit)}`);
-
-export const runAutopilot = (
-  payload = { maxUpdates: 200, dryRun: true, force: false }
-) => apiPost(`/deal-intel/autopilot/run`, payload);
+export const runAutopilot = (payload = { maxUpdates: 200, dryRun: true, force: false }) =>
+  apiPost(`/deal-intel/autopilot/run`, payload);
 
 // -------------------- Revenue Intel Board --------------------
 export const getRevenueIntelBoard = (params = {}) => {
@@ -219,19 +196,12 @@ export const getRevenueIntelBoard = (params = {}) => {
 };
 
 // -------------------- Demo Seed --------------------
-export const seedDemoData = async () => {
-  // backend route: POST /api/seed/refresh
-  return apiPost("/seed/refresh");
-};
+export const seedDemoData = async () => apiPost("/seed/refresh");
 
-// ✅ Optional: getPipeline helper used by Dashboard.jsx
+// -------------------- Optional: pipeline helper --------------------
 export const getPipeline = async () => {
   const res = await getDeals();
-  const deals = Array.isArray(res?.deals)
-    ? res.deals
-    : Array.isArray(res)
-    ? res
-    : [];
+  const deals = Array.isArray(res?.deals) ? res.deals : Array.isArray(res) ? res : [];
 
   const pipelineValue = deals.reduce((sum, d) => {
     const amt = Number(d?.amount ?? d?.value ?? 0) || 0;
