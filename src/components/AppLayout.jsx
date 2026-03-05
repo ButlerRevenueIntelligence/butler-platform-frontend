@@ -1,12 +1,7 @@
 // frontend/src/components/AppLayout.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import {
-  logout,
-  getActiveOrgId,
-  getActiveOrgName,
-  getUser,
-} from "../api";
+import { logout, getActiveOrgId, getActiveOrgName, getUser } from "../api";
 import { hasPerm } from "../utils/permissions";
 
 const linkStyle = ({ isActive }) => ({
@@ -45,6 +40,9 @@ export default function AppLayout() {
     const u = getUser();
     return u?.permissions || u?.perms || [];
   });
+
+  // ✅ IMPORTANT: if perms are empty, treat as full-access (prevents nav “disappearing”)
+  const can = (perm) => !permissions?.length || hasPerm(permissions, perm);
 
   const orgId = getActiveOrgId();
   const [workspaceLabel, setWorkspaceLabel] = useState(
@@ -140,45 +138,45 @@ export default function AppLayout() {
               </div>
             </div>
 
-            {/* ✅ NAV now matches real routes */}
+            {/* ✅ Tabs won’t vanish if perms fail to load */}
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {hasPerm(permissions, "dashboard.view") && (
+              {can("dashboard.view") && (
                 <NavLink to="/overview" style={linkStyle}>
                   Overview
                 </NavLink>
               )}
 
-              {hasPerm(permissions, "command_center.view") && (
+              {can("command_center.view") && (
                 <NavLink to="/command-center" style={linkStyle}>
                   Command Center
                 </NavLink>
               )}
 
-              {hasPerm(permissions, "deal_room.view") && (
+              {can("deal_room.view") && (
                 <NavLink to="/deal-room" style={linkStyle}>
                   Deal Room
                 </NavLink>
               )}
 
-              {hasPerm(permissions, "market_signals.view") && (
+              {can("market_signals.view") && (
                 <NavLink to="/market-signals" style={linkStyle}>
                   Market Signals
                 </NavLink>
               )}
 
-              {hasPerm(permissions, "clients.view") && (
+              {can("clients.view") && (
                 <NavLink to="/accounts" style={linkStyle}>
                   Accounts
                 </NavLink>
               )}
 
-              {hasPerm(permissions, "partners.manage") && (
+              {can("partners.manage") && (
                 <NavLink to="/partners" style={linkStyle}>
                   Partners
                 </NavLink>
               )}
 
-              {hasPerm(permissions, "admin.audit") && (
+              {can("admin.audit") && (
                 <NavLink to="/global-hq" style={linkStyle}>
                   Global HQ
                 </NavLink>
@@ -188,7 +186,14 @@ export default function AppLayout() {
 
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
             <div style={pill}>
-              <span style={{ width: 8, height: 8, borderRadius: 999, background: "#22C55E" }} />
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 999,
+                  background: "#22C55E",
+                }}
+              />
               <span style={{ fontWeight: 900 }}>Systems Online</span>
             </div>
 
