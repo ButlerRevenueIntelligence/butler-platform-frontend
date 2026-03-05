@@ -1,11 +1,6 @@
 // frontend/src/pages/Login.jsx
 import { useEffect, useMemo, useState } from "react";
-import {
-  useNavigate,
-  Link,
-  useLocation,
-  useSearchParams,
-} from "react-router-dom";
+import { useNavigate, Link, useLocation, useSearchParams } from "react-router-dom";
 import {
   login,
   setToken,
@@ -20,21 +15,35 @@ function useQuery() {
   return useMemo(() => new URLSearchParams(search), [search]);
 }
 
-// ✅ helper: normalize Mongo ObjectId-ish shapes to string
+// normalize Mongo ObjectId-ish shapes to string
 const oid = (v) => {
   if (!v) return "";
   if (typeof v === "string") return v;
   if (typeof v === "object") {
-    if (v.$oid) return v.$oid; // Mongo Extended JSON
+    if (v.$oid) return v.$oid;
     if (v.id) return v.id;
     if (v._id) return typeof v._id === "string" ? v._id : v._id?.$oid || "";
-    try {
-      return String(v);
-    } catch {
-      return "";
-    }
+    try { return String(v); } catch { return ""; }
   }
   return "";
+};
+
+// decode JWT payload safely (no verify, just read claims)
+const decodeJwt = (token) => {
+  try {
+    const part = token.split(".")[1];
+    if (!part) return null;
+    const base64 = part.replace(/-/g, "+").replace(/_/g, "/");
+    const json = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join("")
+    );
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
 };
 
 export default function Login() {
@@ -52,18 +61,15 @@ export default function Login() {
   const [prefillLoading, setPrefillLoading] = useState(false);
   const [err, setErr] = useState("");
 
-  // If email comes through search params, prefill
   useEffect(() => {
     const e = params.get("email");
     if (e) setEmail(e);
   }, [params]);
 
-  // Prefill email from query param (if present)
   useEffect(() => {
     if (emailFromQuery) setEmail(emailFromQuery);
   }, [emailFromQuery]);
 
-  // Optional: if invite token passed, fetch invite and prefill email
   useEffect(() => {
     if (!inviteToken) return;
 
@@ -73,7 +79,6 @@ export default function Login() {
 
       try {
         const data = await getInvite(inviteToken);
-
         const ok = data?.ok ?? true;
         const invite = data?.invite ?? data;
 
@@ -81,7 +86,6 @@ export default function Login() {
           setErr(data?.message || "Invite link is invalid or expired.");
           return;
         }
-
         if (invite?.email) setEmail(invite.email);
       } catch (e) {
         setErr(e?.message || "Could not load invite email.");
@@ -99,7 +103,7 @@ export default function Login() {
     try {
       const res = await login({ email, password });
 
-      // ✅ Token (support multiple shapes)
+      // Token: support several shapes
       const token =
         res?.token ||
         res?.accessToken ||
@@ -109,44 +113,45 @@ export default function Login() {
 
       if (!token) throw new Error("Login succeeded but no token was returned.");
 
-      // ✅ persist token in BOTH app helpers + localStorage
-      try {
-        setToken(token);
-      } catch (_) {}
-
-      localStorage.setItem("token", token);
+      // persist token everywhere
+      try { setToken(token); } catch (_) {}
       localStorage.setItem("butler_token", token);
+      localStorage.setItem("token", token);
 
-      // ✅ User
-      const user = res?.user || res?.data?.user || null;
+      // Try to get user from response first
+      let user = res?.user || res?.data?.user || null;
 
-      try {
-        setUser(user || null);
-      } catch (_) {}
-
-      if (user) {
-        localStorage.setItem("user", JSON.stringify(user));
-        localStorage.setItem("butler_user", JSON.stringify(user));
-      } else {
-        localStorage.removeItem("user");
-        localStorage.removeItem("butler_user");
+      // If user missing, derive from JWT claims
+      if (!user) {
+        const claims = decodeJwt(token) || {};
+        user = {
+          id: claims.id || claims.userId || claims.sub || "",
+          email,
+          role: claims.role || "user",
+          plan: claims.plan || claims.tier || claims.subscription || "STANDARD",
+          orgId: claims.orgId || claims.activeOrgId || claims.workspaceId || "",
+          orgName: claims.orgName || claims.workspaceName || claims.company || "",
+          permissions: claims.permissions || claims.perms || [],
+        };
       }
 
-      // ✅ Org context (normalize ObjectId-like shapes)
-      const orgIdRaw =
+      // Store user
+      try { setUser(user); } catch (_) {}
+      localStorage.setItem("butler_user", JSON.stringify(user));
+      localStorage.setItem("user", JSON.stringify(user));
+
+      // Org context
+      const orgId = oid(
         user?.orgId ||
-        user?.activeOrgId ||
-        res?.orgId ||
-        res?.activeOrgId ||
-        res?.workspaceId ||
-        res?.data?.orgId ||
-        res?.data?.activeOrgId ||
-        res?.data?.workspaceId ||
-        "";
+          res?.orgId ||
+          res?.activeOrgId ||
+          res?.workspaceId ||
+          res?.data?.orgId ||
+          res?.data?.activeOrgId ||
+          res?.data?.workspaceId ||
+          ""
+      );
 
-      const orgId = oid(orgIdRaw);
-
-      // ✅ Org name (optional)
       const orgName =
         user?.orgName ||
         user?.organizationName ||
@@ -157,24 +162,23 @@ export default function Login() {
         res?.data?.workspaceName ||
         "";
 
-      // ✅ persist org context in BOTH app helpers + localStorage
       if (orgId) {
-        try {
-          setActiveOrgId(orgId);
-        } catch (_) {}
-        localStorage.setItem("activeOrgId", orgId);
+        try { setActiveOrgId(orgId); } catch (_) {}
         localStorage.setItem("butler_active_org_id", orgId);
+        localStorage.setItem("activeOrgId", orgId);
       }
 
       if (orgName) {
-        try {
-          setActiveOrgName(orgName);
-        } catch (_) {}
-        localStorage.setItem("activeOrgName", orgName);
+        try { setActiveOrgName(orgName); } catch (_) {}
         localStorage.setItem("butler_active_org_name", orgName);
+        localStorage.setItem("activeOrgName", orgName);
       }
 
-      // ✅ Go to primary route
+      console.log("LOGIN RES:", res);
+      console.log("JWT CLAIMS:", decodeJwt(token));
+      console.log("FINAL USER:", user);
+      console.log("FINAL ORG:", { orgId, orgName });
+
       nav("/revenue-intel", { replace: true });
     } catch (e2) {
       setErr(e2?.message || "Login failed");
@@ -221,9 +225,7 @@ export default function Login() {
 
           {err && (
             <div style={styles.errBox}>
-              <b style={{ display: "block", marginBottom: 4 }}>
-                Couldn’t sign in
-              </b>
+              <b style={{ display: "block", marginBottom: 4 }}>Couldn’t sign in</b>
               <span style={{ opacity: 0.9 }}>{err}</span>
             </div>
           )}
@@ -234,10 +236,7 @@ export default function Login() {
 
           <div style={styles.bottomRow}>
             <span style={{ opacity: 0.8 }}>No account?</span>{" "}
-            <Link
-              to="/signup"
-              style={{ color: "rgba(234,240,255,0.92)", fontWeight: 800 }}
-            >
+            <Link to="/signup" style={{ color: "rgba(234,240,255,0.92)", fontWeight: 800 }}>
               Create one
             </Link>
           </div>
@@ -248,12 +247,7 @@ export default function Login() {
 }
 
 const styles = {
-  wrap: {
-    minHeight: "100vh",
-    display: "grid",
-    placeItems: "center",
-    padding: 24,
-  },
+  wrap: { minHeight: "100vh", display: "grid", placeItems: "center", padding: 24 },
   shell: {
     width: "100%",
     maxWidth: 420,
@@ -264,12 +258,7 @@ const styles = {
     boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
     backdropFilter: "blur(12px)",
   },
-  brandRow: {
-    display: "flex",
-    gap: 12,
-    alignItems: "center",
-    marginBottom: 14,
-  },
+  brandRow: { display: "flex", gap: 12, alignItems: "center", marginBottom: 14 },
   logoDot: {
     width: 38,
     height: 38,
