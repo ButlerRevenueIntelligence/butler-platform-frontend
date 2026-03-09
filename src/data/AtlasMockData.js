@@ -32,3 +32,39 @@ export const alerts = [
 
 export const briefing =
   "Revenue pacing is slightly behind target this month due to slower enterprise deal movement. Paid search continues to generate the most efficient cost-to-opportunity ratio, while three late-stage deals represent a high concentration of forecast risk and should be reviewed this week.";
+
+export const alerts = [
+  {
+    title: "Late-stage deal concentration",
+    severity: "High",
+    detail:
+      "Three late-stage opportunities now represent a large share of near-term forecast exposure.",
+  },
+  {
+    title: "Pipeline timing risk",
+    severity: "Medium",
+    detail:
+      "Several active opportunities are trending beyond expected decision windows and may slip.",
+  },
+  {
+    title: "Channel efficiency drift",
+    severity: "Medium",
+    detail:
+      "Lower-performing campaigns are reducing overall marketing efficiency and should be reviewed.",
+  },
+  {
+    title: "Expansion dependency",
+    severity: "Low",
+    detail:
+      "A growing share of upside forecast depends on expansion revenue from a limited set of accounts.",
+  },
+];
+
+export const briefing = `
+Atlas AI Operator is currently monitoring a forecast environment with meaningful late-stage concentration risk.
+
+Pipeline coverage remains healthy enough to support growth, but forecast pressure is building around a small number of active deals. Leadership should focus on deal progression, cleaner next-step commitments, and tighter budget allocation toward the highest-efficiency revenue channels.
+
+Primary recommendation:
+Reduce near-term forecast dependency by accelerating second-tier opportunities, forcing clearer timelines on high-value deals, and protecting spend behind the strongest-performing growth motions.
+`.trim();
