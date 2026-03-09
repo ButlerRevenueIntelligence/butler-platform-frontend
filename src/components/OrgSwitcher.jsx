@@ -106,8 +106,8 @@ export default function OrgSwitcher({ onSwitched }) {
         </option>
 
         {orgs.map((o) => (
-          <option key={o._id} value={o._id}>
-            {o.name}
+          <option key={o.orgId} value={o.orgId}>
+            {o.orgName}
           </option>
         ))}
       </select>

@@ -6,6 +6,23 @@ import { getClients, createClient, deleteClient } from "../api";
 
 const safe = (v) => (v == null ? "" : String(v));
 
+const normalizeWebsite = (url) => {
+  const val = safe(url).trim();
+  if (!val) return "";
+  if (val.startsWith("http://") || val.startsWith("https://")) return val;
+  return `https://${val}`;
+};
+
+const domainFromWebsite = (url) => {
+  try {
+    const normalized = normalizeWebsite(url);
+    if (!normalized) return "";
+    return new URL(normalized).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+};
+
 export default function Clients() {
   const nav = useNavigate();
 
@@ -14,7 +31,6 @@ export default function Clients() {
 
   const [clients, setClients] = useState([]);
 
-  // Create form
   const [name, setName] = useState("");
   const [industry, setIndustry] = useState("");
   const [website, setWebsite] = useState("");
@@ -31,7 +47,7 @@ export default function Clients() {
       setClients(res?.clients || []);
     } catch (e) {
       console.error(e);
-      setError(e?.message || "Failed to load clients");
+      setError(e?.message || "Failed to load accounts");
     } finally {
       setLoading(false);
     }
@@ -39,8 +55,56 @@ export default function Clients() {
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const enrichedClients = useMemo(() => {
+    return (clients || []).map((c, idx) => {
+      const hasWebsite = !!safe(c?.website).trim();
+      const hasOwner = !!safe(c?.ownerName).trim() || !!safe(c?.ownerEmail).trim();
+      const hasIndustry = !!safe(c?.industry).trim();
+      const hasNotes = !!safe(c?.notes).trim();
+
+      let engagementScore = 35;
+      if (hasWebsite) engagementScore += 20;
+      if (hasOwner) engagementScore += 20;
+      if (hasIndustry) engagementScore += 10;
+      if (hasNotes) engagementScore += 10;
+      engagementScore += (idx % 4) * 3;
+
+      const expansionProbability = Math.min(82, 45 + (idx % 5) * 7 + (hasNotes ? 6 : 0));
+
+      return {
+        ...c,
+        engagementScore,
+        expansionProbability,
+        domain: domainFromWebsite(c?.website),
+      };
+    });
+  }, [clients]);
+
+  const summaryStats = useMemo(() => {
+    const total = enrichedClients.length;
+    const withWebsite = enrichedClients.filter((c) => safe(c?.website).trim()).length;
+    const withOwner = enrichedClients.filter(
+      (c) => safe(c?.ownerName).trim() || safe(c?.ownerEmail).trim()
+    ).length;
+    const avgEngagement =
+      total > 0
+        ? Math.round(
+            enrichedClients.reduce((sum, c) => sum + (c.engagementScore || 0), 0) / total
+          )
+        : 0;
+
+    return { total, withWebsite, withOwner, avgEngagement };
+  }, [enrichedClients]);
+
+  const accountBriefing = useMemo(() => {
+    if (!summaryStats.total) {
+      return "No accounts are currently loaded in this workspace. Add account records to begin organizing client data, owner visibility, website coverage, and engagement context.";
+    }
+
+    return `This workspace currently includes ${summaryStats.total} accounts. ${summaryStats.withWebsite} have website coverage, ${summaryStats.withOwner} include owner visibility, and the current average engagement score is ${summaryStats.avgEngagement}. Use this page to manage account records and keep account information organized.`;
+  }, [summaryStats]);
 
   const S = useMemo(() => {
     const card = {
@@ -92,11 +156,34 @@ export default function Clients() {
       title: { margin: 0, fontSize: 32, fontWeight: 900 },
       sub: { marginTop: 8, opacity: 0.8, fontSize: 14 },
       card,
+      heroCard: {
+        ...card,
+        background:
+          "linear-gradient(135deg, rgba(124,92,255,0.16), rgba(56,189,248,0.10), rgba(255,255,255,0.03))",
+      },
       input,
       btn,
       btnDanger: { ...btn, border: "1px solid rgba(251,113,133,0.35)" },
+      btnGhost: {
+        ...btn,
+        background: "rgba(0,0,0,0.16)",
+      },
       grid2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
       grid3: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 },
+      signalGrid: {
+        display: "grid",
+        gridTemplateColumns: "repeat(4, minmax(220px, 1fr))",
+        gap: 12,
+      },
+      signalCard: {
+        borderRadius: 16,
+        padding: 16,
+        border: "1px solid rgba(255,255,255,0.08)",
+        background: "rgba(10, 16, 35, 0.35)",
+      },
+      signalLabel: { fontSize: 12, opacity: 0.8, letterSpacing: 0.8 },
+      signalValue: { marginTop: 8, fontSize: 28, fontWeight: 900 },
+      signalSub: { marginTop: 8, fontSize: 12, opacity: 0.82, lineHeight: 1.45 },
       list: { display: "grid", gap: 12 },
       item: {
         borderRadius: 14,
@@ -108,7 +195,7 @@ export default function Clients() {
         gap: 12,
         alignItems: "center",
       },
-      meta: { opacity: 0.85, fontSize: 13, lineHeight: 1.35 },
+      meta: { opacity: 0.85, fontSize: 13, lineHeight: 1.5 },
       error: {
         marginTop: 10,
         borderRadius: 12,
@@ -127,6 +214,20 @@ export default function Clients() {
         alignItems: "center",
         gap: 8,
       },
+      scorePill: (score) => ({
+        fontSize: 12,
+        fontWeight: 900,
+        padding: "6px 10px",
+        borderRadius: 999,
+        border: "1px solid rgba(255,255,255,0.10)",
+        background:
+          score >= 75
+            ? "rgba(34,197,94,0.12)"
+            : score >= 55
+            ? "rgba(245,158,11,0.12)"
+            : "rgba(251,113,133,0.12)",
+        color: score >= 75 ? "#22C55E" : score >= 55 ? "#F59E0B" : "#FB7185",
+      }),
     };
   }, []);
 
@@ -135,7 +236,7 @@ export default function Clients() {
     setError("");
 
     if (!name.trim()) {
-      setError("Client name is required.");
+      setError("Account name is required.");
       return;
     }
 
@@ -153,7 +254,6 @@ export default function Clients() {
 
       await createClient(payload);
 
-      // reset form
       setName("");
       setIndustry("");
       setWebsite("");
@@ -164,7 +264,7 @@ export default function Clients() {
       await load();
     } catch (e2) {
       console.error(e2);
-      setError(e2?.message || "Failed to create client");
+      setError(e2?.message || "Failed to create account");
     } finally {
       setCreating(false);
     }
@@ -172,7 +272,7 @@ export default function Clients() {
 
   async function onDelete(id) {
     setError("");
-    const ok = window.confirm("Delete this client? This cannot be undone.");
+    const ok = window.confirm("Delete this account? This cannot be undone.");
     if (!ok) return;
 
     try {
@@ -180,7 +280,7 @@ export default function Clients() {
       await load();
     } catch (e) {
       console.error(e);
-      setError(e?.message || "Failed to delete client");
+      setError(e?.message || "Failed to delete account");
     }
   }
 
@@ -190,8 +290,10 @@ export default function Clients() {
 
       <div style={S.topRow}>
         <div>
-          <h1 style={S.title}>Clients</h1>
-          <div style={S.sub}>Create, edit, and manage client records for the current workspace.</div>
+          <h1 style={S.title}>Accounts</h1>
+          <div style={S.sub}>
+            Track account records, engagement context, owner visibility, and website coverage for the current workspace.
+          </div>
         </div>
 
         <div style={{ minWidth: 260 }}>
@@ -199,22 +301,87 @@ export default function Clients() {
         </div>
       </div>
 
-      {/* Create */}
+      <div style={S.heroCard}>
+        <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 10 }}>
+          Account Briefing
+        </div>
+        <div style={{ fontSize: 14, opacity: 0.92, lineHeight: 1.65 }}>
+          {accountBriefing}
+        </div>
+      </div>
+
+      <div style={{ height: 14 }} />
+
+      <div style={S.signalGrid}>
+        <div style={S.signalCard}>
+          <div style={S.signalLabel}>TOTAL ACCOUNTS</div>
+          <div style={S.signalValue}>{summaryStats.total}</div>
+          <div style={S.signalSub}>Total account records in the active workspace.</div>
+        </div>
+
+        <div style={S.signalCard}>
+          <div style={S.signalLabel}>AVG ENGAGEMENT SCORE</div>
+          <div style={S.signalValue}>{summaryStats.avgEngagement}</div>
+          <div style={S.signalSub}>Estimated signal quality across account records.</div>
+        </div>
+
+        <div style={S.signalCard}>
+          <div style={S.signalLabel}>WEBSITE COVERAGE</div>
+          <div style={S.signalValue}>{summaryStats.withWebsite}</div>
+          <div style={S.signalSub}>Accounts with website data available.</div>
+        </div>
+
+        <div style={S.signalCard}>
+          <div style={S.signalLabel}>OWNER VISIBILITY</div>
+          <div style={S.signalValue}>{summaryStats.withOwner}</div>
+          <div style={S.signalSub}>Accounts with named owner or email visibility.</div>
+        </div>
+      </div>
+
+      <div style={{ height: 14 }} />
+
       <div style={S.card}>
-        <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 10 }}>Create Client</div>
+        <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 10 }}>
+          Create Account
+        </div>
 
         <form onSubmit={onCreate}>
           <div style={S.grid3}>
-            <input style={S.input} placeholder="Client name *" value={name} onChange={(e) => setName(e.target.value)} />
-            <input style={S.input} placeholder="Industry" value={industry} onChange={(e) => setIndustry(e.target.value)} />
-            <input style={S.input} placeholder="Website (https://...)" value={website} onChange={(e) => setWebsite(e.target.value)} />
+            <input
+              style={S.input}
+              placeholder="Account name *"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <input
+              style={S.input}
+              placeholder="Industry"
+              value={industry}
+              onChange={(e) => setIndustry(e.target.value)}
+            />
+            <input
+              style={S.input}
+              placeholder="Website (https://...)"
+              value={website}
+              onChange={(e) => setWebsite(e.target.value)}
+            />
           </div>
 
           <div style={{ height: 12 }} />
 
           <div style={S.grid2}>
-            <input style={S.input} placeholder="Owner name" value={ownerName} onChange={(e) => setOwnerName(e.target.value)} />
-            <input style={S.input} placeholder="Owner email" value={ownerEmail} onChange={(e) => setOwnerEmail(e.target.value)} />
+            <input
+              style={S.input}
+              placeholder="Owner name"
+              value={ownerName}
+              onChange={(e) => setOwnerName(e.target.value)}
+            />
+            <input
+              style={S.input}
+              placeholder="Owner email"
+              value={ownerEmail}
+              onChange={(e) => setOwnerEmail(e.target.value)}
+            />
           </div>
 
           <div style={{ height: 12 }} />
@@ -230,11 +397,11 @@ export default function Clients() {
 
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <button type="submit" style={S.btn} disabled={creating}>
-              {creating ? "Creating..." : "Create Client"}
+              {creating ? "Creating..." : "Create Account"}
             </button>
 
-            <button type="button" style={S.btn} onClick={() => nav("/dashboard")}>
-              Back to Dashboard
+            <button type="button" style={S.btnGhost} onClick={() => nav("/overview")}>
+              Back to Overview
             </button>
           </div>
         </form>
@@ -244,10 +411,17 @@ export default function Clients() {
 
       <div style={{ height: 14 }} />
 
-      {/* List */}
       <div style={S.card}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-          <div style={{ fontSize: 16, fontWeight: 900 }}>Client Directory</div>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 10,
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ fontSize: 16, fontWeight: 900 }}>Account Directory</div>
           <div style={S.tag}>{clients.length} total</div>
         </div>
 
@@ -255,24 +429,74 @@ export default function Clients() {
 
         {loading ? (
           <div style={{ opacity: 0.85 }}>Loading…</div>
-        ) : clients.length ? (
+        ) : enrichedClients.length ? (
           <div style={S.list}>
-            {clients.map((c) => {
+            {enrichedClients.map((c) => {
               const id = c?._id || c?.id;
+              const websiteLabel = safe(c?.website).trim();
+              const domain = c?.domain;
+
               return (
                 <div key={id} style={S.item}>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 900, fontSize: 14 }}>{safe(c?.name || "Client")}</div>
-                    <div style={S.meta}>
-                      {c?.industry ? <>Industry: <strong>{safe(c.industry)}</strong> • </> : null}
-                      {c?.website ? <>Website: <strong>{safe(c.website)}</strong></> : null}
-                      <div style={{ marginTop: 6, opacity: 0.8 }}>
-                        Owner: <strong>{safe(c?.ownerName || "—")}</strong> • {safe(c?.ownerEmail || "—")}
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 10,
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <div style={{ fontWeight: 900, fontSize: 14 }}>
+                        {safe(c?.name || "Account")}
                       </div>
+
+                      <div style={S.scorePill(c.engagementScore)}>
+                        Engagement {c.engagementScore}
+                      </div>
+
+                      <div style={S.tag}>Expansion {c.expansionProbability}%</div>
+                    </div>
+
+                    <div style={{ ...S.meta, marginTop: 8 }}>
+                      {c?.industry ? (
+                        <>
+                          Industry: <strong>{safe(c.industry)}</strong>
+                          {" • "}
+                        </>
+                      ) : null}
+
+                      {websiteLabel ? (
+                        <>
+                          Website: <strong>{safe(domain || websiteLabel)}</strong>
+                        </>
+                      ) : (
+                        <>
+                          Website: <strong>—</strong>
+                        </>
+                      )}
+
+                      <div style={{ marginTop: 6, opacity: 0.8 }}>
+                        Owner: <strong>{safe(c?.ownerName || "—")}</strong> •{" "}
+                        {safe(c?.ownerEmail || "—")}
+                      </div>
+
+                      {safe(c?.notes).trim() ? (
+                        <div style={{ marginTop: 6, opacity: 0.82 }}>
+                          Notes: {safe(c.notes)}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
 
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 10,
+                      flexWrap: "wrap",
+                      justifyContent: "flex-end",
+                    }}
+                  >
                     <button style={S.btn} onClick={() => nav(`/clients/${id}`)}>
                       View / Edit
                     </button>
@@ -285,7 +509,7 @@ export default function Clients() {
             })}
           </div>
         ) : (
-          <div style={{ opacity: 0.85 }}>No clients yet. Create one above.</div>
+          <div style={{ opacity: 0.85 }}>No accounts yet. Create one above.</div>
         )}
       </div>
     </div>

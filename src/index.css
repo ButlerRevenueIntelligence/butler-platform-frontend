@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   --bg1: #050815;
   --bg2: #070b1c;
@@ -7,28 +11,57 @@
   --muted: rgba(210, 225, 255, 0.72);
 }
 
-* { box-sizing: border-box; }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
 
-html, body, #root {
-  height: 100%;
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+html {
+  background: var(--bg1);
 }
 
 body {
   margin: 0;
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
   color: var(--text);
   background:
     radial-gradient(1000px 600px at 15% 10%, rgba(92, 124, 255, 0.20), transparent 60%),
     radial-gradient(900px 500px at 70% 20%, rgba(70, 180, 255, 0.16), transparent 55%),
     linear-gradient(180deg, var(--bg1), var(--bg2));
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  isolation: isolate;
 }
 
 a {
-  color: rgba(210,225,255,0.9);
+  color: rgba(210, 225, 255, 0.9);
   text-decoration: none;
 }
-a:hover { text-decoration: underline; }
 
-button, input {
-  font-family: inherit;
+a:hover {
+  text-decoration: underline;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+img,
+svg,
+canvas {
+  display: block;
+  max-width: 100%;
 }
