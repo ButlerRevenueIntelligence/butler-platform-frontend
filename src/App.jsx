@@ -119,7 +119,7 @@ export default function App() {
           path="/command-center"
           element={
             <RequirePerm perm="command_center.view">
-              <Dashboard />
+              <RevenueIntel />
             </RequirePerm>
           }
         />
