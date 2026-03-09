@@ -2,7 +2,10 @@ import React, { useMemo, useState } from "react";
 import { askAtlas } from "../api";
 import RevenueRiskAlerts from "../components/atlas/RevenueRiskAlerts";
 import RecommendedActions from "../components/atlas/RecommendedActions";
-import { alerts, briefing } from "../data/AtlasMockData";
+import {
+  alerts as atlasAlerts,
+  briefing as atlasBriefing,
+} from "../data/AtlasMockData.js";
 import ExecutiveBriefing from "../components/atlas/ExecutiveBriefing";
 import {
   ResponsiveContainer,
@@ -417,7 +420,7 @@ export default function AtlasAIOperator() {
       { label: "Forecast Confidence", value: "78%", note: "Current modeled outlook" },
       {
         label: "Active Risk Alerts",
-        value: String(alerts.length),
+        value: String(atlasAlerts.length),
         note: "Requiring leadership review",
       },
       {
@@ -447,7 +450,7 @@ export default function AtlasAIOperator() {
       pipelineValue: livePipelineValue,
       forecastConfidence: 78,
       riskLevel: liveRiskLevel,
-      activeRiskAlerts: alerts.length,
+      activeRiskAlerts: atlasAlerts.length,
       recommendedActions: operatorMoves.length,
     }),
     [liveCoverage, liveRevenue30, livePipelineValue, liveRiskLevel]
@@ -623,13 +626,13 @@ export default function AtlasAIOperator() {
           </Section>
 
           <Section title="Revenue Risk Alerts" subtitle="Flags">
-            <RevenueRiskAlerts alerts={alerts} />
+            <RevenueRiskAlerts alerts={atlasAlerts} />
           </Section>
         </div>
 
         <div style={styles.twoCol}>
           <Section title="Executive Briefing" subtitle="Narrative">
-            <ExecutiveBriefing text={briefing} />
+            <ExecutiveBriefing text={atlasBriefing} />
           </Section>
 
           <Section title="Operator Feed" subtitle="Live Notes">
