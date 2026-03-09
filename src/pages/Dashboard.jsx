@@ -10,13 +10,31 @@ import {
   seedDemoData,
 } from "../api";
 
-import OrgSwitcher from "../components/OrgSwitcher";
 import { useNavigate } from "react-router-dom";
+import mapboxgl from "mapbox-gl";
+import Map, {
+  Marker,
+  Popup,
+  NavigationControl,
+  Source,
+  Layer,
+} from "react-map-gl/mapbox";
+import "mapbox-gl/dist/mapbox-gl.css";
+
+import OrgSwitcher from "../components/OrgSwitcher";
+import AnimatedCounter from "../components/AnimatedCounter";
+import AITicker from "../components/AITicker";
+import CommandBar from "../components/CommandBar";
+import ForecastConfidence from "../components/ForecastConfidence";
+import SystemStatus from "../components/SystemStatus";
+import ExecutiveBriefing from "../components/ExecutiveBriefing";
+import RevenueLeakDetector from "../components/RevenueLeakDetector";
+import PipelineVelocity from "../components/PipelineVelocity";
+import OpportunityRadar from "../components/atlas/OpportunityRadar";
+import RevenueTimeline from "../components/atlas/RevenueTimeline";
 
 import {
   ResponsiveContainer,
-  LineChart,
-  Line,
   BarChart,
   Bar,
   PieChart,
@@ -27,7 +45,46 @@ import {
   Tooltip,
   CartesianGrid,
   Legend,
+  AreaChart,
+  Area,
 } from "recharts";
+
+/** ---------------- Mapbox setup ---------------- */
+const rawMapToken = import.meta.env.VITE_MAPBOX_TOKEN || "";
+const DASHBOARD_MAPBOX_TOKEN =
+  rawMapToken && rawMapToken !== "YOUR_MAPBOX_PUBLIC_TOKEN" ? rawMapToken : "";
+
+if (DASHBOARD_MAPBOX_TOKEN) {
+  mapboxgl.accessToken = DASHBOARD_MAPBOX_TOKEN;
+}
+
+const hasDashboardMapToken = Boolean(DASHBOARD_MAPBOX_TOKEN);
+
+const dashboardFallbackMapStyle = {
+  version: 8,
+  sources: {
+    "carto-dark": {
+      type: "raster",
+      tiles: [
+        "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+        "https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+        "https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+        "https://d.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+      ],
+      tileSize: 256,
+      attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+    },
+  },
+  layers: [
+    {
+      id: "carto-dark-layer",
+      type: "raster",
+      source: "carto-dark",
+      minzoom: 0,
+      maxzoom: 22,
+    },
+  ],
+};
 
 /** ---------------- Helpers ---------------- */
 const safeNum = (v) => {
@@ -46,7 +103,7 @@ const moneyCompact = (n) => {
   const num = safeNum(n);
   const abs = Math.abs(num);
   if (abs >= 1_000_000) return `$${(num / 1_000_000).toFixed(1)}M`;
-  if (abs >= 1_000) return `$${(num / 1_000).toFixed(0)}k`;
+  if (abs >= 1_000) return `$${(num / 1_000).toFixed(0)}K`;
   return money(num);
 };
 
@@ -109,13 +166,14 @@ const integrationMeta = (i) => {
     i?.connectedAt ||
     i?.createdAt ||
     null;
+
   if (!last) return null;
+
   const d = new Date(last);
   if (Number.isNaN(d.getTime())) return null;
   return `Last sync: ${d.toLocaleString()}`;
 };
 
-// Local insight generator (NO OpenAI key needed)
 const buildLocalInsights = (kpis, seed = 0) => {
   const jitter = (base, range = 6) => {
     const r = Math.sin((seed + base) * 999) * 10000;
@@ -126,9 +184,9 @@ const buildLocalInsights = (kpis, seed = 0) => {
 
   const items = [];
 
-  // 1) Efficiency
   if (kpis.spend30 > 0 && kpis.revenue30 > 0) {
     const roi = (kpis.revenue30 - kpis.spend30) / kpis.spend30;
+
     if (roi >= 1) {
       items.push({
         type: "OPPORTUNITY",
@@ -164,7 +222,6 @@ const buildLocalInsights = (kpis, seed = 0) => {
     });
   }
 
-  // 2) Coverage
   if (kpis.coverage >= 4) {
     items.push({
       type: "SUCCESS",
@@ -191,7 +248,6 @@ const buildLocalInsights = (kpis, seed = 0) => {
     });
   }
 
-  // 3) CAC
   if (kpis.cac > 500) {
     items.push({
       type: "WARNING",
@@ -213,7 +269,6 @@ const buildLocalInsights = (kpis, seed = 0) => {
   return items.slice(0, 3);
 };
 
-// Fallback scenarios
 const FALLBACK_SCENARIOS = [
   {
     key: "current",
@@ -287,7 +342,38 @@ function normalizeScenarios(res) {
   return list.length ? list : null;
 }
 
-/** ---------------- Component ---------------- */
+function MiniRegionMarker({ region, onClick }) {
+  const size = Math.max(14, Math.min(26, Math.round((region.pipeline / 1_000_000) * 1.4 + 10)));
+
+  return (
+    <Marker longitude={region.lng} latitude={region.lat} anchor="center">
+      <button
+        type="button"
+        title={region.region}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick(region);
+        }}
+        style={{
+          width: size,
+          height: size,
+          borderRadius: 999,
+          border: "2px solid rgba(255,255,255,0.92)",
+          cursor: "pointer",
+          animation: "atlasPulse 2.2s infinite",
+          background:
+            region.signal >= 60
+              ? "radial-gradient(circle at 35% 35%, #d8fbff, #22c55e 58%, #0891b2 100%)"
+              : region.signal >= 35
+              ? "radial-gradient(circle at 35% 35%, #fef3c7, #f59e0b 58%, #d97706 100%)"
+              : "radial-gradient(circle at 35% 35%, #fecdd3, #fb7185 58%, #be123c 100%)",
+          boxShadow: "0 0 0 8px rgba(56,189,248,0.10), 0 10px 24px rgba(0,0,0,0.35)",
+        }}
+      />
+    </Marker>
+  );
+}
+
 export default function Dashboard() {
   const nav = useNavigate();
 
@@ -303,15 +389,20 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // AI insights
   const [aiInsights, setAiInsights] = useState([]);
   const [insightsLoading, setInsightsLoading] = useState(false);
   const [insightSeed, setInsightSeed] = useState(Date.now());
 
-  // Demo seed UX (DEV only)
   const isDev = !!import.meta.env.DEV;
   const [demoLoading, setDemoLoading] = useState(false);
   const [demoMsg, setDemoMsg] = useState("");
+
+  const [selectedMiniRegion, setSelectedMiniRegion] = useState(null);
+  const [miniMapView, setMiniMapView] = useState({
+    longitude: 10,
+    latitude: 18,
+    zoom: 0.9,
+  });
 
   async function loadDashboardData() {
     try {
@@ -350,7 +441,6 @@ export default function Dashboard() {
         if (!exists) setScenarioKey(normalized[0].key);
       }
 
-      // reset AI insights cache so local insights show fresh on load
       setAiInsights([]);
       setInsightSeed(Date.now());
     } catch (e) {
@@ -363,17 +453,28 @@ export default function Dashboard() {
 
   useEffect(() => {
     let alive = true;
+
     (async () => {
       if (!alive) return;
       await loadDashboardData();
     })();
+
     return () => {
       alive = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /** seed demo data (DEV only) */
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setMiniMapView((prev) => ({
+        ...prev,
+        longitude: prev.longitude >= 180 ? -180 : prev.longitude + 0.08,
+      }));
+    }, 70);
+
+    return () => clearInterval(interval);
+  }, []);
+
   async function onLoadDemoData() {
     if (demoLoading) return;
 
@@ -409,7 +510,6 @@ export default function Dashboard() {
     }
   }
 
-  /** Attribution normalization */
   const channelRows = useMemo(() => {
     const arr = attribution?.channels;
     return Array.isArray(arr) ? arr : [];
@@ -430,7 +530,6 @@ export default function Dashboard() {
       .sort((a, b) => b.revenue - a.revenue);
   }, [channelRows]);
 
-  /** Data normalization */
   const metrics = useMemo(() => {
     const arr = Array.isArray(dashboard?.metrics) ? dashboard.metrics : [];
     const normalized = arr
@@ -445,7 +544,10 @@ export default function Dashboard() {
 
     return normalized.map((m) => ({
       ...m,
-      x: new Date(m.date).toLocaleDateString(undefined, { month: "short", day: "2-digit" }),
+      x: new Date(m.date).toLocaleDateString(undefined, {
+        month: "short",
+        day: "2-digit",
+      }),
     }));
   }, [dashboard]);
 
@@ -464,9 +566,13 @@ export default function Dashboard() {
     return found || scenarioList[0] || FALLBACK_SCENARIOS[0];
   }, [scenarioList, scenarioKey]);
 
-  /** KPIs */
   const kpis = useMemo(() => {
-    const m = activeScenario?.multipliers || { revenue: 1, spend: 1, leads: 1, pipeline: 1 };
+    const m = activeScenario?.multipliers || {
+      revenue: 1,
+      spend: 1,
+      leads: 1,
+      pipeline: 1,
+    };
 
     const rawRevenue30 =
       (dashboard?.revenue ?? dashboard?.revenue30d ?? null) ??
@@ -555,23 +661,13 @@ export default function Dashboard() {
     };
   }, [dashboard, kpis]);
 
-  const why = useMemo(() => {
-    const protectionMonths = clamp(kpis.coverage, 0, 12);
-    const closeLift5 = safeNum(kpis.pipelineValue) * 0.05;
-    const spend = safeNum(kpis.spend30);
-    const savings10 = spend * 0.1;
-    return { protectionMonths, closeLift5, savings10 };
-  }, [kpis]);
-
-  /** ✅ Generate insights (LOCAL ONLY) */
   async function onGenerateInsights() {
     try {
       setInsightsLoading(true);
       setError("");
-
       const seed = Date.now();
-      setAiInsights([]);       // ensure local insights render
-      setInsightSeed(seed);    // triggers rebuild
+      setAiInsights([]);
+      setInsightSeed(seed);
     } catch (e) {
       console.error("Generate insights error:", e);
       setError("Failed to generate insights");
@@ -581,12 +677,14 @@ export default function Dashboard() {
   }
 
   const pipelineByStage = useMemo(() => {
-    const map = new Map();
+    const map = new window.Map();
+
     for (const d of deals) {
       const stage = normalizeStage(d?.stage || d?.status);
       const val = safeNum(d?.amount ?? d?.value ?? d?.pipelineValue);
       map.set(stage, (map.get(stage) || 0) + val);
     }
+
     return [...map.entries()]
       .map(([name, value]) => ({ name, value }))
       .filter((x) => x.value > 0)
@@ -605,34 +703,179 @@ export default function Dashboard() {
         : clamp(Math.round(kpis.healthScore), 0, 100);
 
     const tier =
-      score >= 85 ? "Strong" : score >= 70 ? "Controlled Volatility" : score >= 55 ? "Watchlist" : "High Risk";
+      score >= 85
+        ? "Strong"
+        : score >= 70
+        ? "Controlled Volatility"
+        : score >= 55
+        ? "Watchlist"
+        : "High Risk";
+
     return { score, tier };
   }, [rss, kpis]);
 
-  /** Styles (same as yours; unchanged) */
+  const overviewSignals = useMemo(() => {
+    const items = [];
+
+    if (kpis.wow != null) {
+      items.push(
+        kpis.wow >= 0
+          ? `Revenue momentum is up ${Math.abs(kpis.wow).toFixed(1)}% week over week`
+          : `Revenue momentum is down ${Math.abs(kpis.wow).toFixed(1)}% week over week`
+      );
+    }
+
+    if (kpis.coverage < 2) {
+      items.push("Pipeline coverage is below target and needs immediate lift");
+    } else if (kpis.coverage < 4) {
+      items.push("Pipeline coverage is workable but not yet elite");
+    } else {
+      items.push("Pipeline coverage is strong and protecting forecast stability");
+    }
+
+    if (channelChart.length) {
+      items.push(
+        `${channelChart[0]?.channel || "Top channel"} is currently leading attributed revenue`
+      );
+    }
+
+    if (integrations.length < 2) {
+      items.push("More integrations should be connected to unlock fuller attribution visibility");
+    }
+
+    if (safeNum(kpis.cac) > 500) {
+      items.push("Customer acquisition cost is elevated and should be reviewed");
+    }
+
+    return items.slice(0, 5);
+  }, [kpis, channelChart, integrations]);
+
+  const regionalSignals = useMemo(() => {
+    const pipelineBase = safeNum(kpis.pipelineValue || 0);
+    const revenueBase = safeNum(kpis.revenue30 || 0);
+
+    return [
+      {
+        region: "North America",
+        signal: 72,
+        revenue: revenueBase * 0.46,
+        pipeline: pipelineBase * 0.44,
+        note: "Strongest current execution zone",
+        lat: 37.0902,
+        lng: -95.7129,
+      },
+      {
+        region: "Europe",
+        signal: 44,
+        revenue: revenueBase * 0.24,
+        pipeline: pipelineBase * 0.27,
+        note: "Healthy pipeline, moderate close pressure",
+        lat: 50.1109,
+        lng: 8.6821,
+      },
+      {
+        region: "Asia",
+        signal: 38,
+        revenue: revenueBase * 0.18,
+        pipeline: pipelineBase * 0.19,
+        note: "Emerging expansion territory",
+        lat: 1.3521,
+        lng: 103.8198,
+      },
+      {
+        region: "LATAM",
+        signal: 21,
+        revenue: revenueBase * 0.12,
+        pipeline: pipelineBase * 0.1,
+        note: "Early-stage opportunity density",
+        lat: -15.7801,
+        lng: -47.9292,
+      },
+    ].sort((a, b) => b.signal - a.signal);
+  }, [kpis]);
+
+  const revenueFlows = useMemo(
+    () => [
+      { from: "North America", to: "Europe" },
+      { from: "North America", to: "Asia" },
+      { from: "Europe", to: "Asia" },
+    ],
+    []
+  );
+
+  const revenueFlowGeoJson = useMemo(() => {
+    return {
+      type: "FeatureCollection",
+      features: revenueFlows
+        .map((f) => {
+          const start = regionalSignals.find((r) => r.region === f.from);
+          const end = regionalSignals.find((r) => r.region === f.to);
+          if (!start || !end) return null;
+
+          return {
+            type: "Feature",
+            properties: {},
+            geometry: {
+              type: "LineString",
+              coordinates: [
+                [start.lng, start.lat],
+                [end.lng, end.lat],
+              ],
+            },
+          };
+        })
+        .filter(Boolean),
+    };
+  }, [regionalSignals, revenueFlows]);
+
+  const axisTick = { fill: "#9fb0d0", fontSize: 11 };
+
+  const tooltipStyle = {
+    background: "rgba(7,11,24,0.97)",
+    border: "1px solid rgba(255,255,255,0.10)",
+    borderRadius: "14px",
+    color: "#fff",
+    boxShadow: "0 14px 40px rgba(0,0,0,0.35)",
+  };
+
+  const legendStyle = { color: "#dbe4f0" };
+
   const S = useMemo(() => {
     const card = {
       background: "rgba(10, 16, 35, 0.55)",
       border: "1px solid rgba(255,255,255,0.08)",
       borderRadius: 18,
-      padding: 18,
+      padding: 16,
       backdropFilter: "blur(10px)",
       boxShadow: "0 12px 40px rgba(0,0,0,0.35)",
     };
 
     return {
-      page: { minHeight: "100vh", padding: "26px 26px 40px", color: "#EAF0FF" },
+      page: { minHeight: "100vh", padding: "22px 22px 34px", color: "#EAF0FF" },
       bgGlow: {
         position: "fixed",
         inset: 0,
         zIndex: -1,
-        background:
-          "radial-gradient(1200px 700px at 15% 15%, rgba(124,92,255,0.25), transparent 60%), radial-gradient(1000px 650px at 85% 30%, rgba(56,189,248,0.18), transparent 60%), radial-gradient(900px 650px at 50% 90%, rgba(34,197,94,0.10), transparent 60%), linear-gradient(180deg, rgba(5,8,18,1) 0%, rgba(7,12,28,1) 55%, rgba(5,8,18,1) 100%)",
+        background: `
+          linear-gradient(#0a0f1f 1px, transparent 1px),
+          linear-gradient(90deg,#0a0f1f 1px, transparent 1px),
+          radial-gradient(circle at 20% 20%,rgba(124,92,255,.25),transparent),
+          radial-gradient(circle at 80% 30%,rgba(56,189,248,.15),transparent),
+          #05070f
+        `,
+        backgroundSize: "60px 60px,60px 60px,auto,auto",
       },
-      topRow: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 16 },
-      title: { margin: 0, fontSize: 34, fontWeight: 900, letterSpacing: 0.2 },
-      sub: { marginTop: 8, opacity: 0.85, fontSize: 14 },
-      org: { opacity: 0.9, fontSize: 14, marginTop: 10 },
+      topRow: {
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "space-between",
+        gap: 16,
+        marginBottom: 14,
+        flexWrap: "wrap",
+      },
+      title: { margin: 0, fontSize: 30, fontWeight: 900, letterSpacing: 0.2 },
+      sub: { marginTop: 8, opacity: 0.85, fontSize: 13 },
+      org: { opacity: 0.9, fontSize: 13, marginTop: 8 },
       badge: {
         display: "inline-flex",
         alignItems: "center",
@@ -641,36 +884,234 @@ export default function Dashboard() {
         borderRadius: 999,
         border: "1px solid rgba(255,255,255,0.10)",
         background: "rgba(255,255,255,0.04)",
-        fontSize: 12,
+        fontSize: 11,
         opacity: 0.95,
         textDecoration: "none",
         color: "#EAF0FF",
         cursor: "pointer",
+        fontWeight: 700,
       },
-      pillLinkRow: { display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 12 },
-      simRow: { display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 14 },
-      kpiGrid: { display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 14, marginBottom: 14 },
+      simRow: {
+        display: "flex",
+        gap: 10,
+        flexWrap: "wrap",
+        alignItems: "center",
+        marginBottom: 12,
+      },
+      navGrid: {
+        display: "grid",
+        gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+        gap: 12,
+        marginTop: 12,
+        marginBottom: 12,
+      },
+      navCard: {
+        borderRadius: 16,
+        padding: 14,
+        border: "1px solid rgba(255,255,255,0.08)",
+        background: "rgba(255,255,255,0.04)",
+        cursor: "pointer",
+      },
+      navTitle: { fontWeight: 900, fontSize: 14, marginBottom: 8 },
+      navDesc: { fontSize: 12, opacity: 0.8, lineHeight: 1.45 },
+      signalStrip: {
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+        gap: 10,
+        marginTop: 12,
+        marginBottom: 12,
+      },
+      signalPill: {
+        borderRadius: 14,
+        padding: "12px 14px",
+        border: "1px solid rgba(255,255,255,0.08)",
+        background: "rgba(255,255,255,0.04)",
+        fontSize: 12,
+        lineHeight: 1.45,
+        opacity: 0.92,
+      },
+      kpiGrid: {
+        display: "grid",
+        gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+        gap: 12,
+        marginBottom: 12,
+      },
       card,
-      kLabel: { fontSize: 12, opacity: 0.8, letterSpacing: 0.8 },
-      kValue: { marginTop: 10, fontSize: 32, fontWeight: 900 },
-      kSub: { marginTop: 10, fontSize: 13, opacity: 0.85 },
-      grid: { display: "grid", gridTemplateColumns: "minmax(0, 2.2fr) minmax(0, 1fr)", gap: 14, alignItems: "start" },
-      chartsGrid: { display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 14 },
-      chartRow: { display: "grid", gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1.1fr)", gap: 14 },
+      kLabel: {
+        fontSize: 11,
+        opacity: 0.8,
+        letterSpacing: 0.8,
+      },
+      kValue: {
+        marginTop: 8,
+        fontSize: 28,
+        fontWeight: 900,
+        lineHeight: 1.08,
+      },
+      kSub: {
+        marginTop: 8,
+        fontSize: 12,
+        opacity: 0.85,
+        lineHeight: 1.45,
+      },
+      grid: {
+        display: "grid",
+        gridTemplateColumns: "minmax(0, 2.15fr) minmax(0, 1fr)",
+        gap: 12,
+        alignItems: "start",
+      },
+      chartsGrid: { display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 12 },
+      chartRow: {
+        display: "grid",
+        gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1.05fr)",
+        gap: 12,
+      },
       sectionTitle: { fontSize: 16, fontWeight: 900, marginBottom: 10 },
-      chartBox: { height: 280 },
-      miniChartBox: { height: 240 },
-      rightStack: { display: "flex", flexDirection: "column", gap: 14 },
+      chartShell: {
+        height: 260,
+        border: "1px solid rgba(255,255,255,0.08)",
+        borderRadius: 16,
+        background: "rgba(4,10,24,0.72)",
+        padding: 10,
+      },
+      miniChartShell: {
+        height: 220,
+        border: "1px solid rgba(255,255,255,0.08)",
+        borderRadius: 16,
+        background: "rgba(4,10,24,0.72)",
+        padding: 10,
+      },
+      miniWorldGrid: {
+        display: "grid",
+        gridTemplateColumns: "1.2fr 0.8fr",
+        gap: 12,
+      },
+      miniMapShell: {
+        height: 320,
+        border: "1px solid rgba(255,255,255,0.08)",
+        borderRadius: 16,
+        overflow: "hidden",
+        background: "rgba(4,10,24,0.72)",
+        position: "relative",
+      },
+      miniMapHud: {
+        position: "absolute",
+        top: 12,
+        left: 12,
+        zIndex: 5,
+        width: 220,
+        borderRadius: 16,
+        border: "1px solid rgba(255,255,255,0.10)",
+        background: "linear-gradient(180deg, rgba(8,14,28,0.88), rgba(5,9,18,0.82))",
+        backdropFilter: "blur(10px)",
+        boxShadow: "0 18px 40px rgba(0,0,0,0.30)",
+        overflow: "hidden",
+      },
+      miniMapHudHead: {
+        padding: "10px 12px",
+        borderBottom: "1px solid rgba(255,255,255,0.08)",
+      },
+      miniMapHudTitle: {
+        fontSize: 11,
+        textTransform: "uppercase",
+        letterSpacing: "0.14em",
+        color: "rgba(148,163,184,0.82)",
+        fontWeight: 800,
+      },
+      miniMapHudBody: {
+        padding: 12,
+        display: "grid",
+        gap: 10,
+      },
+      miniMapHudLabel: {
+        fontSize: 10,
+        textTransform: "uppercase",
+        letterSpacing: "0.14em",
+        color: "rgba(148,163,184,0.78)",
+        fontWeight: 800,
+      },
+      miniMapHudValue: {
+        fontSize: 22,
+        lineHeight: 1.05,
+        fontWeight: 900,
+        color: "#fff",
+      },
+      miniMapHudSub: {
+        fontSize: 12,
+        color: "rgba(203,213,225,0.74)",
+        lineHeight: 1.45,
+      },
+      miniMapStatus: {
+        position: "absolute",
+        left: 12,
+        bottom: 12,
+        zIndex: 5,
+        padding: "7px 11px",
+        borderRadius: 999,
+        border: "1px solid rgba(255,255,255,0.08)",
+        background: "rgba(7,11,24,0.82)",
+        color: "#cbd5e1",
+        fontSize: 10,
+        fontWeight: 700,
+      },
+      miniMapSide: {
+        border: "1px solid rgba(255,255,255,0.08)",
+        borderRadius: 16,
+        background: "rgba(4,10,24,0.55)",
+        padding: 14,
+      },
+      miniMapSideTitle: {
+        fontSize: 14,
+        fontWeight: 900,
+        marginBottom: 10,
+      },
+      miniRankList: {
+        display: "grid",
+        gap: 10,
+      },
+      miniRankRow: {
+        border: "1px solid rgba(255,255,255,0.08)",
+        borderRadius: 12,
+        background: "rgba(255,255,255,0.03)",
+        padding: 10,
+      },
+      miniRankTop: {
+        display: "flex",
+        justifyContent: "space-between",
+        gap: 8,
+        alignItems: "center",
+      },
+      miniRankName: {
+        fontWeight: 800,
+        fontSize: 13,
+      },
+      miniRankValue: {
+        fontWeight: 900,
+        fontSize: 13,
+      },
+      rightStack: { display: "flex", flexDirection: "column", gap: 12 },
       divider: { height: 1, background: "rgba(255,255,255,0.08)", margin: "14px 0" },
       list: { display: "grid", gap: 10 },
-      pillCard: { borderRadius: 14, padding: 12, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)" },
+      pillCard: {
+        borderRadius: 14,
+        padding: 12,
+        border: "1px solid rgba(255,255,255,0.08)",
+        background: "rgba(255,255,255,0.04)",
+      },
       pillTitle: { fontWeight: 900, fontSize: 14, marginBottom: 6 },
       pillMeta: { opacity: 0.85, fontSize: 13, lineHeight: 1.35 },
-      progressWrap: { height: 10, borderRadius: 999, background: "rgba(255,255,255,0.08)", overflow: "hidden", border: "1px solid rgba(255,255,255,0.10)" },
-      progressBar: (pct) => ({ height: "100%", width: `${clamp(pct, 0, 200)}%`, background: "linear-gradient(90deg, rgba(56,189,248,0.9), rgba(124,92,255,0.9))" }),
-      miniRow: { display: "grid", gap: 6 },
-      miniLabel: { fontSize: 12, opacity: 0.8, letterSpacing: 0.6 },
-      miniValue: { fontSize: 18, fontWeight: 900 },
+      progressWrap: {
+        height: 10,
+        borderRadius: 999,
+        background: "rgba(255,255,255,0.08)",
+        overflow: "hidden",
+        border: "1px solid rgba(255,255,255,0.10)",
+      },
+      progressBar: (pct) => ({
+        height: "100%",
+        width: `${clamp(pct, 0, 200)}%`,
+        background: "linear-gradient(90deg, rgba(56,189,248,0.9), rgba(124,92,255,0.9))",
+      }),
       insightWrap: { display: "grid", gap: 10 },
       insightItem: (type) => ({
         borderRadius: 14,
@@ -683,9 +1124,14 @@ export default function Dashboard() {
             ? "linear-gradient(90deg, rgba(245,158,11,0.12), rgba(255,255,255,0.02))"
             : "linear-gradient(90deg, rgba(56,189,248,0.12), rgba(255,255,255,0.02))",
       }),
-      insightTop: { display: "flex", justifyContent: "space-between", gap: 10 },
+      insightTop: {
+        display: "flex",
+        justifyContent: "space-between",
+        gap: 10,
+        flexWrap: "wrap",
+      },
       tag: (type) => ({
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: 900,
         letterSpacing: 0.7,
         padding: "6px 10px",
@@ -694,28 +1140,62 @@ export default function Dashboard() {
         background: "rgba(255,255,255,0.04)",
         color: type === "SUCCESS" ? "#22C55E" : type === "WARNING" ? "#F59E0B" : "#38BDF8",
       }),
-      confidence: { fontSize: 12, fontWeight: 900, padding: "6px 10px", borderRadius: 999, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.10)" },
+      confidence: {
+        fontSize: 11,
+        fontWeight: 900,
+        padding: "6px 10px",
+        borderRadius: 999,
+        background: "rgba(255,255,255,0.05)",
+        border: "1px solid rgba(255,255,255,0.10)",
+      },
       insightTitle: { fontWeight: 900, fontSize: 15, marginTop: 10 },
       insightBody: { opacity: 0.88, marginTop: 6, fontSize: 13, lineHeight: 1.45 },
       statusGood: { color: "#22C55E", fontWeight: 900 },
       statusWarn: { color: "#F59E0B", fontWeight: 900 },
       statusBad: { color: "#FB7185", fontWeight: 900 },
-      error: { marginTop: 10, borderRadius: 12, padding: 12, border: "1px solid rgba(255,0,0,0.25)", background: "rgba(255,0,0,0.10)" },
-      actionBtn: { borderRadius: 999, padding: "10px 14px", border: "1px solid rgba(255,255,255,0.12)", background: "rgba(255,255,255,0.06)", color: "#EAF0FF", fontWeight: 900, fontSize: 12, cursor: "pointer", opacity: 0.98 },
+      error: {
+        marginTop: 10,
+        borderRadius: 12,
+        padding: 12,
+        border: "1px solid rgba(255,0,0,0.25)",
+        background: "rgba(255,0,0,0.10)",
+      },
+      actionBtn: {
+        borderRadius: 999,
+        padding: "10px 14px",
+        border: "1px solid rgba(255,255,255,0.12)",
+        background: "rgba(255,255,255,0.06)",
+        color: "#EAF0FF",
+        fontWeight: 900,
+        fontSize: 12,
+        cursor: "pointer",
+        opacity: 0.98,
+      },
       actionBtnDisabled: { cursor: "not-allowed", opacity: 0.65 },
-      helperText: { opacity: 0.75, fontSize: 12, marginTop: 6 },
-      success: { marginTop: 10, borderRadius: 12, padding: 12, border: "1px solid rgba(34,197,94,0.30)", background: "rgba(34,197,94,0.12)", color: "rgba(234,240,255,0.95)" },
+      helperText: { opacity: 0.75, fontSize: 12, marginTop: 6, lineHeight: 1.45 },
+      success: {
+        marginTop: 10,
+        borderRadius: 12,
+        padding: 12,
+        border: "1px solid rgba(34,197,94,0.30)",
+        background: "rgba(34,197,94,0.12)",
+        color: "rgba(234,240,255,0.95)",
+      },
     };
   }, []);
 
   const riskStyle =
-    kpis.risk.tone === "good" ? S.statusGood : kpis.risk.tone === "warn" ? S.statusWarn : S.statusBad;
+    kpis.risk.tone === "good"
+      ? S.statusGood
+      : kpis.risk.tone === "warn"
+      ? S.statusWarn
+      : S.statusBad;
 
   if (loading) {
     return (
       <div style={S.page}>
         <div style={S.bgGlow} />
-        <h1 style={S.title}>Revenue Intelligence Overview</h1>
+        <h1 style={S.title}>Atlas Overview</h1>
         <div style={S.sub}>Loading…</div>
       </div>
     );
@@ -725,10 +1205,9 @@ export default function Dashboard() {
     <div style={S.page}>
       <div style={S.bgGlow} />
 
-      {/* Header */}
       <div style={S.topRow}>
         <div>
-          <h1 style={S.title}>Revenue Intelligence Overview</h1>
+          <h1 style={S.title}>Atlas Overview</h1>
           <div style={S.sub}>
             <span style={{ opacity: 0.7 }}>Last updated:</span> {lastUpdatedLabel}{" "}
             <span style={{ opacity: 0.7 }}>• Data as of:</span> {dataAsOfLabel}
@@ -740,7 +1219,7 @@ export default function Dashboard() {
 
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap", justifyContent: "flex-end" }}>
           <div style={{ minWidth: 260 }}>
-            <OrgSwitcher onSwitched={() => loadDashboardData()} />
+            <OrgSwitcher onSwitched={loadDashboardData} />
           </div>
 
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
@@ -748,15 +1227,15 @@ export default function Dashboard() {
               <button
                 onClick={onLoadDemoData}
                 disabled={demoLoading}
-                style={{ ...S.actionBtn, ...(demoLoading ? S.actionBtnDisabled : null) }}
+                style={{ ...S.actionBtn, ...(demoLoading ? S.actionBtnDisabled : {}) }}
                 title="Seeds demo clients + deals into the active workspace"
               >
                 {demoLoading ? "Loading Demo…" : "Load Demo Data"}
               </button>
             ) : null}
 
-            <div style={S.badge}>Live KPI Summary</div>
-            <div style={S.badge}>Insights Engine</div>
+            <div style={S.badge}>Revenue OS Overview</div>
+            <div style={S.badge}>AI Insights Active</div>
             <div style={S.badge}>Secure Session</div>
           </div>
         </div>
@@ -765,11 +1244,23 @@ export default function Dashboard() {
       {demoMsg ? <div style={S.success}>{demoMsg}</div> : null}
       {error ? <div style={S.error}>{error}</div> : null}
 
-      {/* Summary */}
+      <SystemStatus />
+      <AITicker />
+      <CommandBar />
+
+      <div style={S.signalStrip}>
+        {overviewSignals.map((signal, idx) => (
+          <div key={`${signal}-${idx}`} style={S.signalPill}>
+            {signal}
+          </div>
+        ))}
+      </div>
+
       <div style={S.card}>
-        <div style={S.sectionTitle}>Revenue Command Center Summary</div>
-        <div style={{ display: "grid", gap: 8, fontSize: 14, opacity: 0.95 }}>
+        <div style={S.sectionTitle}>Atlas Executive Overview</div>
+        <div style={{ display: "grid", gap: 8, fontSize: 14, opacity: 0.95, lineHeight: 1.6 }}>
           <div>
+            <ExecutiveBriefing kpis={kpis} />
             Revenue is{" "}
             {kpis.wow == null ? (
               <strong>steady</strong>
@@ -789,14 +1280,44 @@ export default function Dashboard() {
           <div>
             90-day forecast suggests <strong>{money(kpis.forecast90)}</strong>
           </div>
-          <div style={{ marginTop: 6, opacity: 0.8, fontSize: 12 }}>
-            Mode: <strong>{kpis.scenario?.label || "Current"}</strong> — {kpis.scenario?.note || "Actual performance"}
+          <div style={{ marginTop: 4, opacity: 0.8, fontSize: 12 }}>
+            Mode: <strong>{kpis.scenario?.label || "Current"}</strong> —{" "}
+            {kpis.scenario?.note || "Actual performance"}
           </div>
         </div>
       </div>
 
-      {/* Revenue Impact */}
-      <div style={{ display: "grid", gap: 12, fontSize: 15, lineHeight: 1.7 }}>
+      <div style={S.navGrid}>
+        <div style={S.navCard} onClick={() => nav("/command-center")}>
+          <div style={S.navTitle}>Command Center</div>
+          <div style={S.navDesc}>
+            Go to the main revenue war room for forecast, pipeline health, and AI intelligence.
+          </div>
+        </div>
+
+        <div style={S.navCard} onClick={() => nav("/deal-war-room")}>
+          <div style={S.navTitle}>Deal War Room</div>
+          <div style={S.navDesc}>
+            Analyze opportunity risk, stakeholders, next best actions, and close probability.
+          </div>
+        </div>
+
+        <div style={S.navCard} onClick={() => nav("/growth-engine")}>
+          <div style={S.navTitle}>Growth Engine</div>
+          <div style={S.navDesc}>
+            Connect marketing to pipeline and understand what channels drive revenue.
+          </div>
+        </div>
+
+        <div style={S.navCard} onClick={() => nav("/atlas-ai-operator")}>
+          <div style={S.navTitle}>Atlas AI Operator</div>
+          <div style={S.navDesc}>
+            Open the AI copilot for executive insights, strategy prompts, and revenue guidance.
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gap: 10, fontSize: 14, lineHeight: 1.7, marginBottom: 12 }}>
         <div>
           <strong>Revenue Protection:</strong> At current coverage, revenue is protected for approximately{" "}
           <strong>{kpis.coverage.toFixed(1)} months</strong>.
@@ -815,26 +1336,17 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Quick links */}
-      <div style={{ ...S.pillLinkRow, marginTop: 12 }}>
-        <a href="/api/export/executive-summary" style={S.badge}>
-          Boardroom Export (PDF)
-        </a>
-        <div onClick={() => nav("/workspaces")} style={S.badge}>
-          Workspaces
-        </div>
-        <div onClick={() => nav("/invites")} style={S.badge}>
-          Invites
-        </div>
-        <div onClick={() => nav("/clients")} style={S.badge}>
-          Clients
-        </div>
-        <div onClick={() => nav("/pipeline")} style={S.badge}>
-          Pipeline
-        </div>
+      <div style={S.card}>
+        <div style={S.sectionTitle}>Forecast Confidence</div>
+        <PipelineVelocity pipeline={pipeline} />
+        <ForecastConfidence
+          coverage={kpis.coverage}
+          pipeline={kpis.pipelineValue}
+          revenue={kpis.revenue30}
+          forecast={kpis.forecast90}
+        />
       </div>
 
-      {/* Scenario Mode */}
       <div style={S.simRow}>
         {scenarioList.map((s) => (
           <button
@@ -842,8 +1354,12 @@ export default function Dashboard() {
             onClick={() => setScenarioKey(s.key)}
             style={{
               ...S.badge,
-              background: scenarioKey === s.key ? "rgba(124,92,255,0.18)" : "rgba(255,255,255,0.04)",
-              border: scenarioKey === s.key ? "1px solid rgba(124,92,255,0.45)" : "1px solid rgba(255,255,255,0.10)",
+              background:
+                scenarioKey === s.key ? "rgba(124,92,255,0.18)" : "rgba(255,255,255,0.04)",
+              border:
+                scenarioKey === s.key
+                  ? "1px solid rgba(124,92,255,0.45)"
+                  : "1px solid rgba(255,255,255,0.10)",
             }}
             title={s.note || ""}
           >
@@ -852,11 +1368,12 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* KPI row */}
       <div style={S.kpiGrid}>
         <div style={S.card}>
           <div style={S.kLabel}>REVENUE (30D)</div>
-          <div style={S.kValue}>{moneyCompact(kpis.revenue30)}</div>
+          <div style={S.kValue}>
+            <AnimatedCounter value={kpis.revenue30} formatter={moneyCompact} />
+          </div>
           <div style={S.kSub}>
             Momentum:{" "}
             {kpis.wow == null ? (
@@ -871,7 +1388,9 @@ export default function Dashboard() {
 
         <div style={S.card}>
           <div style={S.kLabel}>PIPELINE</div>
-          <div style={S.kValue}>{moneyCompact(kpis.pipelineValue)}</div>
+          <div style={S.kValue}>
+            <AnimatedCounter value={kpis.pipelineValue} formatter={moneyCompact} />
+          </div>
           <div style={S.kSub}>
             Coverage: <strong>{kpis.coverage.toFixed(1)}x</strong>
           </div>
@@ -879,20 +1398,24 @@ export default function Dashboard() {
 
         <div style={S.card}>
           <div style={S.kLabel}>CUSTOMER ACQUISITION COST</div>
-          <div style={S.kValue}>{moneyCompact(kpis.cac)}</div>
+          <div style={S.kValue}>
+            <AnimatedCounter value={kpis.cac} formatter={moneyCompact} />
+          </div>
           <div style={S.kSub}>Based on spend/leads (30D)</div>
         </div>
 
         <div style={S.card}>
           <div style={S.kLabel}>FORECAST (90D)</div>
-          <div style={S.kValue}>{moneyCompact(kpis.forecast90)}</div>
+          <div style={S.kValue}>
+            <AnimatedCounter value={kpis.forecast90} formatter={moneyCompact} />
+          </div>
           <div style={S.kSub}>Scenario-based projection</div>
         </div>
 
         <div style={S.card}>
           <div style={S.kLabel}>REVENUE STABILITY INDEX</div>
-          <div style={{ marginTop: 10, fontSize: 34, fontWeight: 950, ...S.statusGood }}>
-            {Math.round(rsi.score)}/100
+          <div style={{ marginTop: 8, fontSize: 30, fontWeight: 950, ...S.statusGood }}>
+            <AnimatedCounter value={Math.round(rsi.score)} /> / 100
           </div>
           <div style={S.kSub}>
             Tier: <strong>{rsi.tier}</strong>
@@ -900,37 +1423,79 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Main grid */}
       <div style={S.grid}>
-        {/* LEFT */}
         <div style={S.chartsGrid}>
           <div style={S.chartRow}>
             <div style={S.card}>
               <div style={S.sectionTitle}>Revenue vs Spend (30 Days)</div>
-              <div style={S.chartBox}>
+              <div style={S.chartShell}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={metrics} margin={{ top: 10, right: 18, bottom: 0, left: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="x" tickMargin={8} />
-                    <YAxis tickMargin={8} />
-                    <Tooltip formatter={(value, name) => [money(value), name]} />
-                    <Legend />
-                    <Line type="monotone" dataKey="spend" stroke="#8884d8" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="revenue" stroke="#00c6ff" strokeWidth={3} dot={false} />
-                  </LineChart>
+                  <AreaChart data={metrics} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+                    <defs>
+                      <linearGradient id="revFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#00c6ff" stopOpacity={0.28} />
+                        <stop offset="100%" stopColor="#00c6ff" stopOpacity={0.03} />
+                      </linearGradient>
+                      <linearGradient id="spendFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#7C5CFF" stopOpacity={0.22} />
+                        <stop offset="100%" stopColor="#7C5CFF" stopOpacity={0.03} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.10)" />
+                    <XAxis dataKey="x" tick={axisTick} tickMargin={8} stroke="#94a3b8" />
+                    <YAxis
+                      tick={axisTick}
+                      tickMargin={8}
+                      stroke="#94a3b8"
+                      tickFormatter={moneyCompact}
+                    />
+                    <Tooltip
+                      formatter={(value, name) => [money(value), name]}
+                      contentStyle={tooltipStyle}
+                      labelStyle={{ color: "#fff" }}
+                    />
+                    <Legend wrapperStyle={legendStyle} />
+                    <Area
+                      type="monotone"
+                      dataKey="spend"
+                      stroke="#7C5CFF"
+                      fill="url(#spendFill)"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="revenue"
+                      stroke="#00c6ff"
+                      fill="url(#revFill)"
+                      strokeWidth={3}
+                      dot={false}
+                    />
+                  </AreaChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
             <div style={S.card}>
               <div style={S.sectionTitle}>Pipeline by Stage</div>
-              <div style={S.miniChartBox}>
+              <div style={S.miniChartShell}>
                 {pipelineByStage.length ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
-                      <Tooltip formatter={(value) => money(value)} />
-                      <Legend />
-                      <Pie data={pipelineByStage} dataKey="value" nameKey="name" innerRadius="55%" outerRadius="85%" paddingAngle={3}>
+                      <Tooltip
+                        formatter={(value) => money(value)}
+                        contentStyle={tooltipStyle}
+                        labelStyle={{ color: "#fff" }}
+                      />
+                      <Legend wrapperStyle={legendStyle} />
+                      <Pie
+                        data={pipelineByStage}
+                        dataKey="value"
+                        nameKey="name"
+                        innerRadius="55%"
+                        outerRadius="85%"
+                        paddingAngle={3}
+                      >
                         {pipelineByStage.map((entry, idx) => (
                           <Cell key={entry.name} fill={donutColors[idx % donutColors.length]} />
                         ))}
@@ -951,27 +1516,253 @@ export default function Dashboard() {
 
           <div style={S.card}>
             <div style={S.sectionTitle}>Leads (30 Days)</div>
-            <div style={S.chartBox}>
+            <div style={S.chartShell}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={metrics} margin={{ top: 10, right: 18, bottom: 0, left: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="x" tickMargin={8} />
-                  <YAxis tickMargin={8} />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="leads" />
+                <BarChart data={metrics} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.10)" />
+                  <XAxis dataKey="x" tick={axisTick} tickMargin={8} stroke="#94a3b8" />
+                  <YAxis tick={axisTick} tickMargin={8} stroke="#94a3b8" />
+                  <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "#fff" }} />
+                  <Legend wrapperStyle={legendStyle} />
+                  <Bar dataKey="leads" fill="#38BDF8" radius={[10, 10, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
 
           <div style={S.card}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <div style={S.sectionTitle}>Channel Revenue Attribution</div>
+            <div style={S.chartShell}>
+              {channelChart.length ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={channelChart} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.10)" />
+                    <XAxis dataKey="channel" tick={axisTick} tickMargin={8} stroke="#94a3b8" />
+                    <YAxis
+                      tick={axisTick}
+                      tickMargin={8}
+                      stroke="#94a3b8"
+                      tickFormatter={moneyCompact}
+                    />
+                    <Tooltip
+                      formatter={(value, name) => {
+                        if (name === "revenue" || name === "spend") return [money(value), name];
+                        if (name === "roiPct") return [`${safeNum(value).toFixed(1)}%`, name];
+                        return [value, name];
+                      }}
+                      contentStyle={tooltipStyle}
+                      labelStyle={{ color: "#fff" }}
+                    />
+                    <Legend wrapperStyle={legendStyle} />
+                    <Bar dataKey="revenue" fill="#38BDF8" radius={[8, 8, 0, 0]} />
+                    <Bar dataKey="spend" fill="#7C5CFF" radius={[8, 8, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div style={{ opacity: 0.85 }}>
+                  No attribution data yet.
+                  <div style={{ opacity: 0.7, marginTop: 6, fontSize: 13 }}>
+                    Connect ad platforms and CRM sources to unlock channel-level attribution.
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div style={S.card}>
+            <div style={S.sectionTitle}>Global Revenue Intelligence Map</div>
+
+            <div style={S.miniWorldGrid}>
+              <div style={S.miniMapShell}>
+                <div style={S.miniMapHud}>
+                  <div style={S.miniMapHudHead}>
+                    <div style={S.miniMapHudTitle}>Atlas Live Region Monitor</div>
+                  </div>
+
+                  <div style={S.miniMapHudBody}>
+                    <div>
+                      <div style={S.miniMapHudLabel}>Top Active Region</div>
+                      <div style={S.miniMapHudValue}>{regionalSignals[0]?.region || "—"}</div>
+                      <div style={S.miniMapHudSub}>
+                        Highest revenue concentration and strongest leadership priority.
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={S.miniMapHudLabel}>Revenue</div>
+                      <div style={S.miniMapHudValue}>
+                        {moneyCompact(regionalSignals[0]?.revenue || 0)}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={S.miniMapHudLabel}>Pipeline</div>
+                      <div style={S.miniMapHudValue}>
+                        {moneyCompact(regionalSignals[0]?.pipeline || 0)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <Map
+                  {...miniMapView}
+                  onMove={(e) => setMiniMapView(e.viewState)}
+                  mapboxAccessToken={DASHBOARD_MAPBOX_TOKEN || undefined}
+                  mapStyle={
+                    hasDashboardMapToken
+                      ? "mapbox://styles/mapbox/dark-v11"
+                      : dashboardFallbackMapStyle
+                  }
+                  projection={hasDashboardMapToken ? "globe" : "mercator"}
+                  attributionControl={false}
+                  style={{ width: "100%", height: "100%" }}
+                  onClick={() => setSelectedMiniRegion(null)}
+                  onLoad={(e) => {
+                    const map = e.target;
+
+                    if (hasDashboardMapToken) {
+                      try {
+                        map.setFog({
+                          color: "rgb(10, 15, 35)",
+                          "high-color": "rgb(36, 92, 223)",
+                          "horizon-blend": 0.08,
+                          "space-color": "rgb(3, 7, 18)",
+                          "star-intensity": 0.25,
+                        });
+                      } catch {}
+                    }
+
+                    map.resize();
+                  }}
+                >
+                  <NavigationControl position="top-right" />
+
+                  <Source id="revenue-flows" type="geojson" data={revenueFlowGeoJson}>
+                    <Layer
+                      id="flow-lines"
+                      type="line"
+                      paint={{
+                        "line-color": "#38BDF8",
+                        "line-width": 2,
+                        "line-opacity": 0.55,
+                      }}
+                    />
+                  </Source>
+
+                  {regionalSignals.map((region) => (
+                    <MiniRegionMarker
+                      key={region.region}
+                      region={region}
+                      onClick={setSelectedMiniRegion}
+                    />
+                  ))}
+
+                  {selectedMiniRegion ? (
+                    <Popup
+                      longitude={selectedMiniRegion.lng}
+                      latitude={selectedMiniRegion.lat}
+                      anchor="top"
+                      closeButton={false}
+                      closeOnClick={false}
+                      offset={20}
+                      className="atlas-map-popup"
+                    >
+                      <div
+                        style={{
+                          minWidth: 220,
+                          padding: 12,
+                          borderRadius: 14,
+                          color: "#fff",
+                          background:
+                            "linear-gradient(180deg, rgba(8,14,28,0.98), rgba(5,9,18,0.96))",
+                          border: "1px solid rgba(255,255,255,0.10)",
+                          boxShadow: "0 18px 40px rgba(0,0,0,0.35)",
+                        }}
+                      >
+                        <div style={{ fontWeight: 900, fontSize: 15 }}>
+                          {selectedMiniRegion.region}
+                        </div>
+
+                        <div
+                          style={{
+                            marginTop: 10,
+                            display: "grid",
+                            gap: 6,
+                            fontSize: 12,
+                            color: "rgba(226,232,240,0.9)",
+                          }}
+                        >
+                          <div>Revenue {moneyCompact(selectedMiniRegion.revenue)}</div>
+                          <div>Pipeline {moneyCompact(selectedMiniRegion.pipeline)}</div>
+                          <div>Signal {selectedMiniRegion.signal}%</div>
+                        </div>
+
+                        <div
+                          style={{
+                            marginTop: 10,
+                            fontSize: 11,
+                            lineHeight: 1.5,
+                            color: "rgba(203,213,225,0.74)",
+                          }}
+                        >
+                          {selectedMiniRegion.note}
+                        </div>
+                      </div>
+                    </Popup>
+                  ) : null}
+                </Map>
+
+                {!hasDashboardMapToken ? (
+                  <div style={S.miniMapStatus}>
+                    Fallback map active — add VITE_MAPBOX_TOKEN for full globe
+                  </div>
+                ) : null}
+              </div>
+
+              <div style={S.miniMapSide}>
+                <div style={S.miniMapSideTitle}>Regional Priority Ranking</div>
+
+                <div style={S.miniRankList}>
+                  {regionalSignals.map((r, idx) => (
+                    <div key={`${r.region}-rank`} style={S.miniRankRow}>
+                      <div style={S.miniRankTop}>
+                        <div style={S.miniRankName}>
+                          #{idx + 1} {r.region}
+                        </div>
+                        <div style={S.miniRankValue}>{r.signal}%</div>
+                      </div>
+
+                      <div style={{ marginTop: 6, fontSize: 12, opacity: 0.78, lineHeight: 1.45 }}>
+                        {idx === 0
+                          ? "Highest current revenue concentration and strongest leadership priority."
+                          : idx === 1
+                          ? "Healthy operating zone with room for stronger close execution."
+                          : idx === 2
+                          ? "Emerging territory with developing opportunity flow."
+                          : "Lower-density region with longer-term upside potential."}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style={S.card}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                flexWrap: "wrap",
+              }}
+            >
               <div style={S.sectionTitle}>AI-Powered Insights</div>
               <button
                 onClick={onGenerateInsights}
                 disabled={insightsLoading}
-                style={{ ...S.actionBtn, ...(insightsLoading ? S.actionBtnDisabled : null) }}
+                style={{ ...S.actionBtn, ...(insightsLoading ? S.actionBtnDisabled : {}) }}
               >
                 {insightsLoading ? "Generating..." : "Generate New Insights"}
               </button>
@@ -1000,16 +1791,97 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* RIGHT */}
         <div style={S.rightStack}>
           <div style={S.card}>
+            <div style={S.sectionTitle}>Atlas AI Signals</div>
+            <div style={S.list}>
+              {overviewSignals.map((signal, idx) => (
+                <div key={`${signal}-side-${idx}`} style={S.pillCard}>
+                  <div style={S.pillMeta}>{signal}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={S.card}>
+            <div style={S.sectionTitle}>Revenue Health Snapshot</div>
+
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 6 }}>Pipeline Coverage</div>
+              <div style={S.pillMeta}>
+                <strong>{kpis.coverage.toFixed(1)}x</strong> •{" "}
+                <span style={riskStyle}>{kpis.risk.label}</span>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 6 }}>Forecast Stability</div>
+              <div style={S.pillMeta}>
+                <strong>{rsi.score}/100</strong> • {rsi.tier}
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 6 }}>Scenario Mode</div>
+              <div style={S.pillMeta}>
+                <strong>{kpis.scenario?.label}</strong> — {kpis.scenario?.note}
+              </div>
+            </div>
+          </div>
+
+          <div style={S.card}>
+            <div style={S.sectionTitle}>Goal Tracking</div>
+
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 6 }}>Monthly Revenue Goal</div>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: 8,
+                  fontSize: 13,
+                }}
+              >
+                <span>{money(targets.currentMonthRevenue)}</span>
+                <span>{money(targets.monthlyRevenueGoal)}</span>
+              </div>
+              <div style={S.progressWrap}>
+                <div style={S.progressBar(targets.monthPct)} />
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 6 }}>Quarter Forecast Progress</div>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginBottom: 8,
+                  fontSize: 13,
+                }}
+              >
+                <span>{money(targets.currentQuarterForecast)}</span>
+                <span>{money(targets.quarterlyRevenueGoal)}</span>
+              </div>
+              <div style={S.progressWrap}>
+                <div style={S.progressBar(targets.quarterPct)} />
+              </div>
+            </div>
+          </div>
+
+          <div style={S.card}>
             <div style={S.sectionTitle}>Connected Integrations</div>
+
             {integrations?.length ? (
               <div style={S.list}>
                 {integrations.slice(0, 6).map((i, idx) => {
                   const meta = integrationMeta(i);
+
                   return (
-                    <div key={i?._id || i?.id || `${i?.provider || i?.name || "int"}-${idx}`} style={S.pillCard}>
+                    <div
+                      key={i?._id || i?.id || `${i?.provider || i?.name || "int"}-${idx}`}
+                      style={S.pillCard}
+                    >
                       <div style={S.pillTitle}>{prettyProvider(i)}</div>
                       <div style={S.pillMeta}>
                         Status: <strong>{prettyStatus(i)}</strong>
@@ -1029,8 +1901,11 @@ export default function Dashboard() {
             )}
 
             <div style={S.divider} />
+            <RevenueLeakDetector pipeline={pipeline} />
 
+            <div style={S.divider} />
             <div style={S.sectionTitle}>Recent Deals</div>
+
             {deals?.length ? (
               <div style={S.list}>
                 {deals.slice(0, 5).map((d, idx) => (
@@ -1050,6 +1925,73 @@ export default function Dashboard() {
             ) : (
               <div style={{ opacity: 0.85 }}>No deals yet.</div>
             )}
+          </div>
+
+          <div style={S.card}>
+            <div style={S.sectionTitle}>Quick Navigation</div>
+
+            <div style={S.list}>
+              <div
+                style={{ ...S.pillCard, cursor: "pointer" }}
+                onClick={() => nav("/account-intelligence")}
+              >
+                <div style={S.pillTitle}>Account Intelligence</div>
+                <div style={S.pillMeta}>
+                  View engagement, revenue potential, and expansion opportunities.
+                </div>
+              </div>
+
+              <div
+                style={{ ...S.pillCard, cursor: "pointer" }}
+                onClick={() => nav("/global-revenue-map")}
+              >
+                <div style={S.pillTitle}>Global Revenue Map</div>
+                <div style={S.pillMeta}>
+                  Analyze revenue and opportunity distribution by geography.
+                </div>
+              </div>
+
+              <div
+                style={{ ...S.pillCard, cursor: "pointer" }}
+                onClick={() => nav("/reports")}
+              >
+                <div style={S.pillTitle}>Reports & Briefings</div>
+                <div style={S.pillMeta}>
+                  Generate executive-facing reports and boardroom summaries.
+                </div>
+              </div>
+
+              <div
+                style={{ ...S.pillCard, cursor: "pointer" }}
+                onClick={() => nav("/partners")}
+              >
+                <div style={S.card}>
+                  <div style={S.sectionTitle}>Opportunity Radar</div>
+                  <OpportunityRadar
+                    pipeline={pipeline}
+                    revenue={kpis.revenue30}
+                  />
+                </div>
+                <div style={S.card}>
+                  <div style={S.sectionTitle}>Revenue Timeline Projection</div>
+                  <RevenueTimeline forecast={kpis.forecast90} />
+                </div>
+                <div style={S.pillTitle}>Partners</div>
+                <div style={S.pillMeta}>
+                  Manage partner relationships and partner-sourced opportunity flow.
+                </div>
+              </div>
+
+              <div
+                style={{ ...S.pillCard, cursor: "pointer" }}
+                onClick={() => nav("/integrations")}
+              >
+                <div style={S.pillTitle}>Integrations</div>
+                <div style={S.pillMeta}>
+                  Connect Google Ads, HubSpot, Stripe, and more.
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
