@@ -1,6 +1,5 @@
-// frontend/src/pages/Login.jsx
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, Link, useLocation, useSearchParams } from "react-router-dom";
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import {
   login,
   setToken,
@@ -88,6 +87,7 @@ export default function Login() {
           setErr(data?.message || "Invite link is invalid or expired.");
           return;
         }
+
         if (invite?.email) setEmail(invite.email);
       } catch (e) {
         setErr(e?.message || "Could not load invite email.");
@@ -112,7 +112,9 @@ export default function Login() {
         res?.data?.accessToken ||
         "";
 
-      if (!token) throw new Error("Login succeeded but no token was returned.");
+      if (!token) {
+        throw new Error("Login succeeded but no token was returned.");
+      }
 
       try {
         setToken(token);
@@ -189,31 +191,35 @@ export default function Login() {
   }
 
   return (
-    <div style={styles.page}>
+    <div style={styles.page} className="atlas-login-page">
       <div style={styles.bgGlowA} />
       <div style={styles.bgGlowB} />
       <div style={styles.gridLines} />
       <div style={styles.network} />
 
-      <div style={styles.shell}>
+      <div style={styles.shell} className="atlas-login-shell">
         <div style={styles.heroSide}>
           <div style={styles.heroBadge}>Revenue Intelligence Platform</div>
 
           <div style={styles.brandBlock}>
             <div>
               <div style={styles.heroBrand}>Atlas Revenue AI</div>
-              <div style={styles.heroSubBrand}>Revenue Intelligence Operating System</div>
+              <div style={styles.heroSubBrand}>
+                Revenue Intelligence Operating System
+              </div>
             </div>
           </div>
 
-          <h1 style={styles.heroTitle}>Access your revenue command center.</h1>
+          <h1 style={styles.heroTitle} className="atlas-login-title">
+            Access your revenue command center.
+          </h1>
 
-          <div style={styles.heroText}>
+          <div style={styles.heroText} className="atlas-login-text">
             Monitor pipeline pressure, identify growth opportunities, track market
             signals, and give leadership a clearer path to revenue decisions.
           </div>
 
-          <div style={styles.featureList}>
+          <div style={styles.featureList} className="atlas-feature-list">
             <div style={styles.featurePill}>Command Center</div>
             <div style={styles.featurePill}>Market Signals</div>
             <div style={styles.featurePill}>Deal Intelligence</div>
@@ -221,7 +227,7 @@ export default function Login() {
           </div>
         </div>
 
-        <div style={styles.card}>
+        <div style={styles.card} className="atlas-login-card">
           <div style={styles.cardTop}>
             <div>
               <div style={styles.brand}>Atlas Revenue AI</div>
@@ -237,6 +243,7 @@ export default function Login() {
             <div style={styles.fieldWrap}>
               <label style={styles.label}>Email</label>
               <input
+                className="atlas-login-input"
                 style={styles.input}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -250,6 +257,7 @@ export default function Login() {
             <div style={styles.fieldWrap}>
               <label style={styles.label}>Password</label>
               <input
+                className="atlas-login-input"
                 style={styles.input}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -267,15 +275,27 @@ export default function Login() {
               </div>
             )}
 
-            <button disabled={loading || prefillLoading} style={styles.btn}>
+            <button
+              disabled={loading || prefillLoading}
+              style={styles.btn}
+              className="atlas-login-button"
+            >
               {loading ? "Signing in…" : "Access Atlas"}
             </button>
 
+            <div style={styles.accessNote}>
+              Atlas access is enabled after a live demo, approved billing setup,
+              and workspace invitation.
+            </div>
+
             <div style={styles.bottomRow}>
-              <span style={{ opacity: 0.8 }}>No account?</span>{" "}
-              <Link to="/signup" style={styles.link}>
-                Create one
-              </Link>
+              <span style={{ opacity: 0.8 }}>Need access?</span>{" "}
+              <a
+                href="mailto:admin@butlerco.com?subject=Atlas%20Revenue%20AI%20Demo%20Request"
+                style={styles.link}
+              >
+                Request a demo
+              </a>
             </div>
           </form>
         </div>
@@ -538,8 +558,14 @@ const styles = {
     boxShadow: "0 14px 40px rgba(59,130,246,0.35)",
     transition: "all 0.2s ease",
   },
-  bottomRow: {
+  accessNote: {
     marginTop: 8,
+    fontSize: 12,
+    lineHeight: 1.6,
+    color: "rgba(210,225,255,0.72)",
+  },
+  bottomRow: {
+    marginTop: 6,
     fontSize: 13,
     color: "rgba(210,225,255,0.82)",
   },
