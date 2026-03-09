@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { askAtlas } from "../api";
 import RevenueRiskAlerts from "../components/atlas/RevenueRiskAlerts";
 import RecommendedActions from "../components/atlas/RecommendedActions";
-import { alerts, briefing } from "../data/atlasMockData";
+import { alerts, briefing } from "../data/AtlasMockData";
 import ExecutiveBriefing from "../components/atlas/ExecutiveBriefing";
 import {
   ResponsiveContainer,
