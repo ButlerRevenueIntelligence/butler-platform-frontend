@@ -15,7 +15,6 @@ function useQuery() {
   return useMemo(() => new URLSearchParams(search), [search]);
 }
 
-// normalize Mongo ObjectId-ish shapes to string
 const oid = (v) => {
   if (!v) return "";
   if (typeof v === "string") return v;
@@ -23,12 +22,15 @@ const oid = (v) => {
     if (v.$oid) return v.$oid;
     if (v.id) return v.id;
     if (v._id) return typeof v._id === "string" ? v._id : v._id?.$oid || "";
-    try { return String(v); } catch { return ""; }
+    try {
+      return String(v);
+    } catch {
+      return "";
+    }
   }
   return "";
 };
 
-// decode JWT payload safely (no verify, just read claims)
 const decodeJwt = (token) => {
   try {
     const part = token.split(".")[1];
@@ -103,7 +105,6 @@ export default function Login() {
     try {
       const res = await login({ email, password });
 
-      // Token: support several shapes
       const token =
         res?.token ||
         res?.accessToken ||
@@ -113,15 +114,15 @@ export default function Login() {
 
       if (!token) throw new Error("Login succeeded but no token was returned.");
 
-      // persist token everywhere
-      try { setToken(token); } catch (_) {}
+      try {
+        setToken(token);
+      } catch (_) {}
+
       localStorage.setItem("butler_token", token);
       localStorage.setItem("token", token);
 
-      // Try to get user from response first
       let user = res?.user || res?.data?.user || null;
 
-      // If user missing, derive from JWT claims
       if (!user) {
         const claims = decodeJwt(token) || {};
         user = {
@@ -135,12 +136,13 @@ export default function Login() {
         };
       }
 
-      // Store user
-      try { setUser(user); } catch (_) {}
+      try {
+        setUser(user);
+      } catch (_) {}
+
       localStorage.setItem("butler_user", JSON.stringify(user));
       localStorage.setItem("user", JSON.stringify(user));
 
-      // Org context
       const orgId = oid(
         user?.orgId ||
           res?.orgId ||
@@ -163,21 +165,20 @@ export default function Login() {
         "";
 
       if (orgId) {
-        try { setActiveOrgId(orgId); } catch (_) {}
+        try {
+          setActiveOrgId(orgId);
+        } catch (_) {}
         localStorage.setItem("butler_active_org_id", orgId);
         localStorage.setItem("activeOrgId", orgId);
       }
 
       if (orgName) {
-        try { setActiveOrgName(orgName); } catch (_) {}
+        try {
+          setActiveOrgName(orgName);
+        } catch (_) {}
         localStorage.setItem("butler_active_org_name", orgName);
         localStorage.setItem("activeOrgName", orgName);
       }
-
-      console.log("LOGIN RES:", res);
-      console.log("JWT CLAIMS:", decodeJwt(token));
-      console.log("FINAL USER:", user);
-      console.log("FINAL ORG:", { orgId, orgName });
 
       nav("/revenue-intel", { replace: true });
     } catch (e2) {
@@ -188,109 +189,365 @@ export default function Login() {
   }
 
   return (
-    <div style={styles.wrap}>
+    <div style={styles.page}>
+      <div style={styles.bgGlowA} />
+      <div style={styles.bgGlowB} />
+      <div style={styles.gridLines} />
+      <div style={styles.network} />
+
       <div style={styles.shell}>
-        <div style={styles.brandRow}>
-          <div style={styles.logoDot} />
-          <div>
-            <div style={styles.brand}>Butler Revenue Intelligence</div>
-            <div style={styles.brandSub}>
-              {prefillLoading ? "Loading invite…" : "Sign in to your workspace"}
+        <div style={styles.heroSide}>
+          <div style={styles.heroBadge}>Revenue Intelligence Platform</div>
+
+          <div style={styles.brandBlock}>
+            <div>
+              <div style={styles.heroBrand}>Atlas Revenue AI</div>
+              <div style={styles.heroSubBrand}>Revenue Intelligence Operating System</div>
             </div>
+          </div>
+
+          <h1 style={styles.heroTitle}>Access your revenue command center.</h1>
+
+          <div style={styles.heroText}>
+            Monitor pipeline pressure, identify growth opportunities, track market
+            signals, and give leadership a clearer path to revenue decisions.
+          </div>
+
+          <div style={styles.featureList}>
+            <div style={styles.featurePill}>Command Center</div>
+            <div style={styles.featurePill}>Market Signals</div>
+            <div style={styles.featurePill}>Deal Intelligence</div>
+            <div style={styles.featurePill}>Atlas AI Operator</div>
           </div>
         </div>
 
-        <form onSubmit={onSubmit} style={styles.form}>
-          <label style={styles.label}>Email</label>
-          <input
-            style={styles.input}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@company.com"
-            type="email"
-            required
-            autoComplete="email"
-          />
-
-          <label style={styles.label}>Password</label>
-          <input
-            style={styles.input}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Your password"
-            type="password"
-            required
-            autoComplete="current-password"
-          />
-
-          {err && (
-            <div style={styles.errBox}>
-              <b style={{ display: "block", marginBottom: 4 }}>Couldn’t sign in</b>
-              <span style={{ opacity: 0.9 }}>{err}</span>
+        <div style={styles.card}>
+          <div style={styles.cardTop}>
+            <div>
+              <div style={styles.brand}>Atlas Revenue AI</div>
+              <div style={styles.brandSub}>
+                {prefillLoading ? "Loading invite…" : "Sign in to your workspace"}
+              </div>
             </div>
-          )}
 
-          <button disabled={loading || prefillLoading} style={styles.btn}>
-            {loading ? "Signing in…" : "Sign In"}
-          </button>
-
-          <div style={styles.bottomRow}>
-            <span style={{ opacity: 0.8 }}>No account?</span>{" "}
-            <Link to="/signup" style={{ color: "rgba(234,240,255,0.92)", fontWeight: 800 }}>
-              Create one
-            </Link>
+            <div style={styles.livePill}>Secure Access</div>
           </div>
-        </form>
+
+          <form onSubmit={onSubmit} style={styles.form}>
+            <div style={styles.fieldWrap}>
+              <label style={styles.label}>Email</label>
+              <input
+                style={styles.input}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@company.com"
+                type="email"
+                required
+                autoComplete="email"
+              />
+            </div>
+
+            <div style={styles.fieldWrap}>
+              <label style={styles.label}>Password</label>
+              <input
+                style={styles.input}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Your password"
+                type="password"
+                required
+                autoComplete="current-password"
+              />
+            </div>
+
+            {err && (
+              <div style={styles.errBox}>
+                <b style={{ display: "block", marginBottom: 4 }}>Couldn’t sign in</b>
+                <span style={{ opacity: 0.9 }}>{err}</span>
+              </div>
+            )}
+
+            <button disabled={loading || prefillLoading} style={styles.btn}>
+              {loading ? "Signing in…" : "Access Atlas"}
+            </button>
+
+            <div style={styles.bottomRow}>
+              <span style={{ opacity: 0.8 }}>No account?</span>{" "}
+              <Link to="/signup" style={styles.link}>
+                Create one
+              </Link>
+            </div>
+          </form>
+        </div>
       </div>
+
+      <style>{`
+        @keyframes floatNetwork {
+          from { transform: translateY(0px); }
+          to { transform: translateY(-200px); }
+        }
+
+        @media (max-width: 980px) {
+          .atlas-login-shell {
+            grid-template-columns: 1fr !important;
+            gap: 24px !important;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .atlas-login-page {
+            padding: 18px !important;
+          }
+
+          .atlas-login-title {
+            font-size: 40px !important;
+            line-height: 1.02 !important;
+          }
+
+          .atlas-login-text {
+            font-size: 16px !important;
+            line-height: 1.6 !important;
+          }
+
+          .atlas-login-card {
+            max-width: 100% !important;
+            justify-self: stretch !important;
+          }
+
+          .atlas-feature-list {
+            gap: 8px !important;
+          }
+        }
+
+        .atlas-login-input:focus {
+          border: 1px solid #3b82f6 !important;
+          box-shadow: 0 0 0 3px rgba(59,130,246,0.15) !important;
+        }
+
+        .atlas-login-button:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 18px 44px rgba(59,130,246,0.40);
+        }
+      `}</style>
     </div>
   );
 }
 
 const styles = {
-  wrap: { minHeight: "100vh", display: "grid", placeItems: "center", padding: 24 },
+  page: {
+    minHeight: "100vh",
+    position: "relative",
+    overflow: "hidden",
+    display: "grid",
+    placeItems: "center",
+    padding: 24,
+    background: "linear-gradient(180deg, #040816 0%, #070d1d 48%, #050916 100%)",
+  },
+  bgGlowA: {
+    position: "absolute",
+    inset: "auto auto 10% 8%",
+    width: 560,
+    height: 560,
+    borderRadius: "50%",
+    background: "rgba(37,99,235,0.22)",
+    filter: "blur(120px)",
+    pointerEvents: "none",
+  },
+  bgGlowB: {
+    position: "absolute",
+    inset: "8% 8% auto auto",
+    width: 520,
+    height: 520,
+    borderRadius: "50%",
+    background: "rgba(56,189,248,0.12)",
+    filter: "blur(120px)",
+    pointerEvents: "none",
+  },
+  gridLines: {
+    position: "absolute",
+    inset: 0,
+    backgroundImage:
+      "linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px)",
+    backgroundSize: "72px 72px",
+    opacity: 0.22,
+    pointerEvents: "none",
+  },
+  network: {
+    position: "absolute",
+    inset: 0,
+    backgroundImage: `
+      radial-gradient(circle at 20% 30%, rgba(59,130,246,0.16) 2px, transparent 2px),
+      radial-gradient(circle at 60% 70%, rgba(56,189,248,0.16) 2px, transparent 2px),
+      radial-gradient(circle at 80% 40%, rgba(59,130,246,0.16) 2px, transparent 2px),
+      radial-gradient(circle at 40% 80%, rgba(56,189,248,0.16) 2px, transparent 2px),
+      radial-gradient(circle at 72% 20%, rgba(96,165,250,0.14) 2px, transparent 2px),
+      radial-gradient(circle at 28% 58%, rgba(125,211,252,0.12) 2px, transparent 2px)
+    `,
+    backgroundSize: "400px 400px",
+    opacity: 0.5,
+    animation: "floatNetwork 40s linear infinite",
+    pointerEvents: "none",
+  },
   shell: {
+    position: "relative",
+    zIndex: 1,
     width: "100%",
-    maxWidth: 420,
-    padding: 18,
-    borderRadius: 18,
-    background: "rgba(10, 14, 28, 0.55)",
-    border: "1px solid rgba(140,170,255,0.16)",
-    boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
-    backdropFilter: "blur(12px)",
+    maxWidth: 1120,
+    display: "grid",
+    gridTemplateColumns: "1.1fr 0.9fr",
+    gap: 28,
+    alignItems: "center",
   },
-  brandRow: { display: "flex", gap: 12, alignItems: "center", marginBottom: 14 },
-  logoDot: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    background:
-      "radial-gradient(circle at 30% 30%, rgba(120,160,255,0.9), rgba(60,120,255,0.25))",
-    border: "1px solid rgba(140,170,255,0.25)",
+  heroSide: {
+    padding: "20px 8px",
   },
-  brand: { fontWeight: 800, letterSpacing: "-0.01em" },
-  brandSub: { fontSize: 12, color: "rgba(210,225,255,0.7)" },
-  form: { display: "grid", gap: 10, marginTop: 6 },
-  label: { fontSize: 12, color: "rgba(210,225,255,0.72)", fontWeight: 700 },
+  heroBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    padding: "9px 14px",
+    borderRadius: 999,
+    border: "1px solid rgba(75,145,255,0.30)",
+    background: "rgba(20,32,70,0.45)",
+    color: "#8ec5ff",
+    fontSize: 12,
+    fontWeight: 800,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
+  },
+  brandBlock: {
+    marginTop: 20,
+  },
+  heroBrand: {
+    fontSize: 26,
+    fontWeight: 900,
+    color: "#fff",
+  },
+  heroSubBrand: {
+    marginTop: 6,
+    fontSize: 13,
+    color: "rgba(210,225,255,0.72)",
+    letterSpacing: "0.02em",
+  },
+  heroTitle: {
+    margin: "22px 0 0",
+    fontSize: 54,
+    fontWeight: 950,
+    lineHeight: 1.02,
+    letterSpacing: "-0.04em",
+    color: "#fff",
+    maxWidth: 620,
+  },
+  heroText: {
+    marginTop: 18,
+    maxWidth: 620,
+    fontSize: 18,
+    lineHeight: 1.7,
+    color: "rgba(220,232,255,0.82)",
+  },
+  featureList: {
+    marginTop: 22,
+    display: "flex",
+    gap: 10,
+    flexWrap: "wrap",
+  },
+  featurePill: {
+    padding: "10px 14px",
+    borderRadius: 999,
+    background: "rgba(255,255,255,0.04)",
+    border: "1px solid rgba(255,255,255,0.10)",
+    color: "#dce8ff",
+    fontSize: 13,
+    fontWeight: 700,
+  },
+  card: {
+    width: "100%",
+    maxWidth: 430,
+    justifySelf: "end",
+    padding: 24,
+    borderRadius: 26,
+    background: "rgba(10, 16, 40, 0.75)",
+    border: "1px solid rgba(110,150,255,0.20)",
+    backdropFilter: "blur(20px)",
+    boxShadow:
+      "0 30px 80px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05)",
+  },
+  cardTop: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+    marginBottom: 16,
+  },
+  livePill: {
+    padding: "7px 10px",
+    borderRadius: 999,
+    background: "rgba(34,197,94,0.10)",
+    border: "1px solid rgba(34,197,94,0.22)",
+    color: "#9ff0b7",
+    fontSize: 11,
+    fontWeight: 800,
+    whiteSpace: "nowrap",
+  },
+  brand: {
+    fontWeight: 900,
+    fontSize: 21,
+    color: "#fff",
+    letterSpacing: "-0.02em",
+  },
+  brandSub: {
+    fontSize: 12,
+    color: "rgba(210,225,255,0.72)",
+    marginTop: 4,
+  },
+  form: {
+    display: "grid",
+    gap: 12,
+  },
+  fieldWrap: {
+    display: "grid",
+    gap: 7,
+  },
+  label: {
+    fontSize: 12,
+    color: "rgba(210,225,255,0.74)",
+    fontWeight: 800,
+    letterSpacing: "0.02em",
+  },
   input: {
-    height: 42,
-    borderRadius: 12,
-    padding: "0 12px",
-    background: "rgba(10,14,28,0.35)",
-    border: "1px solid rgba(140,170,255,0.18)",
+    height: 48,
+    borderRadius: 14,
+    padding: "0 14px",
+    background: "#ffffff",
+    border: "1px solid rgba(140,170,255,0.20)",
     outline: "none",
-    color: "rgba(234,240,255,0.92)",
+    color: "#0f172a",
+    fontSize: 16,
+    transition: "all 0.2s ease",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.45)",
   },
   btn: {
-    height: 44,
-    borderRadius: 12,
-    border: "1px solid rgba(140,170,255,0.22)",
-    background: "rgba(120,160,255,0.22)",
-    color: "rgba(234,240,255,0.92)",
-    fontWeight: 800,
+    height: 52,
+    borderRadius: 14,
+    border: "1px solid rgba(120,180,255,0.30)",
+    background: "linear-gradient(135deg, #3b82f6 0%, #38bdf8 100%)",
+    color: "#fff",
+    fontWeight: 900,
+    fontSize: 18,
     cursor: "pointer",
     marginTop: 6,
+    boxShadow: "0 14px 40px rgba(59,130,246,0.35)",
+    transition: "all 0.2s ease",
   },
-  bottomRow: { marginTop: 8, fontSize: 12, color: "rgba(210,225,255,0.8)" },
+  bottomRow: {
+    marginTop: 8,
+    fontSize: 13,
+    color: "rgba(210,225,255,0.82)",
+  },
+  link: {
+    color: "#fff",
+    fontWeight: 800,
+    textDecoration: "none",
+  },
   errBox: {
     padding: 12,
     borderRadius: 14,
