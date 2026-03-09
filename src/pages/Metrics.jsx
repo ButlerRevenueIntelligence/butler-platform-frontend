@@ -1,3 +1,4 @@
+// frontend/src/pages/Metrics.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { getMetricsDaily, getMetricsSummary } from "../api";
 import OpportunityRadar from "../components/atlas/OpportunityRadar";
@@ -84,7 +85,6 @@ function SignalItem({ title, body, tone = "neutral" }) {
 export default function Metrics() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
   const [days, setDays] = useState(30);
   const [summary, setSummary] = useState(null);
   const [series, setSeries] = useState([]);
@@ -102,7 +102,7 @@ export default function Metrics() {
       setSummary(sRes?.summary || null);
       setSeries(Array.isArray(dRes?.days) ? dRes.days : []);
     } catch (e) {
-      setError(e?.message || "Failed to load metrics");
+      setError(e?.message || "Failed to load market signals");
     } finally {
       setLoading(false);
     }
@@ -110,50 +110,51 @@ export default function Metrics() {
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [days]);
 
   const kpis = useMemo(() => {
     const s = summary || {};
     return [
       {
-        label: "Deals (Window)",
+        label: "Signal Volume",
         value: s.totalDeals ?? 0,
-        sub: "Total tracked opportunities in the selected range.",
+        sub: "Tracked opportunities contributing to signal activity.",
       },
       {
         label: "Weighted Pipeline",
         value: money(s.weighted ?? 0),
-        sub: "Probability-adjusted pipeline value.",
+        sub: "Probability-adjusted market opportunity value.",
       },
       {
-        label: "Raw Pipeline",
-        value: money(s.raw ?? 0),
-        sub: "Total pipeline before weighting.",
-      },
-      {
-        label: "Won Revenue",
+        label: "Revenue Captured",
         value: money(s.wonRevenue ?? 0),
-        sub: "Revenue closed won in the selected window.",
+        sub: "Won revenue realized in the selected window.",
       },
       {
         label: "Win Rate",
         value: pct(s.winRate ?? 0),
-        sub: "Closed-won efficiency across deals.",
+        sub: "Signal-to-revenue conversion efficiency.",
       },
       {
-        label: "Avg Deal",
+        label: "Avg Deal Size",
         value: money(s.avgDeal ?? 0),
-        sub: "Average opportunity value.",
+        sub: "Average value across tracked opportunities.",
       },
       {
-        label: "Avg Cycle",
+        label: "Avg Sales Cycle",
         value: `${Math.round(safeNum(s.avgCycleDays ?? 0))}d`,
-        sub: "Average time to close.",
+        sub: "Average time required to close.",
       },
       {
-        label: "Stale Deals",
+        label: "Stale Opportunities",
         value: s.staleCount ?? 0,
-        sub: "Deals showing inactivity or slow movement.",
+        sub: "Signals needing re-engagement or movement.",
+      },
+      {
+        label: "Raw Pipeline",
+        value: money(s.raw ?? 0),
+        sub: "Total unweighted opportunity pool.",
       },
     ];
   }, [summary]);
@@ -167,30 +168,24 @@ export default function Metrics() {
       (sum, row) => sum + safeNum(row?.wonRevenue),
       0
     );
-    const avgDailyWeighted =
-      series?.length > 0 ? weightedCreatedTotal / series.length : 0;
-    const avgDailyWon =
-      series?.length > 0 ? wonRevenueTotal / series.length : 0;
+    const avgDailyWon = series?.length ? wonRevenueTotal / series.length : 0;
 
     return {
       weightedCreatedTotal,
       wonRevenueTotal,
-      avgDailyWeighted,
       avgDailyWon,
     };
   }, [series]);
 
-  const executionPressure = useMemo(() => {
+  const signalStrength = useMemo(() => {
     const s = summary || {};
-    const stale = safeNum(s.staleCount);
-    const winRate = safeNum(s.winRate);
-    const penaltyFromStale = stale * 12;
-    const penaltyFromWinRate = (1 - Math.min(winRate, 1)) * 45;
-    return clamp(Math.round(penaltyFromStale + penaltyFromWinRate), 0, 100);
+    const winComponent = clamp(safeNum(s.winRate) * 100, 0, 100);
+    const stalePenalty = clamp(safeNum(s.staleCount) * 8, 0, 40);
+    return clamp(Math.round(winComponent - stalePenalty + 20), 0, 100);
   }, [summary]);
 
-  const pressureTone =
-    executionPressure >= 75 ? "#FB7185" : executionPressure >= 45 ? "#F59E0B" : "#22C55E";
+  const signalTone =
+    signalStrength >= 75 ? "#22C55E" : signalStrength >= 50 ? "#F59E0B" : "#FB7185";
 
   const avgCloseProbability = useMemo(() => {
     const s = summary || {};
@@ -199,8 +194,126 @@ export default function Metrics() {
 
   const weightedPressure = useMemo(() => {
     const s = summary || {};
-    return safeNum(s.weighted ?? 0) * (executionPressure / 100);
-  }, [summary, executionPressure]);
+    const stale = safeNum(s.staleCount);
+    const pressure = clamp(Math.round(stale * 12 + (1 - Math.min(safeNum(s.winRate), 1)) * 45), 0, 100);
+    return safeNum(s.weighted ?? 0) * (pressure / 100);
+  }, [summary]);
+
+  const marketInsights = useMemo(() => {
+    const s = summary || {};
+    const insights = [];
+
+    if (safeNum(s.winRate) < 0.3) {
+      insights.push({
+        title: "Close efficiency needs attention",
+        body: `Current win rate is ${pct(
+          s.winRate
+        )}. Market signals are being generated, but conversion into revenue is softer than it should be.`,
+        tone: "bad",
+      });
+    } else {
+      insights.push({
+        title: "Conversion quality is holding",
+        body: `Current win rate is ${pct(
+          s.winRate
+        )}, suggesting revenue conversion remains relatively stable across this window.`,
+        tone: "good",
+      });
+    }
+
+    if (safeNum(s.staleCount) >= 5) {
+      insights.push({
+        title: "Stale signal pressure detected",
+        body: `${s.staleCount} opportunities are showing inactivity. Leadership should push re-engagement and tighten follow-up timing.`,
+        tone: "warn",
+      });
+    } else {
+      insights.push({
+        title: "Signal flow remains manageable",
+        body: `Only ${
+          s.staleCount ?? 0
+        } opportunities are currently stale, which keeps signal drag under control.`,
+        tone: "good",
+      });
+    }
+
+    if (totals.weightedCreatedTotal > totals.wonRevenueTotal) {
+      insights.push({
+        title: "Signal creation is outpacing revenue capture",
+        body: "The system is generating opportunity momentum faster than it is being converted into won revenue.",
+        tone: "neutral",
+      });
+    } else {
+      insights.push({
+        title: "Revenue capture is keeping pace",
+        body: "Won revenue is tracking closely against weighted opportunity creation in this period.",
+        tone: "good",
+      });
+    }
+
+    return insights.slice(0, 3);
+  }, [summary, totals]);
+
+  const priorityActions = useMemo(() => {
+    const s = summary || {};
+    const items = [];
+
+    if (safeNum(s.staleCount) >= 5) {
+      items.push("Re-engage stale opportunities within the next 24 hours.");
+    }
+
+    if (safeNum(s.winRate) < 0.3) {
+      items.push("Tighten qualification and improve late-stage follow-up.");
+    }
+
+    if (totals.weightedCreatedTotal > totals.wonRevenueTotal) {
+      items.push("Improve handoff from market demand to revenue realization.");
+    }
+
+    if (!items.length) {
+      items.push("Protect current signal quality and keep momentum consistent.");
+      items.push("Scale the channels generating the strongest revenue efficiency.");
+      items.push("Look for selective expansion without adding conversion drag.");
+    }
+
+    return items.slice(0, 4);
+  }, [summary, totals]);
+
+  const aiRecommendations = useMemo(() => {
+    const s = summary || {};
+    const recs = [];
+
+    if (safeNum(s.winRate) < 0.3) {
+      recs.push({
+        title: "Improve signal monetization",
+        body: "More of the demand being generated needs to be converted into closed revenue. Focus on conversion quality, not just volume.",
+      });
+    } else {
+      recs.push({
+        title: "Preserve winning channel mix",
+        body: "The current market signal mix is supporting stable conversion. Keep budget allocation disciplined around what is already working.",
+      });
+    }
+
+    if (safeNum(s.staleCount) >= 5) {
+      recs.push({
+        title: "Reduce stalled opportunity buildup",
+        body: "Stale opportunity volume is beginning to suppress signal efficiency. Push next-step enforcement and follow-up acceleration.",
+      });
+    } else {
+      recs.push({
+        title: "Execution drag remains moderate",
+        body: "Opportunity aging is present but still manageable. The system can stay focused on growth and conversion optimization.",
+      });
+    }
+
+    recs.push({
+      title: "Use radar and timeline together",
+      body: "Opportunity Radar shows where momentum is strongest, while Revenue Timeline helps leadership judge how signal flow may translate into revenue.",
+    });
+
+    return recs.slice(0, 3);
+  }, [summary]);
 
   const atRiskDeals = useMemo(() => {
     const s = summary || {};
@@ -213,142 +326,21 @@ export default function Metrics() {
 
     for (let i = 0; i < count; i += 1) {
       generated.push({
-        name: `Opportunity ${i + 1}`,
+        name: `Signal Opportunity ${i + 1}`,
         stage: i % 2 === 0 ? "Proposal" : "Negotiation",
-        risk:
-          i === 0
-            ? "High"
-            : i === 1
-            ? "Medium"
-            : "Watch",
+        risk: i === 0 ? "High" : i === 1 ? "Medium" : "Watch",
         value: avgDeal > 0 ? avgDeal : totalDeals > 0 ? 45000 + i * 12000 : 0,
         reason:
           i === 0
-            ? "No recent movement detected and next step is unclear."
+            ? "Signal activity is present, but deal movement has stalled."
             : i === 1
-            ? "Aging in stage longer than expected."
-            : "Needs faster follow-up to protect timing.",
+            ? "Opportunity aging is exceeding the expected pace."
+            : "Needs a faster next action to preserve momentum.",
       });
     }
 
     return generated;
   }, [summary]);
-
-  const priorityActions = useMemo(() => {
-    const s = summary || {};
-    const items = [];
-
-    if (safeNum(s.staleCount) >= 5) {
-      items.push("Launch reactivation on stalled deals within 24 hours.");
-    }
-
-    if (safeNum(s.winRate) < 0.3) {
-      items.push("Review qualification and tighten stage exit criteria.");
-    }
-
-    if (totals.weightedCreatedTotal > totals.wonRevenueTotal) {
-      items.push("Improve follow-through from created pipeline to closed revenue.");
-    }
-
-    if (!items.length) {
-      items.push("Maintain current operating rhythm and protect active pipeline movement.");
-      items.push("Keep close oversight on late-stage opportunities.");
-      items.push("Look for selective growth expansion without increasing friction.");
-    }
-
-    return items.slice(0, 4);
-  }, [summary, totals]);
-
-  const aiRecommendations = useMemo(() => {
-    const s = summary || {};
-    const recommendations = [];
-
-    if (safeNum(s.winRate) < 0.3) {
-      recommendations.push({
-        title: "Improve close efficiency",
-        body: "Current conversion suggests the command center should prioritize tighter qualification and stronger late-stage discipline.",
-      });
-    } else {
-      recommendations.push({
-        title: "Protect current conversion momentum",
-        body: "Win rate is relatively stable. Preserve this by keeping a close eye on deal timing and stakeholder movement.",
-      });
-    }
-
-    if (safeNum(s.staleCount) >= 5) {
-      recommendations.push({
-        title: "Escalate stale deal recovery",
-        body: "Stale volume is high enough to threaten revenue timing. Immediate re-engagement should be considered a top command priority.",
-      });
-    } else {
-      recommendations.push({
-        title: "Execution drag remains controlled",
-        body: "Stale deal pressure is present but manageable. The focus can stay on movement and conversion, not emergency recovery.",
-      });
-    }
-
-    recommendations.push({
-      title: "Use the opportunity radar for next moves",
-      body: "Atlas can identify where conversion improvements and additional pipeline creation will produce the greatest revenue lift.",
-    });
-
-    return recommendations.slice(0, 3);
-  }, [summary]);
-
-  const marketInsights = useMemo(() => {
-    const s = summary || {};
-    const insights = [];
-
-    if (safeNum(s.winRate) < 0.3) {
-      insights.push({
-        title: "Close efficiency needs attention",
-        body: `Current win rate is ${pct(
-          s.winRate
-        )}. This suggests weaker qualification, slower deal handling, or late-stage leakage.`,
-        tone: "bad",
-      });
-    } else {
-      insights.push({
-        title: "Win rate is holding up",
-        body: `Current win rate is ${pct(
-          s.winRate
-        )}, which suggests conversion efficiency is relatively stable across the selected window.`,
-        tone: "good",
-      });
-    }
-
-    if (safeNum(s.staleCount) >= 5) {
-      insights.push({
-        title: "Stale opportunity pressure detected",
-        body: `${s.staleCount} deals are showing inactivity. Re-engagement and next-step enforcement should be prioritized.`,
-        tone: "warn",
-      });
-    } else {
-      insights.push({
-        title: "Stale deal pressure is manageable",
-        body: `Only ${
-          s.staleCount ?? 0
-        } deals are currently stale in this view, suggesting execution drag is moderate rather than severe.`,
-        tone: "good",
-      });
-    }
-
-    if (totals.weightedCreatedTotal > totals.wonRevenueTotal) {
-      insights.push({
-        title: "Pipeline creation outpaces realized revenue",
-        body: "Market signal activity suggests more pipeline is being created than converted. Focus on stage movement and follow-through.",
-        tone: "neutral",
-      });
-    } else {
-      insights.push({
-        title: "Revenue realization is keeping pace",
-        body: "Won revenue is tracking closely against weighted pipeline creation in this window.",
-        tone: "good",
-      });
-    }
-
-    return insights.slice(0, 3);
-  }, [summary, totals]);
 
   const executiveBriefing = useMemo(() => {
     const s = summary || {};
@@ -356,21 +348,11 @@ export default function Metrics() {
     const stale = s.staleCount ?? 0;
 
     if (stale >= 5) {
-      return `Atlas Revenue Command Center is detecting elevated execution pressure in the current ${days}-day operating window. Weighted pipeline creation remains active, but ${stale} stale deals and a ${winRateText} close rate suggest leadership should focus on stalled opportunity recovery, stronger follow-up discipline, and faster late-stage movement.`;
+      return `Atlas Market Signals is detecting rising friction in the current ${days}-day window. Opportunity creation remains active, but ${stale} stale opportunities and a ${winRateText} win rate suggest leadership should focus on re-engagement, faster follow-up, and stronger signal-to-revenue conversion.`;
     }
 
-    return `Atlas Revenue Command Center shows controlled execution pressure in the current ${days}-day operating window. Weighted pipeline creation and won revenue remain visible, stale opportunity levels are manageable, and current close performance is ${winRateText}. Leadership can focus on pipeline acceleration, conversion quality, and selective growth expansion.`;
+    return `Atlas Market Signals shows stable demand intelligence across the current ${days}-day window. Opportunity creation, revenue capture, and conversion performance remain visible, and current close performance is ${winRateText}. Leadership can focus on preserving momentum, improving efficiency, and scaling the strongest channels.`;
   }, [summary, days]);
-
-  const trendScore = useMemo(() => {
-    const s = summary || {};
-    const winComponent = clamp(safeNum(s.winRate) * 100, 0, 100);
-    const stalePenalty = clamp(safeNum(s.staleCount) * 8, 0, 40);
-    return clamp(Math.round(winComponent - stalePenalty + 20), 0, 100);
-  }, [summary]);
-
-  const trendTone =
-    trendScore >= 75 ? "#22C55E" : trendScore >= 50 ? "#F59E0B" : "#FB7185";
 
   const chartSeries = useMemo(() => {
     return (series || []).map((row, idx) => ({
@@ -394,9 +376,9 @@ export default function Metrics() {
       <div style={S.page}>
         <div style={S.wrap}>
           <div style={S.hero}>
-            <div style={S.eyebrow}>Revenue Execution</div>
-            <h1 style={S.h1}>Atlas Revenue Command Center</h1>
-            <div style={S.heroText}>Loading command intelligence…</div>
+            <div style={S.eyebrow}>Market Intelligence</div>
+            <h1 style={S.h1}>Atlas Market Signals</h1>
+            <div style={S.heroText}>Loading market intelligence…</div>
           </div>
         </div>
       </div>
@@ -409,19 +391,19 @@ export default function Metrics() {
         <div style={S.hero}>
           <div style={S.heroTop}>
             <div>
-              <div style={S.eyebrow}>Revenue Execution Command</div>
-              <h1 style={S.h1}>Atlas Revenue Command Center</h1>
+              <div style={S.eyebrow}>Revenue Intelligence Signals</div>
+              <h1 style={S.h1}>Atlas Market Signals</h1>
               <div style={S.heroText}>
-                Real-time revenue execution, pipeline pressure, conversion visibility,
-                and next-best-action intelligence across the selected operating window.
+                Real-time market demand visibility, signal quality tracking,
+                opportunity momentum, and conversion intelligence across the selected window.
               </div>
             </div>
 
             <div style={S.controlsWrap}>
               <div style={S.badge}>Systems Online</div>
-              <div style={S.badge}>Revenue Engine Active</div>
+              <div style={S.badge}>Signals Active</div>
               <div style={S.badge}>
-                {executionPressure >= 60 ? "Execution Pressure Elevated" : "Execution Controlled"}
+                {signalStrength >= 60 ? "Signal Strength Elevated" : "Signal Flow Stable"}
               </div>
 
               <div style={{ width: "100%" }} />
@@ -465,30 +447,30 @@ export default function Metrics() {
 
         <div style={S.statsGrid}>
           <StatCard
-            label="Total Pipeline"
+            label="Signal Pipeline"
             value={money(summary?.raw ?? 0)}
-            note="Combined value of active execution opportunities."
+            note="Total tracked opportunity pool generated from current market activity."
           />
           <StatCard
-            label="Weighted Pressure"
-            value={money(weightedPressure)}
-            note="Probability-adjusted value tied to current execution flow."
+            label="Weighted Signal Value"
+            value={money(summary?.weighted ?? 0)}
+            note="Probability-adjusted value of current signal activity."
           />
           <StatCard
             label="Avg Close Probability"
             value={`${avgCloseProbability}%`}
-            note="Average close confidence across the current board."
+            note="Average close confidence across active signal-driven opportunities."
           />
           <StatCard
-            label="Execution Pressure"
-            value={executionPressure}
-            valueStyle={{ color: pressureTone }}
-            note="Based on stale volume, close rate, and movement friction."
+            label="Signal Strength"
+            value={signalStrength}
+            valueStyle={{ color: signalTone }}
+            note="Derived from conversion efficiency and stale opportunity drag."
           />
         </div>
 
         <div style={S.twoCol}>
-          <Section title="Revenue Execution Timeline" subtitle="Momentum">
+          <Section title="Signal Momentum Timeline" subtitle="Demand Flow">
             <div style={S.chartShellLg}>
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartSeries}>
@@ -550,8 +532,8 @@ export default function Metrics() {
 
         <div style={S.twoCol}>
           <Section
-            title="At-Risk Deals"
-            subtitle="Execution Watchlist"
+            title="At-Risk Opportunities"
+            subtitle="Signal Watchlist"
             action={
               <div style={S.sectionTag}>
                 {atRiskDeals.length ? `${atRiskDeals.length} flagged` : "No critical risks"}
@@ -610,7 +592,7 @@ export default function Metrics() {
             />
           </Section>
 
-          <Section title="AI Recommendations" subtitle="Command Intelligence">
+          <Section title="AI Recommendations" subtitle="Signal Intelligence">
             <div style={S.signalList}>
               {aiRecommendations.map((item, idx) => (
                 <SignalItem
@@ -639,7 +621,20 @@ export default function Metrics() {
         <Section title="Atlas Signals" subtitle="AI Narrative">
           <div style={S.insightGrid}>
             {marketInsights.map((item, idx) => (
-              <div key={`${item.title}-${idx}`} style={S.insightCard}>
+              <div
+                key={`${item.title}-${idx}`}
+                style={{
+                  ...S.insightCard,
+                  borderLeft:
+                    item.tone === "good"
+                      ? "3px solid #22C55E"
+                      : item.tone === "warn"
+                      ? "3px solid #F59E0B"
+                      : item.tone === "bad"
+                      ? "3px solid #FB7185"
+                      : "3px solid #38BDF8",
+                }}
+              >
                 <div style={S.insightTitle}>{item.title}</div>
                 <div style={S.insightBody}>{item.body}</div>
               </div>
@@ -648,7 +643,7 @@ export default function Metrics() {
         </Section>
 
         <div style={S.charts}>
-          <Section title="Won Revenue (Daily)" subtitle="Realization">
+          <Section title="Won Revenue (Daily)" subtitle="Revenue Capture">
             <div style={S.chartShell}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartSeries}>
@@ -748,7 +743,7 @@ export default function Metrics() {
                 ? "Creation-led"
                 : "Conversion-led"
             }
-            note="Indicates whether pipeline creation or revenue conversion is dominating this period."
+            note="Shows whether demand creation or revenue conversion is dominating the current period."
           />
         </div>
       </div>
