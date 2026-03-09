@@ -1,18 +1,39 @@
 // frontend/src/components/RequirePerm.jsx
 import React from "react";
 import { Navigate } from "react-router-dom";
-import { hasPerm } from "../utils/perms";
-import UpgradeBanner from "./UpgradeBanner";
+
+function safeReadUser() {
+  try {
+    return (
+      JSON.parse(localStorage.getItem("butler_user") || "null") ||
+      JSON.parse(localStorage.getItem("user") || "null") ||
+      {}
+    );
+  } catch {
+    return {};
+  }
+}
 
 export default function RequirePerm({ perm, children }) {
-  if (hasPerm(perm)) return children;
+  const user = safeReadUser();
+  const email = String(user?.email || "").trim().toLowerCase();
+  const role = String(user?.role || "").trim().toLowerCase();
+  const perms = Array.isArray(user?.permissions) ? user.permissions : [];
 
-  return (
-    <div style={{ padding: 24 }}>
-      <UpgradeBanner missingPerm={perm} />
-      <div style={{ marginTop: 14 }}>
-        <Navigate to="/revenue-intel" replace />
-      </div>
-    </div>
-  );
+  // SUPER ADMIN / OWNER OVERRIDE
+  if (
+    email === "admin@butlerco.com" ||
+    email === "butlercomarketingagency@gmail.com" ||
+    role === "admin" ||
+    role === "owner" ||
+    perms.includes("*")
+  ) {
+    return children;
+  }
+
+  if (perm && !perms.includes(perm)) {
+    return <Navigate to="/overview" replace />;
+  }
+
+  return children;
 }
