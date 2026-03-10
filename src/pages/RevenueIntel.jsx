@@ -44,6 +44,186 @@ const sectionCount = (arr, fallbackCount) => {
   return safeNum(fallbackCount ?? arr?.length ?? 0);
 };
 
+const daysAgoIso = (days) => {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return d.toISOString();
+};
+
+const daysFromNowIso = (days) => {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString();
+};
+
+function buildDemoRevenueIntelBoard(reactivateAfterDays = 30) {
+  return {
+    execution: {
+      overdue: [
+        {
+          id: "demo-overdue-1",
+          name: "Atlas Enterprise Rollout",
+          clientName: "Northstar Logistics",
+          stage: "Negotiation",
+          amount: 125000,
+          probability: 72,
+          dueAt: daysAgoIso(4),
+          nextAction: "Executive follow-up call",
+          lastActivityAt: daysAgoIso(6),
+        },
+        {
+          id: "demo-overdue-2",
+          name: "Q2 Revenue Intelligence Pilot",
+          clientName: "Pioneer Industrial Group",
+          stage: "Proposal",
+          amount: 78000,
+          probability: 58,
+          dueAt: daysAgoIso(2),
+          nextAction: "Proposal revision + pricing review",
+          lastActivityAt: daysAgoIso(5),
+        },
+        {
+          id: "demo-overdue-3",
+          name: "Multi-Region Forecast Program",
+          clientName: "Elevate Health Systems",
+          stage: "Discovery",
+          amount: 54000,
+          probability: 40,
+          dueAt: daysAgoIso(1),
+          nextAction: "Stakeholder alignment email",
+          lastActivityAt: daysAgoIso(3),
+        },
+      ],
+      dueToday: [
+        {
+          id: "demo-today-1",
+          name: "Board Reporting Expansion",
+          clientName: "Summit Advisory",
+          stage: "Proposal",
+          amount: 64000,
+          probability: 63,
+          dueAt: new Date().toISOString(),
+          nextAction: "Review revised scope",
+          lastActivityAt: daysAgoIso(1),
+        },
+        {
+          id: "demo-today-2",
+          name: "Revenue Command Center Buildout",
+          clientName: "BluePeak Manufacturing",
+          stage: "Negotiation",
+          amount: 98000,
+          probability: 76,
+          dueAt: new Date().toISOString(),
+          nextAction: "Close-plan call with COO",
+          lastActivityAt: daysAgoIso(1),
+        },
+      ],
+      upcoming: [
+        {
+          id: "demo-upcoming-1",
+          name: "Pipeline Visibility Assessment",
+          clientName: "TerraNova Energy",
+          stage: "Discovery",
+          amount: 47000,
+          probability: 34,
+          dueAt: daysFromNowIso(2),
+          nextAction: "Discovery workshop",
+          lastActivityAt: daysAgoIso(1),
+        },
+        {
+          id: "demo-upcoming-2",
+          name: "Atlas AI Operator Deployment",
+          clientName: "Velocity Commerce",
+          stage: "Proposal",
+          amount: 83000,
+          probability: 52,
+          dueAt: daysFromNowIso(3),
+          nextAction: "Security review",
+          lastActivityAt: daysAgoIso(2),
+        },
+        {
+          id: "demo-upcoming-3",
+          name: "Market Signals Expansion",
+          clientName: "Redstone Capital",
+          stage: "Negotiation",
+          amount: 112000,
+          probability: 67,
+          dueAt: daysFromNowIso(5),
+          nextAction: "Finalize implementation timeline",
+          lastActivityAt: daysAgoIso(2),
+        },
+      ],
+      counts: {
+        overdue: 3,
+        dueToday: 2,
+        upcoming: 3,
+      },
+    },
+    reactivation: {
+      count: 4,
+      reactivateAfterDays,
+      items: [
+        {
+          id: "demo-react-1",
+          name: "Enterprise Attribution Program",
+          clientName: "Westbridge Holdings",
+          amount: 91000,
+          lastTouchAgeDays: 46,
+          suggested: "Reopen with revised ROI case study",
+        },
+        {
+          id: "demo-react-2",
+          name: "Revenue Forecasting Sprint",
+          clientName: "Peakline Software",
+          amount: 58000,
+          lastTouchAgeDays: 37,
+          suggested: "Re-engage with Q2 planning angle",
+        },
+        {
+          id: "demo-react-3",
+          name: "Pipeline Leakage Audit",
+          clientName: "Axiom Legal Group",
+          amount: 42000,
+          lastTouchAgeDays: 61,
+          suggested: "Position as revenue recovery initiative",
+        },
+        {
+          id: "demo-react-4",
+          name: "Command Center Advisory",
+          clientName: "BrightPath Staffing",
+          amount: 76000,
+          lastTouchAgeDays: 33,
+          suggested: "Re-introduce with board-level reporting focus",
+        },
+      ],
+    },
+    winLoss: {
+      won: 9,
+      lost: 5,
+      winRate: 64,
+      avgWon: 84200,
+      avgLost: 39100,
+      avgCycleDaysWon: 34,
+      avgCycleDaysLost: 28,
+    },
+  };
+}
+
+function boardHasMeaningfulData(board) {
+  const exec = board?.execution || {};
+  const react = board?.reactivation || {};
+  const wl = board?.winLoss || {};
+
+  const overdue = sectionCount(exec.overdue, exec.counts?.overdue);
+  const dueToday = sectionCount(exec.dueToday, exec.counts?.dueToday);
+  const upcoming = sectionCount(exec.upcoming, exec.counts?.upcoming);
+  const reactCount = safeNum(react.count ?? react.items?.length ?? 0);
+  const won = safeNum(wl.won);
+  const lost = safeNum(wl.lost);
+
+  return overdue > 0 || dueToday > 0 || upcoming > 0 || reactCount > 0 || won > 0 || lost > 0;
+}
+
 export default function RevenueIntel() {
   const nav = useNavigate();
 
@@ -103,20 +283,25 @@ export default function RevenueIntel() {
     load();
   }, [load]);
 
-  const exec = data?.execution || {
+  const effectiveData = useMemo(() => {
+    if (boardHasMeaningfulData(data)) return data;
+    return buildDemoRevenueIntelBoard(reactivateAfterDays);
+  }, [data, reactivateAfterDays]);
+
+  const exec = effectiveData?.execution || {
     overdue: [],
     dueToday: [],
     upcoming: [],
     counts: {},
   };
 
-  const react = data?.reactivation || {
+  const react = effectiveData?.reactivation || {
     items: [],
     count: 0,
     reactivateAfterDays,
   };
 
-  const wl = data?.winLoss || {
+  const wl = effectiveData?.winLoss || {
     won: 0,
     lost: 0,
     winRate: 0,
@@ -222,10 +407,10 @@ export default function RevenueIntel() {
 
     if (overdueCount > 0) list.push(`⚠ ${overdueCount} overdue deal actions detected`);
     if (dueTodayCount > 0) list.push(`⚠ ${dueTodayCount} actions due today`);
-    if (reactCount > 0) list.push(` ${reactCount} reactivation opportunities surfaced`);
-    if (safeNum(wl.winRate) > 0) list.push(` Current win rate is ${wl.winRate}%`);
+    if (reactCount > 0) list.push(`↺ ${reactCount} reactivation opportunities surfaced`);
+    if (safeNum(wl.winRate) > 0) list.push(`✓ Current win rate is ${wl.winRate}%`);
     if (allExecutionDeals.length > 0) {
-      list.push(` ${allExecutionDeals.length} active execution opportunities tracked`);
+      list.push(`• ${allExecutionDeals.length} active execution opportunities tracked`);
     }
 
     return list.slice(0, 5);
@@ -480,15 +665,24 @@ export default function RevenueIntel() {
       background: "rgba(255,255,255,0.08)",
       margin: "10px 0 0",
     },
+    demoBanner: {
+      marginTop: 12,
+      borderRadius: 12,
+      padding: 12,
+      border: "1px solid rgba(56,189,248,0.24)",
+      background: "rgba(56,189,248,0.08)",
+      fontSize: 12,
+      lineHeight: 1.5,
+    },
   };
 
   return (
     <div style={S.page}>
       <div style={S.statusBar}>
-        <span> Systems Online</span>
-        <span> Revenue Engine Active</span>
-        <span> Forecast Model Running</span>
-        <span> Atlas AI Monitoring</span>
+        <span>Systems Online</span>
+        <span>Revenue Engine Active</span>
+        <span>Forecast Model Running</span>
+        <span>Atlas AI Monitoring</span>
         <span>⚠ {signals.length} Signals Detected</span>
       </div>
 
@@ -520,6 +714,13 @@ export default function RevenueIntel() {
           </button>
         </div>
       </div>
+
+      {!boardHasMeaningfulData(data) ? (
+        <div style={S.demoBanner}>
+          Demo board data is currently being shown because the live Command Center feed is empty.
+          Once your backend returns execution items, reactivation items, or win/loss data, this page will automatically switch to live workspace data.
+        </div>
+      ) : null}
 
       {error ? <div style={S.error}>{error}</div> : null}
 
@@ -636,8 +837,7 @@ export default function RevenueIntel() {
                       <br />
                       Next: <b>{d.nextAction || "—"}</b>
                       <br />
-                      Weighted:{" "}
-                      <b>{money(safeNum(d.amount) * (safeNum(d.probability) / 100))}</b>
+                      Weighted: <b>{money(safeNum(d.amount) * (safeNum(d.probability) / 100))}</b>
                     </div>
                   </div>
                 ))
@@ -671,8 +871,7 @@ export default function RevenueIntel() {
                       <br />
                       Next: <b>{d.nextAction || "—"}</b>
                       <br />
-                      Weighted:{" "}
-                      <b>{money(safeNum(d.amount) * (safeNum(d.probability) / 100))}</b>
+                      Weighted: <b>{money(safeNum(d.amount) * (safeNum(d.probability) / 100))}</b>
                     </div>
                   </div>
                 ))

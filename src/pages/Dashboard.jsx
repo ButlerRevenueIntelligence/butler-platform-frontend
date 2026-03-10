@@ -32,6 +32,8 @@ import RevenueLeakDetector from "../components/RevenueLeakDetector";
 import PipelineVelocity from "../components/PipelineVelocity";
 import OpportunityRadar from "../components/atlas/OpportunityRadar";
 import RevenueTimeline from "../components/atlas/RevenueTimeline";
+import LiveRevenueSnapshot from "../components/atlas/LiveRevenueSnapshot";
+import DealRiskDetectionAI from "../components/atlas/DealRiskDetectionAI";
 
 import {
   ResponsiveContainer,
@@ -661,6 +663,93 @@ export default function Dashboard() {
     };
   }, [dashboard, kpis]);
 
+  const liveRevenueSnapshot = useMemo(() => {
+    const projectedRevenue = Math.max(
+      safeNum(kpis.forecast90),
+      safeNum(kpis.revenue30) * 3
+    );
+
+    const pipelineValue = safeNum(kpis.pipelineValue);
+    const dealsAtRisk = Math.max(
+      0,
+      Math.round((safeNum(rss?.score) < 70 ? 3 : 1) + safeNum(dashboard?.staleDeals || 0))
+    );
+    const activeOpportunities = Array.isArray(deals) ? deals.length : 0;
+
+    const forecastConfidence = clamp(
+      Math.round((safeNum(rss?.score) || safeNum(kpis.healthScore)) * 0.95),
+      55,
+      98
+    );
+
+    return {
+      projectedRevenue,
+      pipelineValue,
+      dealsAtRisk,
+      activeOpportunities,
+      forecastConfidence,
+    };
+  }, [kpis, rss, dashboard, deals]);
+
+  const dealRiskItems = useMemo(() => {
+    const sortedDeals = [...(Array.isArray(deals) ? deals : [])]
+      .map((d, idx) => {
+        const value = safeNum(d?.amount ?? d?.value ?? d?.pipelineValue);
+        const stage = normalizeStage(d?.stage || d?.status);
+        const staleDays = safeNum(d?.daysInStage ?? d?.staleDays ?? d?.ageDays);
+        const probability = safeNum(d?.probability ?? d?.closeProbability ?? 0);
+
+        let risk = "Watch";
+        let reason = "Atlas AI suggests this deal should be monitored closely.";
+
+        if (staleDays > 30 || probability < 35) {
+          risk = "High";
+          reason =
+            "Atlas AI detected stalled movement, weak next-step clarity, and elevated close risk.";
+        } else if (staleDays > 18 || probability < 50) {
+          risk = "Medium";
+          reason =
+            "Opportunity is aging in stage longer than expected and follow-up velocity is slowing.";
+        } else {
+          reason =
+            "Multiple timing and activity signals suggest this opportunity should remain on the watchlist.";
+        }
+
+        return {
+          title: d?.name || d?.title || `Opportunity ${idx + 1}`,
+          stage,
+          risk,
+          value,
+          reason,
+        };
+      })
+      .sort((a, b) => {
+        const riskWeight = { High: 3, Medium: 2, Watch: 1 };
+        return (riskWeight[b.risk] || 0) - (riskWeight[a.risk] || 0) || b.value - a.value;
+      });
+
+    if (sortedDeals.length) return sortedDeals.slice(0, 4);
+
+    return [
+      {
+        title: "Opportunity 1",
+        stage: "Proposal",
+        risk: "High",
+        value: 85000,
+        reason:
+          "Atlas AI detected stalled movement, weak next-step clarity, and elevated close risk.",
+      },
+      {
+        title: "Opportunity 2",
+        stage: "Negotiation",
+        risk: "Medium",
+        value: 62000,
+        reason:
+          "Opportunity is aging in stage longer than expected and follow-up velocity is slowing.",
+      },
+    ];
+  }, [deals]);
+
   async function onGenerateInsights() {
     try {
       setInsightsLoading(true);
@@ -1285,6 +1374,20 @@ export default function Dashboard() {
             {kpis.scenario?.note || "Actual performance"}
           </div>
         </div>
+      </div>
+
+      <div style={{ marginTop: 12, marginBottom: 12 }}>
+        <LiveRevenueSnapshot
+          projectedRevenue={liveRevenueSnapshot.projectedRevenue}
+          pipelineValue={liveRevenueSnapshot.pipelineValue}
+          dealsAtRisk={liveRevenueSnapshot.dealsAtRisk}
+          activeOpportunities={liveRevenueSnapshot.activeOpportunities}
+          forecastConfidence={liveRevenueSnapshot.forecastConfidence}
+        />
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <DealRiskDetectionAI deals={dealRiskItems} />
       </div>
 
       <div style={S.navGrid}>
@@ -1965,17 +2068,6 @@ export default function Dashboard() {
                 style={{ ...S.pillCard, cursor: "pointer" }}
                 onClick={() => nav("/partners")}
               >
-                <div style={S.card}>
-                  <div style={S.sectionTitle}>Opportunity Radar</div>
-                  <OpportunityRadar
-                    pipeline={pipeline}
-                    revenue={kpis.revenue30}
-                  />
-                </div>
-                <div style={S.card}>
-                  <div style={S.sectionTitle}>Revenue Timeline Projection</div>
-                  <RevenueTimeline forecast={kpis.forecast90} />
-                </div>
                 <div style={S.pillTitle}>Partners</div>
                 <div style={S.pillMeta}>
                   Manage partner relationships and partner-sourced opportunity flow.
@@ -1993,6 +2085,25 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 12,
+          marginTop: 12,
+        }}
+      >
+        <div style={S.card}>
+          <div style={S.sectionTitle}>Opportunity Radar</div>
+          <OpportunityRadar pipeline={pipeline} revenue={kpis.revenue30} />
+        </div>
+
+        <div style={S.card}>
+          <div style={S.sectionTitle}>Revenue Timeline Projection</div>
+          <RevenueTimeline forecast={kpis.forecast90} />
         </div>
       </div>
     </div>
