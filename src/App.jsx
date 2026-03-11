@@ -1,6 +1,6 @@
 // frontend/src/App.jsx
 import React from "react";
-import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation, Link } from "react-router-dom";
 
 import Signup from "./pages/Signup.jsx";
 import Login from "./pages/Login.jsx";
@@ -33,6 +33,125 @@ function isAuthenticated() {
   return !!localStorage.getItem("butler_token");
 }
 
+function getToken() {
+  return localStorage.getItem("butler_token");
+}
+
+function getOrgId() {
+  return (
+    localStorage.getItem("x-org-id") ||
+    localStorage.getItem("orgId") ||
+    localStorage.getItem("butler_org_id") ||
+    ""
+  );
+}
+
+async function fetchMe() {
+  const token = getToken();
+  const orgId = getOrgId();
+
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+  };
+
+  if (orgId) headers["x-org-id"] = orgId;
+
+  const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || ""}/api/me`, {
+    method: "GET",
+    headers,
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to load me: ${res.status}`);
+  }
+
+  return res.json();
+}
+
+function extractBillingStatus(payload) {
+  return (
+    payload?.billing?.status ||
+    payload?.organization?.billing?.status ||
+    payload?.org?.billing?.status ||
+    payload?.user?.organization?.billing?.status ||
+    payload?.user?.org?.billing?.status ||
+    null
+  );
+}
+
+function BillingRequired() {
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background:
+          "radial-gradient(1200px 700px at 15% 15%, rgba(124,92,255,0.22), transparent 60%), radial-gradient(1000px 650px at 85% 30%, rgba(56,189,248,0.18), transparent 60%), linear-gradient(180deg, rgba(5,8,18,1) 0%, rgba(7,12,28,1) 55%, rgba(5,8,18,1) 100%)",
+        color: "#EAF0FF",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 640,
+          borderRadius: 20,
+          padding: 28,
+          border: "1px solid rgba(255,255,255,0.10)",
+          background: "rgba(255,255,255,0.04)",
+          boxShadow: "0 24px 60px rgba(0,0,0,0.35)",
+          backdropFilter: "blur(12px)",
+        }}
+      >
+        <div style={{ fontSize: 30, fontWeight: 900, marginBottom: 10 }}>
+          Billing activation required
+        </div>
+
+        <div style={{ fontSize: 15, opacity: 0.9, lineHeight: 1.7 }}>
+          Your workspace is authenticated, but Atlas billing is not active yet.
+          Complete your subscription or contact your administrator to unlock the platform.
+        </div>
+
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 24 }}>
+          <a
+            href="https://atlasrevenueai.com"
+            style={{
+              textDecoration: "none",
+              borderRadius: 999,
+              padding: "12px 18px",
+              fontWeight: 900,
+              color: "#fff",
+              background: "linear-gradient(90deg, #2563eb, #38bdf8)",
+              border: "1px solid rgba(255,255,255,0.10)",
+            }}
+          >
+            Go to pricing
+          </a>
+
+          <Link
+            to="/login"
+            style={{
+              textDecoration: "none",
+              borderRadius: 999,
+              padding: "12px 18px",
+              fontWeight: 900,
+              color: "#EAF0FF",
+              background: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(255,255,255,0.10)",
+            }}
+          >
+            Back to login
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function RequireAuth({ children }) {
   const location = useLocation();
   const [checked, setChecked] = React.useState(false);
@@ -50,17 +169,96 @@ function RequireAuth({ children }) {
   return children;
 }
 
-function RedirectIfAuth({ children }) {
-  const [checked, setChecked] = React.useState(false);
+function RequireBilling({ children }) {
+  const [loading, setLoading] = React.useState(true);
+  const [billingActive, setBillingActive] = React.useState(false);
 
   React.useEffect(() => {
-    setChecked(true);
+    let mounted = true;
+
+    async function run() {
+      try {
+        const me = await fetchMe();
+        const status = extractBillingStatus(me);
+        const active = String(status || "").toLowerCase() === "active";
+
+        if (mounted) {
+          setBillingActive(active);
+        }
+      } catch (err) {
+        console.error("Billing check failed:", err);
+        if (mounted) {
+          setBillingActive(false);
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    run();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  if (loading) return null;
+
+  if (!billingActive) {
+    return <Navigate to="/billing-required" replace />;
+  }
+
+  return children;
+}
+
+function RedirectIfAuth({ children }) {
+  const [checked, setChecked] = React.useState(false);
+  const [redirectTo, setRedirectTo] = React.useState(null);
+
+  React.useEffect(() => {
+    let mounted = true;
+
+    async function run() {
+      if (!isAuthenticated()) {
+        if (mounted) {
+          setChecked(true);
+        }
+        return;
+      }
+
+      try {
+        const me = await fetchMe();
+        const status = extractBillingStatus(me);
+        const active = String(status || "").toLowerCase() === "active";
+
+        if (mounted) {
+          setRedirectTo(active ? "/command-center" : "/billing-required");
+        }
+      } catch (err) {
+        console.error("Redirect billing check failed:", err);
+        if (mounted) {
+          setRedirectTo("/billing-required");
+        }
+      } finally {
+        if (mounted) {
+          setChecked(true);
+        }
+      }
+    }
+
+    run();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   if (!checked) return null;
 
-  if (isAuthenticated()) {
-    return <Navigate to="/command-center" replace />;
+  if (redirectTo) {
+    return <Navigate to={redirectTo} replace />;
   }
 
   return children;
@@ -96,12 +294,15 @@ export default function App() {
       />
 
       <Route path="/accept-invite" element={<AcceptInvite />} />
+      <Route path="/billing-required" element={<BillingRequired />} />
 
       {/* PROTECTED */}
       <Route
         element={
           <RequireAuth>
-            <AppLayout />
+            <RequireBilling>
+              <AppLayout />
+            </RequireBilling>
           </RequireAuth>
         }
       >
@@ -124,7 +325,6 @@ export default function App() {
           }
         />
 
-        {/* Legacy Deal Room */}
         <Route
           path="/deal-room"
           element={
