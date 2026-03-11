@@ -50,6 +50,8 @@ async function fetchMe() {
   const token = getToken();
   const orgId = getOrgId();
 
+  const API_BASE = "https://atlas-revenue-backend.onrender.com";
+
   const headers = {
     "Content-Type": "application/json",
     Authorization: `Bearer ${token}`,
@@ -57,14 +59,21 @@ async function fetchMe() {
 
   if (orgId) headers["x-org-id"] = orgId;
 
-  const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || ""}/api/me`, {
+  const res = await fetch(`${API_BASE}/api/me`, {
     method: "GET",
     headers,
     credentials: "include",
   });
 
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    const text = await res.text();
+    throw new Error(`Expected JSON from /api/me but got: ${text.slice(0, 120)}`);
+  }
+
   if (!res.ok) {
-    throw new Error(`Failed to load me: ${res.status}`);
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data?.message || `Failed to load me: ${res.status}`);
   }
 
   return res.json();
