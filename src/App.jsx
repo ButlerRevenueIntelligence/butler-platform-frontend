@@ -77,8 +77,32 @@ function extractBillingStatus(payload) {
     payload?.org?.billing?.status ||
     payload?.user?.organization?.billing?.status ||
     payload?.user?.org?.billing?.status ||
+    payload?.user?.billing?.status ||
     null
   );
+}
+
+function extractPlan(payload) {
+  return (
+    payload?.plan ||
+    payload?.organization?.plan ||
+    payload?.org?.plan ||
+    payload?.user?.plan ||
+    payload?.user?.organization?.plan ||
+    payload?.user?.org?.plan ||
+    null
+  );
+}
+
+function hasActiveAccess(payload) {
+  const status = String(extractBillingStatus(payload) || "").toLowerCase();
+  const plan = String(extractPlan(payload) || "").toUpperCase();
+
+  const billingActive = status === "active";
+  const hasPaidPlan =
+    plan === "SCALE" || plan === "GROWTH" || plan === "ENTERPRISE";
+
+  return billingActive || hasPaidPlan;
 }
 
 function BillingRequired() {
@@ -179,8 +203,7 @@ function RequireBilling({ children }) {
     async function run() {
       try {
         const me = await fetchMe();
-        const status = extractBillingStatus(me);
-        const active = String(status || "").toLowerCase() === "active";
+        const active = hasActiveAccess(me);
 
         if (mounted) {
           setBillingActive(active);
@@ -230,8 +253,7 @@ function RedirectIfAuth({ children }) {
 
       try {
         const me = await fetchMe();
-        const status = extractBillingStatus(me);
-        const active = String(status || "").toLowerCase() === "active";
+        const active = hasActiveAccess(me);
 
         if (mounted) {
           setRedirectTo(active ? "/command-center" : "/billing-required");
