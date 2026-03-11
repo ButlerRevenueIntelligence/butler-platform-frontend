@@ -4,6 +4,7 @@ import { Routes, Route, Navigate, useLocation, Link } from "react-router-dom";
 
 import Signup from "./pages/Signup.jsx";
 import Login from "./pages/Login.jsx";
+import PaymentSuccess from "./pages/PaymentSuccess.jsx";
 
 import Dashboard from "./pages/Dashboard.jsx";
 import RevenueIntel from "./pages/RevenueIntel.jsx";
@@ -326,6 +327,7 @@ export default function App() {
 
       <Route path="/accept-invite" element={<AcceptInvite />} />
       <Route path="/billing-required" element={<BillingRequired />} />
+      <Route path="/payment-success" element={<PaymentSuccess />} />
 
       {/* PROTECTED */}
       <Route
