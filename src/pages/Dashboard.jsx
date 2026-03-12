@@ -34,6 +34,7 @@ import OpportunityRadar from "../components/atlas/OpportunityRadar";
 import RevenueTimeline from "../components/atlas/RevenueTimeline";
 import LiveRevenueSnapshot from "../components/atlas/LiveRevenueSnapshot";
 import DealRiskDetectionAI from "../components/atlas/DealRiskDetectionAI";
+import ExecutiveSummary from "../components/ExecutiveSummary";
 
 import {
   ResponsiveContainer,
