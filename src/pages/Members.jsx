@@ -1,6 +1,6 @@
-// frontend/src/pages/Invites.jsx
+// frontend/src/pages/Members.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import { createInvite, listInvites, getActiveOrgName } from "../api";
+import { apiGet, apiPut, getActiveOrgName } from "../api";
 
 const safe = (v) => (v == null ? "" : String(v));
 
@@ -17,10 +17,10 @@ const roleTone = (role) => {
 
 const statusTone = (status) => {
   const s = safe(status).toLowerCase();
-  if (s.includes("accepted")) return "#22C55E";
-  if (s.includes("pending")) return "#F59E0B";
-  if (s.includes("expired")) return "#FB7185";
-  if (s.includes("revoked")) return "#94A3B8";
+  if (s === "active") return "#22C55E";
+  if (s === "invited") return "#F59E0B";
+  if (s === "suspended") return "#FB7185";
+  if (s === "disabled") return "#94A3B8";
   return "#A3A3A3";
 };
 
@@ -33,14 +33,12 @@ function formatDate(value) {
   }
 }
 
-export default function Invites() {
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState("analyst");
+export default function Members() {
   const [items, setItems] = useState([]);
   const [err, setErr] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
+  const [savingId, setSavingId] = useState("");
 
   const workspaceName = getActiveOrgName() || "Current Workspace";
 
@@ -49,16 +47,15 @@ export default function Invites() {
     setErr("");
 
     try {
-      const data = await listInvites();
-      const list = Array.isArray(data?.invites)
-        ? data.invites
+      const data = await apiGet("/members");
+      const list = Array.isArray(data?.members)
+        ? data.members
         : Array.isArray(data)
         ? data
         : [];
-
       setItems(list);
     } catch (e) {
-      setErr(e?.message || "Failed to load invites");
+      setErr(e?.message || "Failed to load members");
     } finally {
       setLoading(false);
     }
@@ -68,48 +65,40 @@ export default function Invites() {
     load();
   }, []);
 
-  async function onCreate() {
+  async function updateMember(membershipId, patch) {
     setErr("");
     setSuccess("");
+    setSavingId(membershipId);
 
     try {
-      setCreating(true);
-
-      await createInvite(email.trim(), role);
-
-      setSuccess(`Invite created for ${email.trim()}.`);
-      setEmail("");
-      setRole("analyst");
-
+      await apiPut(`/members/${membershipId}`, patch);
+      setSuccess("Member updated successfully.");
       await load();
     } catch (e) {
-      setErr(e?.message || "Create invite failed");
+      setErr(e?.message || "Failed to update member");
     } finally {
-      setCreating(false);
+      setSavingId("");
     }
   }
 
   const stats = useMemo(() => {
     const total = items.length;
-    const pending = items.filter((i) =>
-      safe(i?.status).toLowerCase().includes("pending")
-    ).length;
-    const accepted = items.filter((i) =>
-      safe(i?.status).toLowerCase().includes("accepted")
-    ).length;
-    const expired = items.filter((i) =>
-      safe(i?.status).toLowerCase().includes("expired")
-    ).length;
+    const active = items.filter((i) => safe(i?.status).toLowerCase() === "active").length;
+    const admins = items.filter((i) => {
+      const r = safe(i?.role).toLowerCase();
+      return r === "owner" || r === "admin";
+    }).length;
+    const managers = items.filter((i) => safe(i?.role).toLowerCase() === "manager").length;
 
-    return { total, pending, accepted, expired };
+    return { total, active, admins, managers };
   }, [items]);
 
   const executiveSummary = useMemo(() => {
     if (!items.length) {
-      return `No invite records are currently active for ${workspaceName}. Atlas Invite Control lets you manage access expansion, track invite status, and oversee workspace onboarding from one place.`;
+      return `No active team members are currently being shown for ${workspaceName}. Atlas Member Control lets owners and admins monitor workspace access, adjust roles, and manage operational permissions.`;
     }
 
-    return `Atlas Invite Control is currently tracking ${stats.total} invite records for ${workspaceName}. ${stats.pending} are pending, ${stats.accepted} have been accepted, and ${stats.expired} are expired. Use this layer to manage who gets access to the workspace and how that access is expanding over time.`;
+    return `Atlas Member Control is tracking ${stats.total} team members for ${workspaceName}. ${stats.active} are active, ${stats.admins} have admin-level access, and ${stats.managers} have manager-level access. Use this layer to manage who can operate inside the workspace.`;
   }, [items, stats, workspaceName]);
 
   const S = {
@@ -187,34 +176,6 @@ export default function Invites() {
       backdropFilter: "blur(10px)",
       boxShadow: "0 12px 40px rgba(0,0,0,0.35)",
     },
-    input: {
-      width: "100%",
-      padding: "12px 12px",
-      borderRadius: 12,
-      border: "1px solid rgba(255,255,255,0.12)",
-      background: "rgba(255,255,255,0.04)",
-      color: "#EAF0FF",
-      outline: "none",
-    },
-    select: {
-      width: "100%",
-      padding: "12px 12px",
-      borderRadius: 12,
-      border: "1px solid rgba(255,255,255,0.12)",
-      background: "rgba(255,255,255,0.04)",
-      color: "#EAF0FF",
-      outline: "none",
-    },
-    btn: {
-      borderRadius: 999,
-      padding: "10px 14px",
-      border: "1px solid rgba(255,255,255,0.12)",
-      background: "rgba(255,255,255,0.06)",
-      color: "#EAF0FF",
-      fontWeight: 900,
-      fontSize: 12,
-      cursor: "pointer",
-    },
     btnGhost: {
       borderRadius: 999,
       padding: "10px 14px",
@@ -224,13 +185,6 @@ export default function Invites() {
       fontWeight: 900,
       fontSize: 12,
       cursor: "pointer",
-    },
-    formGrid: {
-      display: "grid",
-      gridTemplateColumns: "2fr 1fr auto",
-      gap: 12,
-      alignItems: "end",
-      maxWidth: 840,
     },
     error: {
       marginTop: 12,
@@ -252,7 +206,6 @@ export default function Invites() {
       display: "grid",
       gap: 12,
       marginTop: 12,
-      maxWidth: 900,
     },
     item: {
       padding: 14,
@@ -288,6 +241,31 @@ export default function Invites() {
       alignItems: "center",
       gap: 8,
     },
+    controls: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap",
+      marginTop: 12,
+      alignItems: "center",
+    },
+    select: {
+      padding: "10px 12px",
+      borderRadius: 10,
+      border: "1px solid rgba(255,255,255,0.12)",
+      background: "rgba(255,255,255,0.04)",
+      color: "#EAF0FF",
+      outline: "none",
+    },
+    button: {
+      borderRadius: 999,
+      padding: "10px 14px",
+      border: "1px solid rgba(255,255,255,0.12)",
+      background: "rgba(255,255,255,0.06)",
+      color: "#EAF0FF",
+      fontWeight: 900,
+      fontSize: 12,
+      cursor: "pointer",
+    },
   };
 
   return (
@@ -296,9 +274,9 @@ export default function Invites() {
 
       <div style={S.topRow}>
         <div>
-          <h1 style={S.title}>Atlas Invite Control</h1>
+          <h1 style={S.title}>Atlas Member Control</h1>
           <div style={S.sub}>
-            Create, track, and manage workspace invites for <b>{workspaceName}</b>.
+            Manage member roles and access for <b>{workspaceName}</b>.
           </div>
         </div>
 
@@ -309,7 +287,7 @@ export default function Invites() {
 
       <div style={S.heroCard}>
         <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 10 }}>
-          Executive Invite Briefing
+          Executive Team Briefing
         </div>
         <div style={{ fontSize: 14, opacity: 0.92, lineHeight: 1.65 }}>
           {executiveSummary}
@@ -318,114 +296,118 @@ export default function Invites() {
 
       <div style={S.signalGrid}>
         <div style={S.signalCard}>
-          <div style={S.signalLabel}>TOTAL INVITES</div>
+          <div style={S.signalLabel}>TOTAL MEMBERS</div>
           <div style={S.signalValue}>{stats.total}</div>
-          <div style={S.signalSub}>All tracked invite records in this workspace.</div>
+          <div style={S.signalSub}>All tracked team members in this workspace.</div>
         </div>
 
         <div style={S.signalCard}>
-          <div style={S.signalLabel}>PENDING</div>
-          <div style={S.signalValue}>{stats.pending}</div>
-          <div style={S.signalSub}>Invites awaiting acceptance or action.</div>
+          <div style={S.signalLabel}>ACTIVE</div>
+          <div style={S.signalValue}>{stats.active}</div>
+          <div style={S.signalSub}>Members currently able to operate in the workspace.</div>
         </div>
 
         <div style={S.signalCard}>
-          <div style={S.signalLabel}>ACCEPTED</div>
-          <div style={S.signalValue}>{stats.accepted}</div>
-          <div style={S.signalSub}>Invites that have already converted into access.</div>
+          <div style={S.signalLabel}>ADMIN ACCESS</div>
+          <div style={S.signalValue}>{stats.admins}</div>
+          <div style={S.signalSub}>Owners and admins with elevated control.</div>
         </div>
 
         <div style={S.signalCard}>
-          <div style={S.signalLabel}>EXPIRED</div>
-          <div style={S.signalValue}>{stats.expired}</div>
-          <div style={S.signalSub}>Invites that are no longer valid and may need reissue.</div>
+          <div style={S.signalLabel}>MANAGERS</div>
+          <div style={S.signalValue}>{stats.managers}</div>
+          <div style={S.signalSub}>Members with manager-level workspace access.</div>
         </div>
-      </div>
-
-      <div style={S.card}>
-        <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 12 }}>
-          Create Invite
-        </div>
-
-        <div style={S.formGrid}>
-          <input
-            value={email}
-            placeholder="person@company.com"
-            onChange={(e) => setEmail(e.target.value)}
-            style={S.input}
-            type="email"
-          />
-
-          <select value={role} onChange={(e) => setRole(e.target.value)} style={S.select}>
-            <option value="owner">owner</option>
-            <option value="admin">admin</option>
-            <option value="manager">manager</option>
-            <option value="analyst">analyst</option>
-            <option value="member">member</option>
-            <option value="viewer">viewer</option>
-          </select>
-
-          <button onClick={onCreate} disabled={!email.trim() || creating} style={S.btn}>
-            {creating ? "Creating..." : "Create Invite"}
-          </button>
-        </div>
-
-        {success ? <div style={S.success}>{success}</div> : null}
-        {err ? <div style={S.error}>{err}</div> : null}
       </div>
 
       <div style={S.card}>
         <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 4 }}>
-          Recent Invites
+          Workspace Members
         </div>
         <div style={{ opacity: 0.78, fontSize: 13 }}>
-          Track recent access invites and their current status across the workspace.
+          Review active members, update roles, and manage status across the workspace.
         </div>
+
+        {success ? <div style={S.success}>{success}</div> : null}
+        {err ? <div style={S.error}>{err}</div> : null}
 
         {loading ? (
           <div style={{ marginTop: 12 }}>Loading…</div>
         ) : items.length === 0 ? (
-          <div style={{ marginTop: 12, opacity: 0.84 }}>No invites yet.</div>
+          <div style={{ marginTop: 12, opacity: 0.84 }}>No members found.</div>
         ) : (
           <div style={S.list}>
-            {items.map((inv) => {
-              const id = inv?._id || inv?.id || `${inv.email}-${inv.createdAt}`;
-              const roleColor = roleTone(inv?.role);
-              const statusColor = statusTone(inv?.status);
+            {items.map((member) => {
+              const id = member?.membershipId || member?._id || member?.id;
+              const roleColor = roleTone(member?.role);
+              const statusColor = statusTone(member?.status);
 
               return (
                 <div key={id} style={S.item}>
                   <div style={S.itemTop}>
-                    <div style={S.itemTitle}>{inv?.email || "—"}</div>
+                    <div>
+                      <div style={S.itemTitle}>{member?.name || "User"}</div>
+                      <div style={S.itemMeta}>
+                        {member?.email || "—"}
+                        {" • "}Joined: <strong>{formatDate(member?.joinedAt || member?.createdAt)}</strong>
+                        {member?.lastActiveAt ? (
+                          <>
+                            {" • "}Last Active: <strong>{formatDate(member.lastActiveAt)}</strong>
+                          </>
+                        ) : null}
+                      </div>
+                    </div>
 
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      <div
-                        style={{
-                          ...S.tag,
-                          color: roleColor,
-                        }}
-                      >
-                        Role {safe(inv?.role || "—").toUpperCase()}
+                      <div style={{ ...S.tag, color: roleColor }}>
+                        Role {safe(member?.role || "—").toUpperCase()}
                       </div>
-                      <div
-                        style={{
-                          ...S.tag,
-                          color: statusColor,
-                        }}
-                      >
-                        {safe(inv?.status || "—").toUpperCase()}
+                      <div style={{ ...S.tag, color: statusColor }}>
+                        {safe(member?.status || "—").toUpperCase()}
                       </div>
                     </div>
                   </div>
 
-                  <div style={S.itemMeta}>
-                    Created: <strong>{formatDate(inv?.createdAt)}</strong>
-                    {" • "}Expires: <strong>{formatDate(inv?.expiresAt)}</strong>
-                    {inv?.acceptedAt ? (
-                      <>
-                        {" • "}Accepted: <strong>{formatDate(inv.acceptedAt)}</strong>
-                      </>
-                    ) : null}
+                  <div style={S.controls}>
+                    <select
+                      defaultValue={member?.role || "member"}
+                      style={S.select}
+                      id={`role-${id}`}
+                    >
+                      <option value="owner">owner</option>
+                      <option value="admin">admin</option>
+                      <option value="manager">manager</option>
+                      <option value="analyst">analyst</option>
+                      <option value="member">member</option>
+                      <option value="viewer">viewer</option>
+                    </select>
+
+                    <select
+                      defaultValue={member?.status || "active"}
+                      style={S.select}
+                      id={`status-${id}`}
+                    >
+                      <option value="active">active</option>
+                      <option value="invited">invited</option>
+                      <option value="suspended">suspended</option>
+                      <option value="disabled">disabled</option>
+                    </select>
+
+                    <button
+                      style={S.button}
+                      disabled={savingId === id}
+                      onClick={() => {
+                        const roleEl = document.getElementById(`role-${id}`);
+                        const statusEl = document.getElementById(`status-${id}`);
+
+                        updateMember(id, {
+                          role: roleEl?.value,
+                          status: statusEl?.value,
+                        });
+                      }}
+                    >
+                      {savingId === id ? "Saving..." : "Update Member"}
+                    </button>
                   </div>
                 </div>
               );

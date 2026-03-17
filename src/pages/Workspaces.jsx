@@ -1,23 +1,33 @@
 // frontend/src/pages/Workspaces.jsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getMyOrgs, setActiveOrgId, getActiveOrgId, switchOrg } from "../api";
+import {
+  getMyOrgs,
+  getActiveOrgId,
+  getActiveOrgName,
+  getWorkspaces,
+  getActiveWorkspace,
+  switchWorkspace,
+} from "../api";
 
 const ROLE_RANK = {
-  owner: 5,
-  admin: 4,
-  manager: 3,
-  sales: 2,
-  analyst: 1,
+  owner: 6,
+  admin: 5,
+  manager: 4,
+  analyst: 3,
+  member: 2,
+  viewer: 1,
+  sales: 1,
 };
 
 const rankRole = (r) => ROLE_RANK[String(r || "").toLowerCase()] || 0;
 
 function roleTone(role) {
   const rank = rankRole(role);
-  if (rank >= 5) return "#22C55E";
-  if (rank >= 4) return "#38BDF8";
-  if (rank >= 3) return "#F59E0B";
+  if (rank >= 6) return "#22C55E";
+  if (rank >= 5) return "#38BDF8";
+  if (rank >= 4) return "#F59E0B";
+  if (rank >= 3) return "#A78BFA";
   return "#A3A3A3";
 }
 
@@ -62,24 +72,86 @@ function StatCard({ label, value, note }) {
   );
 }
 
+function normalizeWorkspaceRow(row) {
+  if (!row) return null;
+
+  const workspace = row.workspace || row.org || row.organization || null;
+
+  const orgId =
+    workspace?._id ||
+    workspace?.id ||
+    row.orgId ||
+    row.workspaceId ||
+    row.id ||
+    "";
+
+  if (!orgId) return null;
+
+  return {
+    orgId: String(orgId),
+    orgName:
+      workspace?.name ||
+      row.orgName ||
+      row.workspaceName ||
+      row.name ||
+      "Workspace",
+    orgSlug: workspace?.slug || row.orgSlug || row.slug || "",
+    role: row.role || row.orgRole || row.workspaceRole || "member",
+    status:
+      row.status ||
+      workspace?.status ||
+      row.membershipStatus ||
+      "active",
+    plan: workspace?.plan || row.plan || "",
+    billingStatus:
+      workspace?.billing?.status || row.billingStatus || "",
+  };
+}
+
 export default function Workspaces() {
   const nav = useNavigate();
-  const [orgsRaw, setOrgsRaw] = useState([]);
+
+  const [orgsRaw, setOrgsRaw] = useState(() => {
+    const stored = getWorkspaces();
+    return Array.isArray(stored) ? stored : [];
+  });
+
   const [loading, setLoading] = useState(true);
   const [switching, setSwitching] = useState(false);
   const [err, setErr] = useState("");
 
   const activeOrgId = getActiveOrgId();
+  const activeWorkspace = getActiveWorkspace();
+  const activeOrgName = getActiveOrgName();
 
   async function load() {
     try {
       setLoading(true);
       setErr("");
+
+      const stored = getWorkspaces();
+      if (Array.isArray(stored) && stored.length) {
+        setOrgsRaw(stored);
+      }
+
       const res = await getMyOrgs();
-      const rows = res?.orgs || res?.data?.orgs || [];
-      setOrgsRaw(Array.isArray(rows) ? rows : []);
+      const rows =
+        res?.orgs ||
+        res?.data?.orgs ||
+        res?.workspaces ||
+        res?.data?.workspaces ||
+        [];
+
+      if (Array.isArray(rows) && rows.length) {
+        setOrgsRaw(rows);
+      }
     } catch (e) {
-      setErr(e?.message || "Failed to load workspaces");
+      const stored = getWorkspaces();
+      if (Array.isArray(stored) && stored.length) {
+        setOrgsRaw(stored);
+      } else {
+        setErr(e?.message || "Failed to load workspaces");
+      }
     } finally {
       setLoading(false);
     }
@@ -87,19 +159,25 @@ export default function Workspaces() {
 
   useEffect(() => {
     let alive = true;
+
     (async () => {
       if (!alive) return;
       await load();
     })();
+
     return () => {
       alive = false;
     };
   }, []);
 
   const orgs = useMemo(() => {
+    const normalized = (Array.isArray(orgsRaw) ? orgsRaw : [])
+      .map(normalizeWorkspaceRow)
+      .filter(Boolean);
+
     const map = new Map();
 
-    for (const o of orgsRaw) {
+    for (const o of normalized) {
       const id = String(o?.orgId || "").trim();
       if (!id) continue;
 
@@ -122,6 +200,8 @@ export default function Workspaces() {
           orgName: current.orgName || o.orgName,
           orgSlug: current.orgSlug || o.orgSlug,
           status: current.status || o.status,
+          plan: current.plan || o.plan,
+          billingStatus: current.billingStatus || o.billingStatus,
         });
       }
     }
@@ -147,10 +227,8 @@ export default function Workspaces() {
       setErr("");
       setSwitching(true);
 
-      await switchOrg(orgId);
-      setActiveOrgId(orgId);
-
-      nav("/overview", { replace: true });
+      await switchWorkspace(orgId);
+      nav("/command-center", { replace: true });
     } catch (e) {
       setErr(e?.message || "Failed to switch workspace");
     } finally {
@@ -159,7 +237,14 @@ export default function Workspaces() {
   }
 
   const activeOrg =
-    orgs.find((o) => String(o.orgId) === String(activeOrgId)) || null;
+    orgs.find((o) => String(o.orgId) === String(activeOrgId)) ||
+    (activeWorkspace
+      ? normalizeWorkspaceRow({
+          workspace: activeWorkspace,
+          role: "member",
+          status: "active",
+        })
+      : null);
 
   const stats = useMemo(() => {
     const total = orgs.length;
@@ -182,14 +267,16 @@ export default function Workspaces() {
     }
 
     if (activeOrg) {
-      return `Global HQ is currently tracking ${stats.total} workspace environments. The active workspace is ${activeOrg.orgName || "Current Workspace"}, where your role is ${activeOrg.role || "analyst"}. Use this hub to switch organizations, validate access, and manage workspace context.`;
+      return `Global HQ is currently tracking ${stats.total} workspace environments. The active workspace is ${activeOrg.orgName || activeOrgName || "Current Workspace"}, where your role is ${activeOrg.role || "member"}. Use this hub to switch organizations, validate access, and manage workspace context.`;
     }
 
     return `Global HQ is currently tracking ${stats.total} workspace environments. Select a workspace to activate the correct organization context and x-org-id header.`;
-  }, [orgs, activeOrg, stats]);
+  }, [orgs, activeOrg, activeOrgName, stats]);
 
   const topAccessOrgs = useMemo(() => {
-    return [...orgs].sort((a, b) => rankRole(b.role) - rankRole(a.role)).slice(0, 3);
+    return [...orgs]
+      .sort((a, b) => rankRole(b.role) - rankRole(a.role))
+      .slice(0, 3);
   }, [orgs]);
 
   return (
@@ -262,13 +349,18 @@ export default function Workspaces() {
           <div style={S.currentCard}>
             <div style={S.currentEyebrow}>Current Workspace</div>
             <div style={S.currentTitle}>
-              {activeOrg.orgName || "Workspace"}
+              {activeOrg.orgName || activeOrgName || "Workspace"}
             </div>
             <div style={S.currentMeta}>
               Role: <b>{activeOrg.role}</b>
               {activeOrg.orgSlug ? (
                 <>
                   {" • "}Slug: <b>{activeOrg.orgSlug}</b>
+                </>
+              ) : null}
+              {activeOrg.plan ? (
+                <>
+                  {" • "}Plan: <b>{activeOrg.plan}</b>
                 </>
               ) : null}
             </div>
@@ -320,11 +412,12 @@ export default function Workspaces() {
                           <div style={S.leaderName}>{o.orgName || "Workspace"}</div>
                           <div style={S.leaderMeta}>
                             {o.orgSlug || "No slug"} • {o.status || "active"}
+                            {o.plan ? ` • ${o.plan}` : ""}
                           </div>
                         </div>
 
                         <div style={scorePill(o.role)}>
-                          {String(o.role || "analyst").toUpperCase()}
+                          {String(o.role || "member").toUpperCase()}
                         </div>
                       </div>
 
@@ -368,11 +461,16 @@ export default function Workspaces() {
                     <div style={S.itemLeft}>
                       <div style={S.itemTitle}>{o.orgName || "Workspace"}</div>
                       <div style={S.itemMeta}>
-                        Role: <b>{o.role || "analyst"}</b> • Status:{" "}
+                        Role: <b>{o.role || "member"}</b> • Status:{" "}
                         <b>{o.status || "active"}</b>
                         {o.orgSlug ? (
                           <>
                             {" • "}Slug: <b>{o.orgSlug}</b>
+                          </>
+                        ) : null}
+                        {o.plan ? (
+                          <>
+                            {" • "}Plan: <b>{o.plan}</b>
                           </>
                         ) : null}
                       </div>
@@ -380,7 +478,7 @@ export default function Workspaces() {
 
                     <div style={S.itemRight}>
                       <div style={scorePill(o.role)}>
-                        {String(o.role || "analyst").toUpperCase()}
+                        {String(o.role || "member").toUpperCase()}
                       </div>
                       <div style={S.tag}>
                         {isActive ? "Active Workspace" : "Available Workspace"}

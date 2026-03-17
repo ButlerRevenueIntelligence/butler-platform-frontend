@@ -123,40 +123,53 @@ export default function Login() {
       localStorage.setItem("butler_token", token);
       localStorage.setItem("token", token);
 
+      const claims = decodeJwt(token) || {};
+
       let user = res?.user || res?.data?.user || null;
+      const activeWorkspace =
+        res?.activeWorkspace || res?.data?.activeWorkspace || null;
+      const workspaces = res?.workspaces || res?.data?.workspaces || [];
+      const membership = res?.membership || res?.data?.membership || null;
 
       if (!user) {
-        const claims = decodeJwt(token) || {};
         user = {
           id: claims.id || claims.userId || claims.sub || "",
           email,
           role: claims.role || "user",
           plan: claims.plan || claims.tier || claims.subscription || "STANDARD",
-          orgId: claims.orgId || claims.activeOrgId || claims.workspaceId || "",
-          orgName: claims.orgName || claims.workspaceName || claims.company || "",
+          orgId:
+            claims.orgId ||
+            claims.activeWorkspace ||
+            claims.activeOrgId ||
+            claims.workspaceId ||
+            "",
+          orgName:
+            claims.orgName ||
+            claims.workspaceName ||
+            claims.company ||
+            "",
           permissions: claims.permissions || claims.perms || [],
         };
       }
 
-      try {
-        setUser(user);
-      } catch (_) {}
-
-      localStorage.setItem("butler_user", JSON.stringify(user));
-      localStorage.setItem("user", JSON.stringify(user));
-
-      const orgId = oid(
-        user?.orgId ||
+      const resolvedWorkspaceId = oid(
+        activeWorkspace?._id ||
+          activeWorkspace?.id ||
+          user?.orgId ||
           res?.orgId ||
           res?.activeOrgId ||
           res?.workspaceId ||
           res?.data?.orgId ||
           res?.data?.activeOrgId ||
           res?.data?.workspaceId ||
+          claims?.activeWorkspace ||
+          claims?.orgId ||
+          claims?.workspaceId ||
           ""
       );
 
-      const orgName =
+      const resolvedWorkspaceName =
+        activeWorkspace?.name ||
         user?.orgName ||
         user?.organizationName ||
         user?.company ||
@@ -166,23 +179,65 @@ export default function Login() {
         res?.data?.workspaceName ||
         "";
 
-      if (orgId) {
+      const normalizedUser = {
+        ...user,
+        orgId: resolvedWorkspaceId,
+        activeWorkspace: resolvedWorkspaceId,
+        orgName: resolvedWorkspaceName,
+        workspaceName: resolvedWorkspaceName,
+        permissions:
+          user?.permissions ||
+          user?.perms ||
+          membership?.permissions ||
+          [],
+      };
+
+      try {
+        setUser(normalizedUser);
+      } catch (_) {}
+
+      localStorage.setItem("butler_user", JSON.stringify(normalizedUser));
+      localStorage.setItem("user", JSON.stringify(normalizedUser));
+
+      if (resolvedWorkspaceId) {
         try {
-          setActiveOrgId(orgId);
+          setActiveOrgId(resolvedWorkspaceId);
         } catch (_) {}
-        localStorage.setItem("butler_active_org_id", orgId);
-        localStorage.setItem("activeOrgId", orgId);
+
+        localStorage.setItem("x-org-id", resolvedWorkspaceId);
+        localStorage.setItem("orgId", resolvedWorkspaceId);
+        localStorage.setItem("butler_org_id", resolvedWorkspaceId);
+        localStorage.setItem("butler_active_org_id", resolvedWorkspaceId);
+        localStorage.setItem("activeOrgId", resolvedWorkspaceId);
       }
 
-      if (orgName) {
+      if (resolvedWorkspaceName) {
         try {
-          setActiveOrgName(orgName);
+          setActiveOrgName(resolvedWorkspaceName);
         } catch (_) {}
-        localStorage.setItem("butler_active_org_name", orgName);
-        localStorage.setItem("activeOrgName", orgName);
+
+        localStorage.setItem("butler_active_org_name", resolvedWorkspaceName);
+        localStorage.setItem("activeOrgName", resolvedWorkspaceName);
       }
 
-      nav("/revenue-intel", { replace: true });
+      if (activeWorkspace) {
+        localStorage.setItem("activeWorkspace", JSON.stringify(activeWorkspace));
+      }
+
+      if (Array.isArray(workspaces)) {
+        localStorage.setItem("workspaces", JSON.stringify(workspaces));
+      }
+
+      if (membership) {
+        localStorage.setItem("membership", JSON.stringify(membership));
+      }
+
+      if (!resolvedWorkspaceId) {
+        nav("/create-workspace", { replace: true });
+        return;
+      }
+
+      nav("/command-center", { replace: true });
     } catch (e2) {
       setErr(e2?.message || "Login failed");
     } finally {

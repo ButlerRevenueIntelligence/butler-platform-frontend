@@ -5,6 +5,8 @@ import { Routes, Route, Navigate, useLocation, Link } from "react-router-dom";
 import Signup from "./pages/Signup.jsx";
 import Login from "./pages/Login.jsx";
 import PaymentSuccess from "./pages/PaymentSuccess.jsx";
+import CreateWorkspace from "./pages/CreateWorkspace.jsx";
+import Members from "./pages/Members.jsx";
 
 import Dashboard from "./pages/Dashboard.jsx";
 import RevenueIntel from "./pages/RevenueIntel.jsx";
@@ -100,6 +102,16 @@ function extractPlan(payload) {
     payload?.user?.plan ||
     payload?.user?.organization?.plan ||
     payload?.user?.org?.plan ||
+    null
+  );
+}
+
+function extractActiveWorkspace(payload) {
+  return (
+    payload?.activeWorkspace ||
+    payload?.user?.activeWorkspace ||
+    payload?.workspace ||
+    payload?.user?.workspace ||
     null
   );
 }
@@ -206,6 +218,7 @@ function RequireAuth({ children }) {
 function RequireBilling({ children }) {
   const [loading, setLoading] = React.useState(true);
   const [billingActive, setBillingActive] = React.useState(false);
+  const [hasWorkspace, setHasWorkspace] = React.useState(true);
 
   React.useEffect(() => {
     let mounted = true;
@@ -214,14 +227,17 @@ function RequireBilling({ children }) {
       try {
         const me = await fetchMe();
         const active = hasActiveAccess(me);
+        const activeWorkspace = extractActiveWorkspace(me);
 
         if (mounted) {
           setBillingActive(active);
+          setHasWorkspace(!!activeWorkspace);
         }
       } catch (err) {
-        console.error("Billing check failed:", err);
+        console.error("Billing/workspace check failed:", err);
         if (mounted) {
           setBillingActive(false);
+          setHasWorkspace(false);
         }
       } finally {
         if (mounted) {
@@ -238,6 +254,10 @@ function RequireBilling({ children }) {
   }, []);
 
   if (loading) return null;
+
+  if (!hasWorkspace) {
+    return <Navigate to="/create-workspace" replace />;
+  }
 
   if (!billingActive) {
     return <Navigate to="/billing-required" replace />;
@@ -264,12 +284,17 @@ function RedirectIfAuth({ children }) {
       try {
         const me = await fetchMe();
         const active = hasActiveAccess(me);
+        const activeWorkspace = extractActiveWorkspace(me);
 
         if (mounted) {
-          setRedirectTo(active ? "/command-center" : "/billing-required");
+          if (!activeWorkspace) {
+            setRedirectTo("/create-workspace");
+          } else {
+            setRedirectTo(active ? "/command-center" : "/billing-required");
+          }
         }
       } catch (err) {
-        console.error("Redirect billing check failed:", err);
+        console.error("Redirect billing/workspace check failed:", err);
         if (mounted) {
           setRedirectTo("/billing-required");
         }
@@ -328,6 +353,14 @@ export default function App() {
       <Route path="/accept-invite" element={<AcceptInvite />} />
       <Route path="/billing-required" element={<BillingRequired />} />
       <Route path="/payment-success" element={<PaymentSuccess />} />
+      <Route
+        path="/create-workspace"
+        element={
+          <RequireAuth>
+            <CreateWorkspace />
+          </RequireAuth>
+        }
+      />
 
       {/* PROTECTED */}
       <Route
@@ -339,7 +372,6 @@ export default function App() {
           </RequireAuth>
         }
       >
-        {/* Core / legacy routes */}
         <Route
           path="/overview"
           element={
@@ -421,10 +453,26 @@ export default function App() {
           }
         />
 
-        <Route path="/invites" element={<Invites />} />
+        <Route
+          path="/invites"
+          element={
+            <RequirePerm perm="admin.audit">
+              <Invites />
+            </RequirePerm>
+          }
+        />
+
+        <Route
+          path="/members"
+          element={
+            <RequirePerm perm="admin.audit">
+              <Members />
+            </RequirePerm>
+          }
+        />
+
         <Route path="/clients/:id" element={<ClientDetail />} />
 
-        {/* Atlas Revenue OS routes */}
         <Route
           path="/deal-war-room"
           element={

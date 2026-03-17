@@ -1,6 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { logout, getActiveOrgId, getActiveOrgName, getUser } from "../api";
+import {
+  logout,
+  getActiveOrgId,
+  getActiveOrgName,
+  getUser,
+  getWorkspaces,
+  getActiveWorkspace,
+  switchWorkspace,
+} from "../api";
 import { hasPerm } from "../utils/permissions";
 
 const baseLink = {
@@ -79,6 +87,21 @@ function NavRow({ title, children }) {
   );
 }
 
+function workspaceIdFromItem(item) {
+  return (
+    item?.workspace?._id ||
+    item?.workspace?.id ||
+    item?._id ||
+    item?.id ||
+    item?.orgId ||
+    ""
+  );
+}
+
+function workspaceNameFromItem(item) {
+  return item?.workspace?.name || item?.name || item?.orgName || "Workspace";
+}
+
 export default function AppLayout() {
   const nav = useNavigate();
 
@@ -89,16 +112,40 @@ export default function AppLayout() {
 
   const can = (perm) => !permissions?.length || hasPerm(permissions, perm);
 
-  const orgId = getActiveOrgId();
+  const initialOrgId = getActiveOrgId();
+  const initialWorkspace = getActiveWorkspace();
+
   const [workspaceLabel, setWorkspaceLabel] = useState(
-    () => getActiveOrgName() || orgId || "—"
+    () => getActiveOrgName() || initialWorkspace?.name || initialOrgId || "—"
   );
+
+  const [workspaceOptions, setWorkspaceOptions] = useState(() => {
+    const stored = getWorkspaces();
+    return Array.isArray(stored) ? stored : [];
+  });
+
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(
+    () => initialOrgId || initialWorkspace?._id || initialWorkspace?.id || ""
+  );
+
+  const [switchingWorkspace, setSwitchingWorkspace] = useState(false);
 
   useEffect(() => {
     const sync = () => {
       const u = getUser();
+      const activeOrgId = getActiveOrgId();
+      const activeOrgName = getActiveOrgName();
+      const activeWorkspace = getActiveWorkspace();
+      const storedWorkspaces = getWorkspaces();
+
       setPermissions(u?.permissions || u?.perms || []);
-      setWorkspaceLabel(getActiveOrgName() || getActiveOrgId() || "—");
+      setWorkspaceLabel(
+        activeOrgName || activeWorkspace?.name || activeOrgId || "—"
+      );
+      setSelectedWorkspaceId(
+        activeOrgId || activeWorkspace?._id || activeWorkspace?.id || ""
+      );
+      setWorkspaceOptions(Array.isArray(storedWorkspaces) ? storedWorkspaces : []);
     };
 
     sync();
@@ -106,8 +153,17 @@ export default function AppLayout() {
     const onStorage = (e) => {
       if (
         e.key === "butler_user" ||
+        e.key === "user" ||
+        e.key === "x-org-id" ||
+        e.key === "orgId" ||
+        e.key === "butler_org_id" ||
         e.key === "active_org_id" ||
-        e.key === "active_org_name"
+        e.key === "butler_active_org_id" ||
+        e.key === "activeOrgName" ||
+        e.key === "butler_active_org_name" ||
+        e.key === "activeWorkspace" ||
+        e.key === "workspaces" ||
+        e.key === "membership"
       ) {
         sync();
       }
@@ -154,6 +210,42 @@ export default function AppLayout() {
       return "";
     }
   }, []);
+
+  async function handleWorkspaceChange(e) {
+    const nextId = e.target.value;
+    setSelectedWorkspaceId(nextId);
+
+    if (!nextId || nextId === getActiveOrgId()) {
+      return;
+    }
+
+    try {
+      setSwitchingWorkspace(true);
+      const res = await switchWorkspace(nextId);
+
+      const nextName =
+        res?.activeWorkspace?.name ||
+        workspaceOptions.find((w) => workspaceIdFromItem(w) === nextId)?.workspace?.name ||
+        workspaceOptions.find((w) => workspaceIdFromItem(w) === nextId)?.name ||
+        "Workspace";
+
+      const membershipPerms = res?.membership?.permissions || [];
+      setPermissions(membershipPerms);
+      setWorkspaceLabel(nextName);
+
+      nav("/command-center", { replace: true });
+    } catch (err) {
+      console.error("Workspace switch failed:", err);
+      alert(err?.message || "Failed to switch workspace.");
+      setSelectedWorkspaceId(getActiveOrgId() || "");
+    } finally {
+      setSwitchingWorkspace(false);
+    }
+  }
+
+  const visibleWorkspaceOptions = Array.isArray(workspaceOptions)
+    ? workspaceOptions.filter(Boolean)
+    : [];
 
   return (
     <div
@@ -242,9 +334,50 @@ export default function AppLayout() {
                 <strong>Systems Online</strong>
               </div>
 
-              <div style={pill}>
-                Workspace: <strong>{workspaceLabel}</strong>
-              </div>
+              {visibleWorkspaceOptions.length > 0 ? (
+                <div
+                  style={{
+                    ...pill,
+                    gap: 8,
+                    paddingRight: 8,
+                  }}
+                >
+                  <span>Workspace:</span>
+                  <select
+                    value={selectedWorkspaceId}
+                    onChange={handleWorkspaceChange}
+                    disabled={switchingWorkspace}
+                    style={{
+                      background: "transparent",
+                      color: "#EAF0FF",
+                      border: "none",
+                      outline: "none",
+                      fontWeight: 800,
+                      fontSize: 11,
+                      cursor: switchingWorkspace ? "wait" : "pointer",
+                    }}
+                  >
+                    {visibleWorkspaceOptions.map((item, idx) => {
+                      const value = workspaceIdFromItem(item);
+                      const name = workspaceNameFromItem(item);
+
+                      return (
+                        <option
+                          key={value || `${name}-${idx}`}
+                          value={value}
+                          style={{ color: "#0f172a" }}
+                        >
+                          {name}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              ) : (
+                <div style={pill}>
+                  Workspace: <strong>{workspaceLabel}</strong>
+                </div>
+              )}
 
               <div style={pill}>
                 HQ (EST): <strong>{hqTime || "—"}</strong>
@@ -365,6 +498,26 @@ export default function AppLayout() {
               )}
             </NavRow>
 
+            <NavRow title="ADMIN">
+              {can("admin.audit") && (
+                <NavLink to="/global-hq" style={navLinkStyle}>
+                  Global HQ
+                </NavLink>
+              )}
+
+              {can("admin.audit") && (
+                <NavLink to="/members" style={navLinkStyle}>
+                  Members
+                </NavLink>
+              )}
+
+              {can("admin.audit") && (
+                <NavLink to="/invites" style={navLinkStyle}>
+                  Invites
+                </NavLink>
+              )}
+            </NavRow>
+
             <NavRow title="LEGACY">
               {can("deal_room.view") && (
                 <NavLink to="/deal-room" style={navLinkStyle}>
@@ -375,12 +528,6 @@ export default function AppLayout() {
               {can("clients.view") && (
                 <NavLink to="/accounts" style={navLinkStyle}>
                   Accounts
-                </NavLink>
-              )}
-
-              {can("admin.audit") && (
-                <NavLink to="/global-hq" style={navLinkStyle}>
-                  Global HQ
                 </NavLink>
               )}
             </NavRow>
