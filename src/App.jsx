@@ -7,6 +7,7 @@ import Login from "./pages/Login.jsx";
 import PaymentSuccess from "./pages/PaymentSuccess.jsx";
 import CreateWorkspace from "./pages/CreateWorkspace.jsx";
 import Members from "./pages/Members.jsx";
+import Welcome from "./pages/Welcome.jsx";
 
 import Dashboard from "./pages/Dashboard.jsx";
 import RevenueIntel from "./pages/RevenueIntel.jsx";
@@ -542,6 +543,7 @@ export default function App() {
         <Route path="/pipeline" element={<Navigate to="/deal-war-room" replace />} />
         <Route path="/metrics" element={<Navigate to="/market-signals" replace />} />
         <Route path="/clients" element={<Navigate to="/accounts" replace />} />
+        <Route path="/welcome" element={<Welcome />} />
 
         {/* Friendly aliases */}
         <Route path="/growth" element={<Navigate to="/growth-engine" replace />} />

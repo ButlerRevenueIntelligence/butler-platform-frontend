@@ -1,4 +1,4 @@
-// frontend/src/pages/Dashboard.jsx
+   // frontend/src/pages/Dashboard.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import {
   getDashboard,
@@ -380,6 +380,15 @@ function MiniRegionMarker({ region, onClick }) {
 export default function Dashboard() {
   const nav = useNavigate();
 
+  useEffect(() => {
+    if (
+      !localStorage.getItem("atlas_onboarded") &&
+      window.location.pathname !== "/welcome"
+    ) {
+      window.location.href = "/welcome";
+    }
+  }, []);
+
   const [dashboard, setDashboard] = useState(null);
   const [integrations, setIntegrations] = useState([]);
   const [pipeline, setPipeline] = useState({ deals: [], pipelineValue: 0 });
@@ -406,6 +415,12 @@ export default function Dashboard() {
     latitude: 18,
     zoom: 0.9,
   });
+
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState("analyst");
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteMsg, setInviteMsg] = useState("");
+  const [inviteErr, setInviteErr] = useState("");
 
   async function loadDashboardData() {
     try {
@@ -510,6 +525,60 @@ export default function Dashboard() {
       setError(e?.message || "Failed to load demo data");
     } finally {
       setDemoLoading(false);
+    }
+  }
+
+  async function handleQuickInvite() {
+    setInviteMsg("");
+    setInviteErr("");
+
+    const email = inviteEmail.trim().toLowerCase();
+
+    if (!email) {
+      setInviteErr("Please enter an email address.");
+      return;
+    }
+
+    try {
+      setInviteLoading(true);
+
+      const token =
+        localStorage.getItem("butler_token") ||
+        localStorage.getItem("token") ||
+        "";
+
+      const orgId =
+        localStorage.getItem("x-org-id") ||
+        localStorage.getItem("orgId") ||
+        localStorage.getItem("butler_org_id") ||
+        "";
+
+      const res = await fetch("https://atlas-revenue-backend.onrender.com/api/invites", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+          ...(orgId ? { "x-org-id": orgId } : {}),
+        },
+        body: JSON.stringify({
+          email,
+          role: inviteRole,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data?.message || "Failed to send invite.");
+      }
+
+      setInviteMsg(`Invite sent to ${email}.`);
+      setInviteEmail("");
+      setInviteRole("analyst");
+    } catch (e) {
+      setInviteErr(e?.message || "Failed to send invite.");
+    } finally {
+      setInviteLoading(false);
     }
   }
 
@@ -1335,9 +1404,76 @@ export default function Dashboard() {
       {error ? <div style={S.error}>{error}</div> : null}
 
       <SystemStatus />
-      <AITicker />
-      <CommandBar />
+<AITicker />
+<CommandBar />
 
+<div style={{ ...S.card, marginTop: 12, marginBottom: 12 }}>
+  <div style={S.sectionTitle}>Invite Your Team</div>
+
+  <div style={S.helperText}>
+    Bring analysts, managers, and leadership into Atlas so your whole team can
+    operate inside one revenue command center.
+  </div>
+
+  <div
+    style={{
+      display: "grid",
+      gridTemplateColumns: "1.6fr 0.8fr auto",
+      gap: 12,
+      marginTop: 14,
+    }}
+  >
+    <input
+      type="email"
+      placeholder="person@company.com"
+      value={inviteEmail}
+      onChange={(e) => setInviteEmail(e.target.value)}
+      style={{
+        padding: 12,
+        borderRadius: 10,
+        border: "1px solid rgba(255,255,255,0.12)",
+        background: "rgba(255,255,255,0.04)",
+        color: "#EAF0FF",
+        outline: "none",
+      }}
+    />
+
+    <select
+      value={inviteRole}
+      onChange={(e) => setInviteRole(e.target.value)}
+      style={{
+        padding: 12,
+        borderRadius: 10,
+        border: "1px solid rgba(255,255,255,0.12)",
+        background: "rgba(255,255,255,0.04)",
+        color: "#EAF0FF",
+        outline: "none",
+      }}
+    >
+      <option value="analyst">analyst</option>
+      <option value="manager">manager</option>
+      <option value="admin">admin</option>
+      <option value="viewer">viewer</option>
+    </select>
+
+    <button
+      onClick={handleQuickInvite}
+      disabled={inviteLoading}
+      style={{
+        ...S.actionBtn,
+        ...(inviteLoading ? S.actionBtnDisabled : {}),
+        minWidth: 140,
+      }}
+    >
+      {inviteLoading ? "Sending..." : "Send Invite"}
+    </button>
+  </div>
+
+  {inviteMsg ? <div style={S.success}>{inviteMsg}</div> : null}
+  {inviteErr ? <div style={S.error}>{inviteErr}</div> : null}
+</div>
+      
+     
       <div style={S.signalStrip}>
         {overviewSignals.map((signal, idx) => (
           <div key={`${signal}-${idx}`} style={S.signalPill}>
