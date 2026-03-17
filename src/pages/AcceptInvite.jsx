@@ -1,7 +1,7 @@
 // frontend/src/pages/AcceptInvite.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import { acceptInvite, getInvite } from "../api";
-import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import { acceptInvite, getInvite, setToken, setUser, setActiveOrgId } from "../api";
+import { useSearchParams, Link } from "react-router-dom";
 
 const safe = (v) => (v == null ? "" : String(v));
 
@@ -16,7 +16,6 @@ const roleTone = (role) => {
 
 export default function AcceptInvite() {
   const [params] = useSearchParams();
-  const nav = useNavigate();
   const token = params.get("token") || "";
 
   const [invite, setInvite] = useState(null);
@@ -72,15 +71,52 @@ export default function AcceptInvite() {
 
     try {
       setAccepting(true);
-      await acceptInvite(token, {
+
+      const data = await acceptInvite(token, {
         name: trimmedName,
         password,
       });
+
+      if (data?.token) {
+        try {
+          setToken(data.token);
+        } catch {}
+
+        localStorage.setItem("butler_token", data.token);
+        localStorage.setItem("token", data.token);
+      }
+
+      if (data?.user) {
+        try {
+          setUser(data.user);
+        } catch {}
+
+        localStorage.setItem("butler_user", JSON.stringify(data.user));
+        localStorage.setItem("user", JSON.stringify(data.user));
+      }
+
+      const orgId =
+        data?.user?.orgId ||
+        data?.orgId ||
+        invite?.orgId ||
+        "";
+
+      if (orgId) {
+        try {
+          setActiveOrgId(orgId);
+        } catch {}
+
+        localStorage.setItem("butler_active_org_id", String(orgId));
+        localStorage.setItem("active_org_id", String(orgId));
+        localStorage.setItem("x-org-id", String(orgId));
+        localStorage.setItem("orgId", String(orgId));
+      }
+
       setOk(true);
 
       setTimeout(() => {
-        nav(`/login?email=${encodeURIComponent(invite?.email || "")}`, { replace: true });
-      }, 1200);
+        window.location.href = "/overview";
+      }, 900);
     } catch (e) {
       setErr(e?.message || "Accept failed");
     } finally {
@@ -94,7 +130,7 @@ export default function AcceptInvite() {
     }
 
     if (ok) {
-      return "Your Atlas workspace invite has been accepted successfully. Your account is now connected to the invited workspace and you’ll be redirected to sign in.";
+      return "Your Atlas workspace invite has been accepted successfully. Your account is now being signed in and redirected into the platform.";
     }
 
     if (invite?.email) {
@@ -297,7 +333,7 @@ export default function AcceptInvite() {
 
             {ok ? (
               <div style={S.success}>
-                Invite accepted ✅ Redirecting you to sign in...
+                Invite accepted ✅ Signing you in and redirecting...
               </div>
             ) : (
               <div style={S.card}>
