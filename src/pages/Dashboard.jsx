@@ -841,6 +841,64 @@ const workspaceName = isDemo
       setInsightsLoading(false);
     }
   }
+ 
+ function handleGenerateBoardReport() {
+    nav("/reports");
+  }
+
+  function handleRunAiAnalysis() {
+    onGenerateInsights();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function handleSimulateForecast() {
+    const currentIndex = scenarioList.findIndex((s) => s.key === scenarioKey);
+    const nextIndex = currentIndex >= scenarioList.length - 1 ? 0 : currentIndex + 1;
+    const nextScenario = scenarioList[nextIndex];
+
+    if (nextScenario?.key) {
+      setScenarioKey(nextScenario.key);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }
+
+  function handleExportRevenueModel() {
+    const exportData = {
+      exportedAt: new Date().toISOString(),
+      orgName,
+      scenario: kpis.scenario?.label || "Baseline Reality",
+      kpis: {
+        revenue30: kpis.revenue30,
+        spend30: kpis.spend30,
+        leads30: kpis.leads30,
+        pipelineValue: kpis.pipelineValue,
+        cac: kpis.cac,
+        forecast90: kpis.forecast90,
+        coverage: kpis.coverage,
+        healthScore: kpis.healthScore,
+        revenueStabilityIndex: rsi.score,
+        revenueStabilityTier: rsi.tier,
+      },
+      overviewSignals,
+      channelAttribution: channelChart,
+      pipelineByStage,
+      recentDeals: deals.slice(0, 10),
+      integrations,
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+      type: "application/json",
+    });
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${orgName.replace(/\s+/g, "-").toLowerCase()}-revenue-model.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
 
   const pipelineByStage = useMemo(() => {
     const map = new window.Map();
@@ -1412,7 +1470,13 @@ const workspaceName = isDemo
 
       <SystemStatus />
 <AITicker />
-<CommandBar />
+<CommandBar
+  onGenerateBoardReport={handleGenerateBoardReport}
+  onRunAiAnalysis={handleRunAiAnalysis}
+  onSimulateForecast={handleSimulateForecast}
+  onExportRevenueModel={handleExportRevenueModel}
+  busy={insightsLoading}
+/>
 
 <div style={{ ...S.card, marginTop: 12, marginBottom: 12 }}>
   <div style={S.sectionTitle}>Invite Your Team</div>
