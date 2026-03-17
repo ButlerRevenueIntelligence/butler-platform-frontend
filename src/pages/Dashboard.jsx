@@ -703,8 +703,15 @@ export default function Dashboard() {
     : metrics?.length
     ? dateLabel(metrics[metrics.length - 1].date, "date")
     : new Date().toLocaleDateString();
+   const isDemo =
+  dashboard?.org?.isDemo ||
+  dashboard?.org?.slug === "demo" ||
+  (dashboard?.org?.name || "").toLowerCase().includes("butler");
 
-  const orgName = dashboard?.org?.name || dashboard?.orgName || "Butler & Co";
+const workspaceName = isDemo
+  ? "Atlas Executive Demo"
+  : dashboard?.org?.name || "Atlas Workspace";
+  const orgName = dashboard?.org?.name || dashboard?.orgName || "Atlas Executive Demo";
 
   const targets = useMemo(() => {
     const monthlyRevenueGoal =
