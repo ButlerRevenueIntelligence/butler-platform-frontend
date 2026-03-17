@@ -525,7 +525,7 @@ export const listInvites = () => apiGet("/invites");
 export const getInvite = (token) =>
   apiGet(`/invites/${encodeURIComponent(token)}`);
 
-export const acceptInvite = (token, payload) =>
+export const acceptInvite = (token, payload = {}) =>
   apiPost(`/invites/${encodeURIComponent(token)}/accept`, payload);
 
 // -------------------- Clients (CRUD) --------------------

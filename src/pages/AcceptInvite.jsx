@@ -1,7 +1,7 @@
 // frontend/src/pages/AcceptInvite.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { acceptInvite, getInvite } from "../api";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 
 const safe = (v) => (v == null ? "" : String(v));
 
@@ -16,6 +16,7 @@ const roleTone = (role) => {
 
 export default function AcceptInvite() {
   const [params] = useSearchParams();
+  const nav = useNavigate();
   const token = params.get("token") || "";
 
   const [invite, setInvite] = useState(null);
@@ -23,6 +24,10 @@ export default function AcceptInvite() {
   const [ok, setOk] = useState(false);
   const [loading, setLoading] = useState(false);
   const [accepting, setAccepting] = useState(false);
+
+  const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -32,9 +37,9 @@ export default function AcceptInvite() {
 
       try {
         const data = await getInvite(token);
-        setInvite(data?.invite || data);
-      } catch {
-        // ignore on purpose
+        setInvite(data?.invite || data || null);
+      } catch (e) {
+        setErr(e?.message || "Failed to load invite details.");
       } finally {
         setLoading(false);
       }
@@ -43,14 +48,39 @@ export default function AcceptInvite() {
     load();
   }, [token]);
 
-  async function onAccept() {
+  async function onAccept(e) {
+    e?.preventDefault?.();
     setErr("");
     setOk(false);
 
+    const trimmedName = name.trim();
+
+    if (!trimmedName) {
+      setErr("Please enter your full name.");
+      return;
+    }
+
+    if (password.length < 8) {
+      setErr("Password must be at least 8 characters.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setErr("Passwords do not match.");
+      return;
+    }
+
     try {
       setAccepting(true);
-      await acceptInvite(token);
+      await acceptInvite(token, {
+        name: trimmedName,
+        password,
+      });
       setOk(true);
+
+      setTimeout(() => {
+        nav(`/login?email=${encodeURIComponent(invite?.email || "")}`, { replace: true });
+      }, 1200);
     } catch (e) {
       setErr(e?.message || "Accept failed");
     } finally {
@@ -64,20 +94,20 @@ export default function AcceptInvite() {
     }
 
     if (ok) {
-      return "Your Atlas workspace invite has been accepted successfully. You can now sign in and access the workspace based on the permissions attached to this invite.";
+      return "Your Atlas workspace invite has been accepted successfully. Your account is now connected to the invited workspace and you’ll be redirected to sign in.";
     }
 
     if (invite?.email) {
       return `Atlas has detected an invite for ${invite.email}. This invite is configured for the ${safe(
         invite.role || "—"
-      )} role. Accepting it will connect your account to the invited workspace context.`;
+      )} role. Complete your account setup below to connect to the invited workspace.`;
     }
 
     if (loading) {
       return "Atlas is validating your invite token and loading available invite details.";
     }
 
-    return "Atlas detected an invite token, but invite details could not be fully resolved. You can still attempt to accept the invite if the token is valid.";
+    return "Atlas detected an invite token, but invite details could not be fully resolved. If the token is still valid, you may still be able to continue.";
   }, [token, invite, ok, loading]);
 
   const S = {
@@ -140,13 +170,41 @@ export default function AcceptInvite() {
     },
     btn: {
       borderRadius: 999,
-      padding: "10px 16px",
+      padding: "12px 16px",
       border: "1px solid rgba(255,255,255,0.12)",
       background: "rgba(255,255,255,0.06)",
       color: "#EAF0FF",
       fontWeight: 900,
-      fontSize: 12,
+      fontSize: 13,
       cursor: "pointer",
+      minWidth: 140,
+    },
+    input: {
+      width: "100%",
+      padding: "12px 12px",
+      borderRadius: 12,
+      border: "1px solid rgba(255,255,255,0.12)",
+      background: "rgba(255,255,255,0.04)",
+      color: "#EAF0FF",
+      outline: "none",
+      fontSize: 14,
+      boxSizing: "border-box",
+    },
+    label: {
+      fontSize: 12,
+      fontWeight: 800,
+      opacity: 0.84,
+      marginBottom: 6,
+      display: "block",
+    },
+    fieldWrap: {
+      display: "grid",
+      gap: 6,
+    },
+    formGrid: {
+      display: "grid",
+      gap: 12,
+      marginTop: 16,
     },
     error: {
       borderRadius: 12,
@@ -164,6 +222,11 @@ export default function AcceptInvite() {
       opacity: 0.85,
       fontSize: 13,
       lineHeight: 1.6,
+    },
+    loginLink: {
+      color: "#EAF0FF",
+      fontWeight: 800,
+      textDecoration: "none",
     },
   };
 
@@ -211,6 +274,11 @@ export default function AcceptInvite() {
                       {" • "}Role: <strong>{invite.role}</strong>
                     </>
                   ) : null}
+                  {invite?.workspaceName ? (
+                    <>
+                      {" • "}Workspace: <strong>{invite.workspaceName}</strong>
+                    </>
+                  ) : null}
                   {invite?.expiresAt ? (
                     <>
                       <br />
@@ -220,7 +288,7 @@ export default function AcceptInvite() {
                 </div>
               ) : (
                 <div style={S.meta}>
-                  Invite details could not be fully loaded, but you can still attempt acceptance if the token is valid.
+                  Invite details could not be fully loaded. If you continue to see this, request a fresh invite.
                 </div>
               )}
             </div>
@@ -229,22 +297,67 @@ export default function AcceptInvite() {
 
             {ok ? (
               <div style={S.success}>
-                Invite accepted ✅ You can now close this tab and sign in to Atlas.
+                Invite accepted ✅ Redirecting you to sign in...
               </div>
             ) : (
               <div style={S.card}>
                 <div style={{ fontWeight: 900, fontSize: 16, marginBottom: 8 }}>
-                  Accept Workspace Invite
+                  Complete Your Account Setup
                 </div>
                 <div style={S.meta}>
-                  Accepting this invite will attach your account to the target Atlas workspace with the role assigned in the invite.
+                  Enter your name and create a password to join the invited Atlas workspace.
                 </div>
 
-                <div style={{ marginTop: 14 }}>
-                  <button onClick={onAccept} disabled={accepting} style={S.btn}>
-                    {accepting ? "Accepting..." : "Accept Invite"}
-                  </button>
-                </div>
+                <form onSubmit={onAccept} style={S.formGrid}>
+                  <div style={S.fieldWrap}>
+                    <label style={S.label}>Full Name</label>
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Your full name"
+                      style={S.input}
+                      autoComplete="name"
+                    />
+                  </div>
+
+                  <div style={S.fieldWrap}>
+                    <label style={S.label}>Password</label>
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="At least 8 characters"
+                      style={S.input}
+                      autoComplete="new-password"
+                    />
+                  </div>
+
+                  <div style={S.fieldWrap}>
+                    <label style={S.label}>Confirm Password</label>
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Re-enter password"
+                      style={S.input}
+                      autoComplete="new-password"
+                    />
+                  </div>
+
+                  <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+                    <button type="submit" disabled={accepting || loading} style={S.btn}>
+                      {accepting ? "Accepting..." : "Accept Invite"}
+                    </button>
+
+                    <Link
+                      to={invite?.email ? `/login?email=${encodeURIComponent(invite.email)}` : "/login"}
+                      style={S.loginLink}
+                    >
+                      Already have an account? Sign in
+                    </Link>
+                  </div>
+                </form>
               </div>
             )}
           </>
