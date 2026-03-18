@@ -317,7 +317,7 @@ export default function ClientDetail() {
 
         <div style={S.signalCard}>
           <div style={S.signalLabel}>DOMAIN</div>
-          <div style={S.signalValue} style={{ ...S.signalValue, fontSize: 22 }}>
+          <div style={{ ...S.signalValue, fontSize: 22 }}>
             {derived.domain || "—"}
           </div>
           <div style={S.signalSub}>Resolved account domain from the website field.</div>

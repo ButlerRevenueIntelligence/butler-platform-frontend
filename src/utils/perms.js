@@ -19,16 +19,23 @@ export function hasPerm(perms, perm) {
 
 // --- Plan helpers (used by UpgradeBanner) ---
 export function getPlan() {
-  // Try a few common keys (safe defaults)
   return (
     localStorage.getItem("active_org_plan") ||
     localStorage.getItem("org_plan") ||
     localStorage.getItem("plan") ||
-    "STANDARD"
+    "SCALE"
   );
 }
 
 export function setPlan(plan) {
-  if (!plan) localStorage.removeItem("active_org_plan");
-  else localStorage.setItem("active_org_plan", String(plan));
+  if (!plan) {
+    localStorage.removeItem("active_org_plan");
+    localStorage.removeItem("org_plan");
+    localStorage.removeItem("plan");
+  } else {
+    const value = String(plan).toUpperCase().trim();
+    localStorage.setItem("active_org_plan", value);
+    localStorage.setItem("org_plan", value);
+    localStorage.setItem("plan", value);
+  }
 }
