@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { getMyOrgs } from "../api";
+import { getMyOrgs, apiGet } from "../api";
 
 export default function BillingSuccess() {
   const nav = useNavigate();
@@ -18,11 +18,32 @@ export default function BillingSuccess() {
           setStatus("Verifying payment and syncing workspace plan...");
         }
 
-        // Give Stripe webhook a few chances to finish and update MongoDB
         let synced = false;
 
         for (let i = 0; i < 6; i++) {
           await getMyOrgs();
+
+          try {
+            const me = await apiGet("/me");
+
+            const freshPlan =
+              me?.plan ||
+              me?.organization?.plan ||
+              me?.org?.plan ||
+              me?.activeWorkspace?.plan ||
+              "";
+
+            if (freshPlan) {
+              localStorage.setItem("active_org_plan", freshPlan);
+              localStorage.setItem("org_plan", freshPlan);
+              localStorage.setItem("plan", freshPlan);
+            }
+
+            localStorage.setItem("butler_user", JSON.stringify(me));
+            localStorage.setItem("user", JSON.stringify(me));
+          } catch (err) {
+            console.error("Failed to refresh /me during billing sync:", err);
+          }
 
           const plan =
             localStorage.getItem("active_org_plan") ||
@@ -51,6 +72,7 @@ export default function BillingSuccess() {
         }, 1500);
       } catch (err) {
         console.error("Billing success sync failed:", err);
+
         if (mounted) {
           setStatus("Payment was completed. Redirecting back into Atlas...");
         }

@@ -464,6 +464,8 @@ export const createCheckoutSession = (payload) =>
 export const createPortalSession = (payload) =>
   apiPost("/stripe/create-portal-session", payload);
 
+export const startFreeTrial = (payload = {}) =>
+  apiPost("/trial/start", payload);
 // -------------------- Dashboard --------------------
 export const getDashboard = () => apiGet("/dashboard");
 export const getIntegrations = () => apiGet("/integrations");

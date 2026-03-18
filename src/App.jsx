@@ -123,11 +123,19 @@ function hasActiveAccess(payload) {
   const status = String(extractBillingStatus(payload) || "").toLowerCase();
   const plan = String(extractPlan(payload) || "").toUpperCase();
 
-  const billingActive = status === "active";
+  const trialStatus = String(
+    payload?.trial?.status ||
+      payload?.organization?.trial?.status ||
+      payload?.org?.trial?.status ||
+      ""
+  ).toLowerCase();
+
+  const billingActive = status === "active" || status === "trialing";
   const hasPaidPlan =
     plan === "SCALE" || plan === "GROWTH" || plan === "ENTERPRISE";
+  const hasTrial = trialStatus === "trialing";
 
-  return billingActive || hasPaidPlan;
+  return billingActive || hasPaidPlan || hasTrial;
 }
 
 function BillingRequired() {
