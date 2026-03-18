@@ -8,7 +8,7 @@ import PaymentSuccess from "./pages/PaymentSuccess.jsx";
 import CreateWorkspace from "./pages/CreateWorkspace.jsx";
 import Members from "./pages/Members.jsx";
 import Welcome from "./pages/Welcome.jsx";
-import Billing from "./pages/Billing";
+import Billing from "./pages/Billing.jsx";
 
 import Dashboard from "./pages/Dashboard.jsx";
 import RevenueIntel from "./pages/RevenueIntel.jsx";
@@ -33,7 +33,7 @@ import BoardMode from "./pages/BoardMode.jsx";
 
 import AppLayout from "./components/AppLayout.jsx";
 import RequirePerm from "./components/RequirePerm.jsx";
-import BillingSuccess from "./pages/BillingSuccess";
+import BillingSuccess from "./pages/BillingSuccess.jsx";
 
 function isAuthenticated() {
   return !!localStorage.getItem("butler_token");
@@ -166,8 +166,8 @@ function BillingRequired() {
         </div>
 
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 24 }}>
-          <a
-            href="https://atlasrevenueai.com"
+          <Link
+            to="/billing"
             style={{
               textDecoration: "none",
               borderRadius: 999,
@@ -178,8 +178,8 @@ function BillingRequired() {
               border: "1px solid rgba(255,255,255,0.10)",
             }}
           >
-            Go to pricing
-          </a>
+            Go to billing
+          </Link>
 
           <Link
             to="/login"
@@ -356,6 +356,7 @@ export default function App() {
       <Route path="/accept-invite" element={<AcceptInvite />} />
       <Route path="/billing-required" element={<BillingRequired />} />
       <Route path="/payment-success" element={<PaymentSuccess />} />
+
       <Route
         path="/create-workspace"
         element={
@@ -365,7 +366,27 @@ export default function App() {
         }
       />
 
-      {/* PROTECTED */}
+      {/* AUTH ONLY: Billing pages must be reachable before billing is active */}
+      <Route
+        element={
+          <RequireAuth>
+            <AppLayout />
+          </RequireAuth>
+        }
+      >
+        <Route path="/billing" element={<Billing />} />
+      </Route>
+
+      <Route
+        path="/billing/success"
+        element={
+          <RequireAuth>
+            <BillingSuccess />
+          </RequireAuth>
+        }
+      />
+
+      {/* PROTECTED: Auth + Billing Required */}
       <Route
         element={
           <RequireAuth>
@@ -546,8 +567,6 @@ export default function App() {
         <Route path="/metrics" element={<Navigate to="/market-signals" replace />} />
         <Route path="/clients" element={<Navigate to="/accounts" replace />} />
         <Route path="/welcome" element={<Welcome />} />
-        <Route path="/billing/success" element={<BillingSuccess />} />
-        <Route path="/billing" element={<Billing />} />
 
         {/* Friendly aliases */}
         <Route path="/growth" element={<Navigate to="/growth-engine" replace />} />
