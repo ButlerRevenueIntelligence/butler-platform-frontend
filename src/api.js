@@ -1,4 +1,5 @@
 // frontend/src/api.js
+import { setPlan } from "./utils/perms";
 
 // Build a safe API base that ALWAYS ends with /api
 function buildApiBase(raw) {
@@ -184,9 +185,11 @@ export function setActiveWorkspace(workspace) {
 
   const id = oid(workspace?._id || workspace?.id);
   const name = workspace?.name || "";
+  const plan = workspace?.plan || "";
 
   if (id) setActiveOrgId(id);
   if (name) setActiveOrgName(name);
+  if (plan) setPlan(plan);
 }
 
 export function getWorkspaces() {
@@ -230,6 +233,7 @@ export function logout() {
   clearUser();
   setActiveOrgId("");
   setActiveOrgName("");
+  setPlan("");
   localStorage.removeItem("activeWorkspace");
   localStorage.removeItem("workspaces");
   localStorage.removeItem("membership");
@@ -338,6 +342,21 @@ function syncSessionFromAuthResponse(res) {
 
   if (orgName) {
     setActiveOrgName(orgName);
+  }
+
+  const plan =
+    activeWorkspace?.plan ||
+    user?.plan ||
+    res?.plan ||
+    res?.org?.plan ||
+    res?.workspace?.plan ||
+    res?.data?.plan ||
+    res?.data?.org?.plan ||
+    res?.data?.workspace?.plan ||
+    "";
+
+  if (plan) {
+    setPlan(plan);
   }
 
   return res;
@@ -473,19 +492,36 @@ export const generateInsights = (payload) =>
 export const getMyOrgs = async () => {
   const res = await apiGet("/org/mine");
 
-  if (!getActiveOrgId()) {
-    const list = Array.isArray(res?.orgs)
-      ? res.orgs
-      : Array.isArray(res)
-      ? res
-      : [];
+  const list = Array.isArray(res?.orgs)
+    ? res.orgs
+    : Array.isArray(res)
+    ? res
+    : [];
 
+  if (!getActiveOrgId()) {
     const first = list?.[0];
-    const firstId = oid(first?._id || first?.id);
-    const firstName = first?.name || "";
+    const firstId = oid(first?._id || first?.id || first?.orgId || first?.workspaceId);
+    const firstName =
+      first?.name ||
+      first?.orgName ||
+      first?.workspaceName ||
+      "";
+    const firstPlan = first?.plan || "";
 
     if (firstId) setActiveOrgId(firstId);
     if (firstName) setActiveOrgName(firstName);
+    if (firstPlan) setPlan(firstPlan);
+  } else {
+    const activeId = getActiveOrgId();
+
+    const active = list.find(
+      (o) =>
+        oid(o?._id || o?.id || o?.orgId || o?.workspaceId) === activeId
+    );
+
+    if (active?.plan) {
+      setPlan(active.plan);
+    }
   }
 
   return res;
@@ -501,6 +537,7 @@ export const createWorkspace = async (payload) => {
   const workspace = res?.workspace || null;
   const workspaceId = oid(workspace?._id || workspace?.id);
   const workspaceName = workspace?.name || "";
+  const workspacePlan = workspace?.plan || res?.plan || "";
 
   if (workspace) {
     setActiveWorkspace(workspace);
@@ -512,6 +549,10 @@ export const createWorkspace = async (payload) => {
 
   if (workspaceName) {
     setActiveOrgName(workspaceName);
+  }
+
+  if (workspacePlan) {
+    setPlan(workspacePlan);
   }
 
   return res;

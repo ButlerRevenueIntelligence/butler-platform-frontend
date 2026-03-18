@@ -17,14 +17,14 @@ export function hasPerm(perms, perm) {
   return perms.includes(perm);
 }
 
-// --- Plan helpers (used by UpgradeBanner) ---
 export function getPlan() {
-  return (
+  const raw =
     localStorage.getItem("active_org_plan") ||
     localStorage.getItem("org_plan") ||
     localStorage.getItem("plan") ||
-    "SCALE"
-  );
+    "SCALE";
+
+  return String(raw).toUpperCase().trim();
 }
 
 export function setPlan(plan) {
@@ -32,10 +32,20 @@ export function setPlan(plan) {
     localStorage.removeItem("active_org_plan");
     localStorage.removeItem("org_plan");
     localStorage.removeItem("plan");
-  } else {
-    const value = String(plan).toUpperCase().trim();
-    localStorage.setItem("active_org_plan", value);
-    localStorage.setItem("org_plan", value);
-    localStorage.setItem("plan", value);
+    return;
   }
+
+  const value = String(plan).toUpperCase().trim();
+  localStorage.setItem("active_org_plan", value);
+  localStorage.setItem("org_plan", value);
+  localStorage.setItem("plan", value);
+}
+
+export function getPlanLabel(plan = getPlan()) {
+  const normalized = String(plan).toUpperCase().trim();
+
+  if (normalized === "SCALE") return "CORE";
+  if (normalized === "GROWTH") return "GROWTH";
+  if (normalized === "ENTERPRISE") return "ENTERPRISE";
+  return normalized;
 }

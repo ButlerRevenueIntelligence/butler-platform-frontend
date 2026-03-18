@@ -8,6 +8,7 @@ import {
   getWorkspaces,
   getActiveWorkspace,
   switchWorkspace,
+  getMyOrgs,
 } from "../api";
 import { hasPerm } from "../utils/permissions";
 
@@ -94,12 +95,13 @@ function workspaceIdFromItem(item) {
     item?._id ||
     item?.id ||
     item?.orgId ||
+    item?.workspaceId ||
     ""
   );
 }
 
 function workspaceNameFromItem(item) {
-  return item?.workspace?.name || item?.name || item?.orgName || "Workspace";
+  return item?.workspace?.name || item?.name || item?.orgName || item?.workspaceName || "Workspace";
 }
 
 export default function AppLayout() {
@@ -148,7 +150,18 @@ export default function AppLayout() {
       setWorkspaceOptions(Array.isArray(storedWorkspaces) ? storedWorkspaces : []);
     };
 
+    async function bootstrapWorkspacePlan() {
+      try {
+        await getMyOrgs();
+      } catch (err) {
+        console.error("Workspace bootstrap sync failed:", err);
+      } finally {
+        sync();
+      }
+    }
+
     sync();
+    bootstrapWorkspacePlan();
 
     const onStorage = (e) => {
       if (
@@ -163,7 +176,10 @@ export default function AppLayout() {
         e.key === "butler_active_org_name" ||
         e.key === "activeWorkspace" ||
         e.key === "workspaces" ||
-        e.key === "membership"
+        e.key === "membership" ||
+        e.key === "active_org_plan" ||
+        e.key === "org_plan" ||
+        e.key === "plan"
       ) {
         sync();
       }

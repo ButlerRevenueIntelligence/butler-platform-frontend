@@ -1,4 +1,5 @@
 import React from "react";
+import { getPlan } from "../utils/perms";
 
 export default function CommandBar({
   onGenerateBoardReport,
@@ -7,6 +8,12 @@ export default function CommandBar({
   onExportRevenueModel,
   busy = false,
 }) {
+  const plan = getPlan();
+
+  const isScale = plan === "SCALE";
+  const isGrowth = plan === "GROWTH" || plan === "ENTERPRISE";
+  const isEnterprise = plan === "ENTERPRISE";
+
   return (
     <div
       style={{
@@ -28,8 +35,9 @@ export default function CommandBar({
       <button
         className="cmd"
         onClick={onRunAiAnalysis}
-        disabled={busy}
+        disabled={!isGrowth || busy}
         type="button"
+        title={!isGrowth ? "Available on Growth and Enterprise plans" : ""}
       >
         Run AI Analysis
       </button>
@@ -37,8 +45,9 @@ export default function CommandBar({
       <button
         className="cmd"
         onClick={onSimulateForecast}
-        disabled={busy}
+        disabled={!isGrowth || busy}
         type="button"
+        title={!isGrowth ? "Available on Growth and Enterprise plans" : ""}
       >
         Simulate Forecast
       </button>
@@ -46,8 +55,9 @@ export default function CommandBar({
       <button
         className="cmd"
         onClick={onExportRevenueModel}
-        disabled={busy}
+        disabled={!isEnterprise || busy}
         type="button"
+        title={!isEnterprise ? "Available on Enterprise plan only" : ""}
       >
         Export Revenue Model
       </button>
