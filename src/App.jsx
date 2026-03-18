@@ -8,6 +8,7 @@ import PaymentSuccess from "./pages/PaymentSuccess.jsx";
 import CreateWorkspace from "./pages/CreateWorkspace.jsx";
 import Members from "./pages/Members.jsx";
 import Welcome from "./pages/Welcome.jsx";
+import Billing from "./pages/Billing";
 
 import Dashboard from "./pages/Dashboard.jsx";
 import RevenueIntel from "./pages/RevenueIntel.jsx";
@@ -546,6 +547,7 @@ export default function App() {
         <Route path="/clients" element={<Navigate to="/accounts" replace />} />
         <Route path="/welcome" element={<Welcome />} />
         <Route path="/billing/success" element={<BillingSuccess />} />
+        <Route path="/billing" element={<Billing />} />
 
         {/* Friendly aliases */}
         <Route path="/growth" element={<Navigate to="/growth-engine" replace />} />

@@ -520,6 +520,12 @@ export default function AppLayout() {
                   Global HQ
                 </NavLink>
               )}
+              
+              {can("admin.audit") && (
+                <NavLink to="/billing" style={navLinkStyle}>
+                  Billing
+                </NavLink>
+              )}
 
               {can("admin.audit") && (
                 <NavLink to="/members" style={navLinkStyle}>

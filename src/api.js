@@ -458,6 +458,12 @@ export const switchWorkspace = async (workspaceId) => {
 
 export const serverLogout = () => request("/auth/logout", { method: "POST" });
 
+export const createCheckoutSession = (payload) =>
+  apiPost("/stripe/create-checkout-session", payload);
+
+export const createPortalSession = (payload) =>
+  apiPost("/stripe/create-portal-session", payload);
+
 // -------------------- Dashboard --------------------
 export const getDashboard = () => apiGet("/dashboard");
 export const getIntegrations = () => apiGet("/integrations");
