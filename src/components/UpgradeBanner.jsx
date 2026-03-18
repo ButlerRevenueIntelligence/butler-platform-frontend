@@ -2,6 +2,14 @@
 import React from "react";
 import { getPlan } from "../utils/perms";
 
+function prettyPlan(plan) {
+  const normalized = String(plan || "").toUpperCase().trim();
+  if (normalized === "SCALE") return "CORE";
+  if (normalized === "GROWTH") return "GROWTH";
+  if (normalized === "ENTERPRISE") return "ENTERPRISE";
+  return normalized || "CORE";
+}
+
 export default function UpgradeBanner({ missingPerm }) {
   const plan = getPlan();
 
@@ -31,7 +39,8 @@ export default function UpgradeBanner({ missingPerm }) {
       </div>
 
       <div style={{ marginTop: 6, opacity: 0.9, fontSize: 13 }}>
-        Your current plan (<b>{plan}</b>) does not include: <b>{missingPerm}</b>
+        Your current plan (<b>{prettyPlan(plan)}</b>) does not include:{" "}
+        <b>{missingPerm}</b>
       </div>
 
       <div style={{ marginTop: 6, opacity: 0.85, fontSize: 12 }}>
@@ -40,7 +49,9 @@ export default function UpgradeBanner({ missingPerm }) {
 
       <button
         style={btn}
-        onClick={() => alert("Upgrade flow coming next (Stripe checkout / invoice).")}
+        onClick={() => {
+          window.location.href = "/pricing";
+        }}
       >
         Upgrade Plan
       </button>

@@ -32,6 +32,7 @@ import BoardMode from "./pages/BoardMode.jsx";
 
 import AppLayout from "./components/AppLayout.jsx";
 import RequirePerm from "./components/RequirePerm.jsx";
+import BillingSuccess from "./pages/BillingSuccess";
 
 function isAuthenticated() {
   return !!localStorage.getItem("butler_token");
@@ -544,6 +545,7 @@ export default function App() {
         <Route path="/metrics" element={<Navigate to="/market-signals" replace />} />
         <Route path="/clients" element={<Navigate to="/accounts" replace />} />
         <Route path="/welcome" element={<Welcome />} />
+        <Route path="/billing/success" element={<BillingSuccess />} />
 
         {/* Friendly aliases */}
         <Route path="/growth" element={<Navigate to="/growth-engine" replace />} />
