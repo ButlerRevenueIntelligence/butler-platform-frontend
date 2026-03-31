@@ -11,6 +11,8 @@ import {
   getMyOrgs,
 } from "../api";
 import { hasPerm } from "../utils/permissions";
+import TrialBanner from "./TrialBanner";
+import PaywallModal from "./PaywallModal";
 
 const baseLink = {
   textDecoration: "none",
@@ -101,7 +103,13 @@ function workspaceIdFromItem(item) {
 }
 
 function workspaceNameFromItem(item) {
-  return item?.workspace?.name || item?.name || item?.orgName || item?.workspaceName || "Workspace";
+  return (
+    item?.workspace?.name ||
+    item?.name ||
+    item?.orgName ||
+    item?.workspaceName ||
+    "Workspace"
+  );
 }
 
 export default function AppLayout() {
@@ -111,6 +119,8 @@ export default function AppLayout() {
     const u = getUser();
     return u?.permissions || u?.perms || [];
   });
+
+  const [paywallData, setPaywallData] = useState(null);
 
   const can = (perm) => !permissions?.length || hasPerm(permissions, perm);
 
@@ -135,17 +145,17 @@ export default function AppLayout() {
   useEffect(() => {
     const sync = () => {
       const u = getUser();
-      const activeOrgId = getActiveOrgId();
+      const activeOrgIdValue = getActiveOrgId();
       const activeOrgName = getActiveOrgName();
       const activeWorkspace = getActiveWorkspace();
       const storedWorkspaces = getWorkspaces();
 
       setPermissions(u?.permissions || u?.perms || []);
       setWorkspaceLabel(
-        activeOrgName || activeWorkspace?.name || activeOrgId || "—"
+        activeOrgName || activeWorkspace?.name || activeOrgIdValue || "—"
       );
       setSelectedWorkspaceId(
-        activeOrgId || activeWorkspace?._id || activeWorkspace?.id || ""
+        activeOrgIdValue || activeWorkspace?._id || activeWorkspace?.id || ""
       );
       setWorkspaceOptions(Array.isArray(storedWorkspaces) ? storedWorkspaces : []);
     };
@@ -187,6 +197,17 @@ export default function AppLayout() {
 
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  useEffect(() => {
+    function handleLimit(e) {
+      setPaywallData(
+        e.detail || { message: "Usage limit reached. Upgrade to continue." }
+      );
+    }
+
+    window.addEventListener("atlas:usage-limit", handleLimit);
+    return () => window.removeEventListener("atlas:usage-limit", handleLimit);
   }, []);
 
   const [now, setNow] = useState(() => new Date());
@@ -271,6 +292,8 @@ export default function AppLayout() {
           "radial-gradient(900px 460px at 10% 0%, rgba(37,99,235,0.16), transparent 55%), radial-gradient(700px 420px at 85% 0%, rgba(99,102,241,0.10), transparent 55%), linear-gradient(180deg, #060915 0%, #070b18 100%)",
       }}
     >
+      <TrialBanner />
+
       <div
         style={{
           position: "sticky",
@@ -520,7 +543,7 @@ export default function AppLayout() {
                   Global HQ
                 </NavLink>
               )}
-              
+
               {can("admin.audit") && (
                 <NavLink to="/billing" style={navLinkStyle}>
                   Billing
@@ -566,6 +589,18 @@ export default function AppLayout() {
       >
         <Outlet />
       </div>
+
+      {paywallData ? (
+        <PaywallModal
+          open={!!paywallData}
+          title="Usage limit reached"
+          message={
+            paywallData?.message ||
+            "You’ve reached a limit on your current Atlas plan."
+          }
+          onClose={() => setPaywallData(null)}
+        />
+      ) : null}
     </div>
   );
 }

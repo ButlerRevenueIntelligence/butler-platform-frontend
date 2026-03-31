@@ -120,7 +120,7 @@ function extractActiveWorkspace(payload) {
 }
 
 function hasActiveAccess(payload) {
-  const status = String(extractBillingStatus(payload) || "").toLowerCase();
+  const billingStatus = String(extractBillingStatus(payload) || "").toLowerCase();
   const plan = String(extractPlan(payload) || "").toUpperCase();
 
   const trialStatus = String(
@@ -130,12 +130,36 @@ function hasActiveAccess(payload) {
       ""
   ).toLowerCase();
 
-  const billingActive = status === "active" || status === "trialing";
-  const hasPaidPlan =
-    plan === "SCALE" || plan === "GROWTH" || plan === "ENTERPRISE";
-  const hasTrial = trialStatus === "trialing";
+  const accessStatus = String(
+    payload?.accessStatus ||
+      payload?.organization?.accessStatus ||
+      payload?.org?.accessStatus ||
+      payload?.status ||
+      payload?.organization?.status ||
+      payload?.org?.status ||
+      ""
+  ).toLowerCase();
 
-  return billingActive || hasPaidPlan || hasTrial;
+  const paidActive =
+    (plan === "SCALE" || plan === "GROWTH" || plan === "ENTERPRISE") &&
+    billingStatus === "active";
+
+  const trialActive = trialStatus === "trialing";
+  const billingActive = billingStatus === "active" || billingStatus === "trialing";
+  const accessAllowed = accessStatus === "active" || accessStatus === "";
+
+  return accessAllowed && (paidActive || trialActive || billingActive);
+}
+
+function isTrialExpired(payload) {
+  const trialStatus = String(
+    payload?.trial?.status ||
+      payload?.organization?.trial?.status ||
+      payload?.org?.trial?.status ||
+      ""
+  ).toLowerCase();
+
+  return trialStatus === "expired";
 }
 
 function BillingRequired() {
@@ -230,6 +254,7 @@ function RequireBilling({ children }) {
   const [loading, setLoading] = React.useState(true);
   const [billingActive, setBillingActive] = React.useState(false);
   const [hasWorkspace, setHasWorkspace] = React.useState(true);
+  const [trialExpired, setTrialExpired] = React.useState(false);
 
   React.useEffect(() => {
     let mounted = true;
@@ -239,16 +264,19 @@ function RequireBilling({ children }) {
         const me = await fetchMe();
         const active = hasActiveAccess(me);
         const activeWorkspace = extractActiveWorkspace(me);
+        const expired = isTrialExpired(me);
 
         if (mounted) {
           setBillingActive(active);
           setHasWorkspace(!!activeWorkspace);
+          setTrialExpired(expired);
         }
       } catch (err) {
         console.error("Billing/workspace check failed:", err);
         if (mounted) {
           setBillingActive(false);
           setHasWorkspace(false);
+          setTrialExpired(false);
         }
       } finally {
         if (mounted) {
@@ -268,6 +296,10 @@ function RequireBilling({ children }) {
 
   if (!hasWorkspace) {
     return <Navigate to="/create-workspace" replace />;
+  }
+
+  if (trialExpired) {
+    return <Navigate to="/billing" replace />;
   }
 
   if (!billingActive) {
@@ -296,10 +328,13 @@ function RedirectIfAuth({ children }) {
         const me = await fetchMe();
         const active = hasActiveAccess(me);
         const activeWorkspace = extractActiveWorkspace(me);
+        const expired = isTrialExpired(me);
 
         if (mounted) {
           if (!activeWorkspace) {
             setRedirectTo("/create-workspace");
+          } else if (expired) {
+            setRedirectTo("/billing");
           } else {
             setRedirectTo(active ? "/command-center" : "/billing-required");
           }

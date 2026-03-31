@@ -28,6 +28,7 @@ function prettyBillingStatus(status) {
   if (s === "canceled") return "Canceled";
   if (s === "paid") return "Paid";
   if (s === "pending") return "Pending";
+  if (s === "expired") return "Expired";
   return s ? s.replace(/_/g, " ") : "Unknown";
 }
 
@@ -311,9 +312,12 @@ export default function Billing() {
   );
 
   const isTrialing = String(billingSummary.trialStatus || "").toLowerCase() === "trialing";
+  const isTrialExpired = String(billingSummary.trialStatus || "").toLowerCase() === "expired";
   const daysLeft = calcDaysLeft(billingSummary.trialEndsAt);
+
   const canStartTrial =
     !isTrialing &&
+    !isTrialExpired &&
     String(billingSummary.trialStatus || "none").toLowerCase() !== "converted";
 
   return (
@@ -356,6 +360,26 @@ export default function Billing() {
                     billingSummary.trialEndsAt
                   )}.`
                 : `Your free trial is active until ${formatDate(billingSummary.trialEndsAt)}.`}
+            </div>
+          </div>
+        ) : null}
+
+        {isTrialExpired ? (
+          <div
+            style={{
+              marginTop: 16,
+              borderRadius: 16,
+              padding: 14,
+              border: "1px solid rgba(251,113,133,0.28)",
+              background: "rgba(251,113,133,0.10)",
+            }}
+          >
+            <div style={{ fontWeight: 900, fontSize: 15 }}>
+              Your free trial has expired
+            </div>
+            <div style={{ marginTop: 6, fontSize: 13, opacity: 0.92, lineHeight: 1.55 }}>
+              Upgrade now to restore access to Atlas Growth features, AI analysis,
+              forecasting, reports, and revenue intelligence tools.
             </div>
           </div>
         ) : null}
@@ -429,7 +453,7 @@ export default function Billing() {
               RENEWS / PERIOD END
             </div>
             <div style={{ marginTop: 8, fontSize: 18, fontWeight: 1000 }}>
-              {isTrialing
+              {isTrialing || isTrialExpired
                 ? formatDate(billingSummary.trialEndsAt)
                 : formatDate(billingSummary.currentPeriodEnd)}
             </div>
@@ -452,6 +476,24 @@ export default function Billing() {
               }}
             >
               {loading ? "Starting Trial..." : "Start 7-Day Free Trial"}
+            </button>
+          ) : null}
+
+          {isTrialExpired ? (
+            <button
+              onClick={() => upgrade("GROWTH")}
+              disabled={loading}
+              style={{
+                borderRadius: 999,
+                padding: "10px 14px",
+                border: "1px solid rgba(255,255,255,0.12)",
+                background: "linear-gradient(90deg, #2563eb, #38bdf8)",
+                color: "#fff",
+                fontWeight: 900,
+                cursor: "pointer",
+              }}
+            >
+              {loading ? "Loading..." : "Upgrade to Restore Access"}
             </button>
           ) : null}
 

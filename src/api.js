@@ -192,7 +192,7 @@ export function setActiveWorkspace(workspace) {
   if (plan) setPlan(plan);
 }
 
-export function getWorkspaces() {
+export function getStoredWorkspaces() {
   try {
     const raw = localStorage.getItem("workspaces");
     return raw ? JSON.parse(raw) : [];
@@ -201,7 +201,7 @@ export function getWorkspaces() {
   }
 }
 
-export function setWorkspaces(workspaces) {
+export function setStoredWorkspaces(workspaces) {
   if (!Array.isArray(workspaces)) {
     localStorage.removeItem("workspaces");
     return;
@@ -289,6 +289,8 @@ function syncSessionFromAuthResponse(res) {
   const activeWorkspace =
     res?.activeWorkspace ||
     res?.data?.activeWorkspace ||
+    res?.workspace ||
+    res?.data?.workspace ||
     null;
 
   if (activeWorkspace) {
@@ -301,7 +303,7 @@ function syncSessionFromAuthResponse(res) {
     null;
 
   if (Array.isArray(workspaces)) {
-    setWorkspaces(workspaces);
+    setStoredWorkspaces(workspaces);
   }
 
   const membership =
@@ -406,6 +408,14 @@ async function request(path, options = {}) {
       (data && (data.message || data.error)) ||
       `Request failed (${res.status})`;
 
+    if (data?.code === "USAGE_LIMIT") {
+      window.dispatchEvent(
+        new CustomEvent("atlas:usage-limit", {
+          detail: data,
+        })
+      );
+    }
+
     const err = new Error(msg);
     err.status = res.status;
     err.data = data;
@@ -451,11 +461,6 @@ export const login = async (payload) => {
   return syncSessionFromAuthResponse(res);
 };
 
-export const switchWorkspace = async (workspaceId) => {
-  const res = await apiPost("/auth/switch-workspace", { workspaceId });
-  return syncSessionFromAuthResponse(res);
-};
-
 export const serverLogout = () => request("/auth/logout", { method: "POST" });
 
 export const createCheckoutSession = (payload) =>
@@ -466,6 +471,7 @@ export const createPortalSession = (payload) =>
 
 export const startFreeTrial = (payload = {}) =>
   apiPost("/trial/start", payload);
+
 // -------------------- Dashboard --------------------
 export const getDashboard = () => apiGet("/dashboard");
 export const getIntegrations = () => apiGet("/integrations");
@@ -496,7 +502,7 @@ export const getMetricsSummary = (days = 30) =>
 export const generateInsights = (payload) =>
   apiPost("/insights/generate", payload);
 
-// -------------------- Orgs / Workspaces --------------------
+// -------------------- Orgs / Legacy --------------------
 export const getMyOrgs = async () => {
   const res = await apiGet("/org/mine");
 
@@ -539,6 +545,25 @@ export const getMyOrgs = async () => {
 export const switchOrg = async (orgId) => switchWorkspace(orgId);
 
 // -------------------- Workspaces --------------------
+export const getWorkspaces = async () => {
+  const res = await apiGet("/workspaces");
+
+  const workspaces = Array.isArray(res?.workspaces)
+    ? res.workspaces
+    : Array.isArray(res)
+    ? res
+    : [];
+
+  if (Array.isArray(workspaces)) {
+    setStoredWorkspaces(workspaces);
+  }
+
+  return {
+    ...res,
+    workspaces,
+  };
+};
+
 export const createWorkspace = async (payload) => {
   const res = await apiPost("/workspaces", payload);
 
@@ -561,6 +586,35 @@ export const createWorkspace = async (payload) => {
 
   if (workspacePlan) {
     setPlan(workspacePlan);
+  }
+
+  return res;
+};
+
+export const switchWorkspace = async (workspaceId) => {
+  const res = await apiPost("/workspaces/switch", { workspaceId });
+
+  const activeWorkspace = res?.activeWorkspace || null;
+
+  if (activeWorkspace) {
+    setActiveWorkspace(activeWorkspace);
+  }
+
+  if (res?.membership) {
+    setMembership(res.membership);
+  }
+
+  return syncSessionFromAuthResponse(res);
+};
+
+export const deleteWorkspace = async (workspaceId) => {
+  const res = await apiDelete(`/workspaces/${workspaceId}`);
+
+  const currentActiveId = getActiveOrgId();
+  if (String(currentActiveId) === String(workspaceId)) {
+    setActiveOrgId("");
+    setActiveOrgName("");
+    localStorage.removeItem("activeWorkspace");
   }
 
   return res;
