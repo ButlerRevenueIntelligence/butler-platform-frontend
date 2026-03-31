@@ -475,6 +475,10 @@ export const startFreeTrial = (payload = {}) =>
 // -------------------- Dashboard --------------------
 export const getDashboard = () => apiGet("/dashboard");
 export const getIntegrations = () => apiGet("/integrations");
+export const connectIntegration = (id) =>
+  apiPost("/integrations/connect", { id });
+export const disconnectIntegration = (id) =>
+  apiPost("/integrations/disconnect", { id });
 export const getAttributionSummary = () => apiGet("/attribution/summary");
 export const getRevenueStability = () => apiGet("/revenue-stability");
 export const getForecastScenarios = () => apiGet("/forecast/scenarios");
