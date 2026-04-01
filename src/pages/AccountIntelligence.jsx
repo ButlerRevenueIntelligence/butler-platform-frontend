@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -13,70 +13,7 @@ import {
 } from "recharts";
 
 import AtlasAccountExpansionSignals from "../components/atlas/AtlasAccountExpansionSignals";
-
-const topStats = [
-  { label: "Top Opportunity Accounts", value: "3", note: "Highest-priority targets" },
-  { label: "Highest Engagement", value: "84", note: "Current peak score" },
-  { label: "Best Expansion Signal", value: "71%", note: "Strongest account fit" },
-  { label: "Revenue Potential", value: "$545K", note: "Near-term account upside" },
-];
-
-const summaryPoints = [
-  "Manufacturing accounts are producing the highest revenue potential right now.",
-  "Healthcare accounts show strong engagement and mid-range expansion probability.",
-  "Apex Manufacturing is currently the strongest near-term expansion target.",
-  "Multi-stakeholder engagement is rising across top accounts.",
-];
-
-const opportunityRadar = [
-  "Apex Manufacturing should move into an executive expansion motion immediately.",
-  "Nova Healthcare Systems has budget movement, but stakeholder alignment still needs work.",
-  "Titan Logistics Group remains promising, but account maturity trails the top two targets.",
-  "Revenue quality improves when account scoring is paired with buying-signal monitoring.",
-];
-
-const accounts = [
-  {
-    name: "Apex Manufacturing",
-    engagement: 84,
-    expansion: 71,
-    industry: "Manufacturing",
-    revenuePotential: 220000,
-    revenueLabel: "$220K",
-    buyingSignal: "Hiring growth team",
-    priority: "High Priority",
-    tone: "High",
-  },
-  {
-    name: "Nova Healthcare Systems",
-    engagement: 77,
-    expansion: 64,
-    industry: "Healthcare",
-    revenuePotential: 180000,
-    revenueLabel: "$180K",
-    buyingSignal: "Budget activity detected",
-    priority: "Expansion Watch",
-    tone: "Strong",
-  },
-  {
-    name: "Titan Logistics Group",
-    engagement: 69,
-    expansion: 58,
-    industry: "Logistics",
-    revenuePotential: 145000,
-    revenueLabel: "$145K",
-    buyingSignal: "Stakeholder re-engagement",
-    priority: "Watchlist",
-    tone: "Watch",
-  },
-];
-
-const nextMoves = [
-  "Prioritize executive outreach on Apex Manufacturing this week.",
-  "Map budget authority and internal buying roles for Nova Healthcare Systems.",
-  "Reinforce logistics messaging around operational efficiency and revenue visibility.",
-  "Create account-specific next-step plans for the top three opportunities.",
-];
+import { getDashboard } from "../api";
 
 const axisTick = { fill: "#9fb0d0", fontSize: 11 };
 
@@ -88,11 +25,598 @@ const tooltipStyle = {
   boxShadow: "0 14px 40px rgba(0,0,0,0.35)",
 };
 
-const moneyCompact = (num) => {
-  if (num >= 1000000) return `$${(num / 1000000).toFixed(1)}M`;
-  if (num >= 1000) return `$${(num / 1000).toFixed(0)}K`;
-  return `$${num}`;
+const safeNum = (v, fallback = 0) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
 };
+
+const money = (n) =>
+  safeNum(n).toLocaleString(undefined, {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  });
+
+const moneyCompact = (num) => {
+  const n = safeNum(num);
+  if (n >= 1000000) return `$${(n / 1000000).toFixed(1)}M`;
+  if (n >= 1000) return `$${(n / 1000).toFixed(0)}K`;
+  return `$${n}`;
+};
+
+function toneStyle(tone) {
+  const map = {
+    High: {
+      border: "1px solid rgba(16,185,129,0.22)",
+      background: "rgba(16,185,129,0.12)",
+      color: "#bbf7d0",
+    },
+    Strong: {
+      border: "1px solid rgba(56,189,248,0.22)",
+      background: "rgba(56,189,248,0.12)",
+      color: "#bae6fd",
+    },
+    Watch: {
+      border: "1px solid rgba(245,158,11,0.22)",
+      background: "rgba(245,158,11,0.12)",
+      color: "#fde68a",
+    },
+  };
+
+  return {
+    display: "inline-flex",
+    alignItems: "center",
+    padding: "7px 11px",
+    borderRadius: 999,
+    fontSize: 11,
+    fontWeight: 800,
+    whiteSpace: "nowrap",
+    ...(map[tone] || map.Strong),
+  };
+}
+
+function Section({ title, subtitle, children }) {
+  return (
+    <div style={styles.section}>
+      <div style={styles.sectionHead}>
+        {subtitle ? <div style={styles.sectionSub}>{subtitle}</div> : null}
+        <div style={styles.sectionTitle}>{title}</div>
+      </div>
+      <div style={styles.sectionBody}>{children}</div>
+    </div>
+  );
+}
+
+function SmallStat({ label, value, note }) {
+  return (
+    <div style={styles.statCard}>
+      <div style={styles.statLabel}>{label}</div>
+      <div style={styles.statValue}>{value}</div>
+      {note ? <div style={styles.statNote}>{note}</div> : null}
+    </div>
+  );
+}
+
+function EmptyState({ text = "No live account intelligence data available yet." }) {
+  return <div style={styles.emptyState}>{text}</div>;
+}
+
+function normalizeDeal(d) {
+  if (!d) return null;
+  return {
+    id: d?._id || d?.id || "",
+    name: d?.name || d?.title || d?.accountName || "Opportunity",
+    company:
+      d?.accountName ||
+      d?.company ||
+      d?.clientName ||
+      d?.name ||
+      "Account",
+    stage: String(d?.stage || "Unknown"),
+    amount:
+      safeNum(d?.amount, 0) ||
+      safeNum(d?.value, 0) ||
+      safeNum(d?.pipelineValue, 0),
+  };
+}
+
+export default function AccountIntelligence() {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [dashboard, setDashboard] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function load() {
+      try {
+        setLoading(true);
+        setError("");
+        const res = await getDashboard();
+        if (!mounted) return;
+        setDashboard(res || null);
+      } catch (err) {
+        console.error(err);
+        if (!mounted) return;
+        setError(err?.message || "Failed to load Account Intelligence");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    load();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const workspaceMode = String(dashboard?.workspaceMode || "demo").toLowerCase();
+  const isDemo = workspaceMode === "demo";
+  const orgName = dashboard?.activeWorkspace?.name || "Workspace";
+
+  const deals = useMemo(() => {
+    return (Array.isArray(dashboard?.deals) ? dashboard.deals : [])
+      .map(normalizeDeal)
+      .filter(Boolean);
+  }, [dashboard]);
+
+  const pipelineValue = safeNum(dashboard?.summary?.pipelineValue, 0);
+  const revenue = safeNum(dashboard?.summary?.revenue, 0);
+
+  const groupedAccounts = useMemo(() => {
+    const map = new Map();
+
+    deals.forEach((deal) => {
+      const key = String(deal.company || "Account").trim();
+      if (!map.has(key)) {
+        map.set(key, {
+          name: key,
+          engagement: 0,
+          expansion: 0,
+          industry: "Connected Account",
+          revenuePotential: 0,
+          revenueLabel: "$0",
+          buyingSignal: "Live deal activity detected",
+          priority: "Watchlist",
+          tone: "Watch",
+          dealCount: 0,
+          openCount: 0,
+        });
+      }
+
+      const row = map.get(key);
+      row.revenuePotential += safeNum(deal.amount, 0);
+      row.dealCount += 1;
+
+      if (!["Closed Won", "Closed Lost"].includes(deal.stage)) {
+        row.openCount += 1;
+      }
+    });
+
+    const arr = Array.from(map.values()).map((row, idx) => {
+      const engagementBase = 45 + Math.min(40, row.dealCount * 9 + row.openCount * 6);
+      const expansionBase =
+        row.revenuePotential > 0
+          ? Math.min(85, 40 + Math.round(row.revenuePotential / 10000))
+          : 0;
+
+      const priority =
+        row.revenuePotential >= 150000
+          ? "High Priority"
+          : row.revenuePotential >= 50000
+          ? "Expansion Watch"
+          : "Watchlist";
+
+      const tone =
+        row.revenuePotential >= 150000
+          ? "High"
+          : row.revenuePotential >= 50000
+          ? "Strong"
+          : "Watch";
+
+      return {
+        ...row,
+        engagement: engagementBase,
+        expansion: expansionBase,
+        revenueLabel: moneyCompact(row.revenuePotential),
+        buyingSignal:
+          row.openCount > 0
+            ? `${row.openCount} active opportunity${row.openCount === 1 ? "" : "ies"}`
+            : "No active opportunities",
+        priority,
+        tone,
+      };
+    });
+
+    arr.sort((a, b) => b.revenuePotential - a.revenuePotential);
+    return arr.slice(0, 6);
+  }, [deals]);
+
+  const accounts = groupedAccounts;
+
+  const hasLiveAccountData = accounts.length > 0;
+
+  const topStats = useMemo(() => {
+    const topEngagement = accounts.length
+      ? Math.max(...accounts.map((a) => safeNum(a.engagement, 0)))
+      : 0;
+
+    const topExpansion = accounts.length
+      ? Math.max(...accounts.map((a) => safeNum(a.expansion, 0)))
+      : 0;
+
+    const topPotential = accounts.reduce(
+      (sum, a) => sum + safeNum(a.revenuePotential, 0),
+      0
+    );
+
+    return [
+      {
+        label: "Top Opportunity Accounts",
+        value: String(accounts.length),
+        note: hasLiveAccountData
+          ? "Highest-priority live targets"
+          : "No live targets yet",
+      },
+      {
+        label: "Highest Engagement",
+        value: String(topEngagement),
+        note: hasLiveAccountData
+          ? "Current live peak score"
+          : "Waiting for account activity",
+      },
+      {
+        label: "Best Expansion Signal",
+        value: `${topExpansion}%`,
+        note: hasLiveAccountData
+          ? "Strongest account fit"
+          : "No expansion signal yet",
+      },
+      {
+        label: "Revenue Potential",
+        value: moneyCompact(topPotential),
+        note: hasLiveAccountData
+          ? "Near-term live upside"
+          : "No live upside yet",
+      },
+    ];
+  }, [accounts, hasLiveAccountData]);
+
+  const summaryPoints = useMemo(() => {
+    if (!hasLiveAccountData) {
+      return [
+        "No live account intelligence data is available for this workspace yet.",
+        "Account Intelligence will populate when deals, companies, and connected account activity begin flowing in.",
+        "This live workspace is no longer showing hardcoded demo account scores.",
+        "Once opportunities are active, Atlas will identify which accounts deserve the most attention.",
+      ];
+    }
+
+    const top = accounts[0];
+
+    return [
+      `${top.name} is currently the strongest near-term account based on live opportunity value.`,
+      `${accounts.length} account group${accounts.length === 1 ? "" : "s"} are currently being evaluated by Atlas.`,
+      `Total tracked revenue potential across surfaced accounts is ${moneyCompact(
+        accounts.reduce((sum, a) => sum + safeNum(a.revenuePotential, 0), 0)
+      )}.`,
+      "Atlas is prioritizing accounts using live deal concentration, opportunity count, and expansion potential.",
+    ];
+  }, [accounts, hasLiveAccountData]);
+
+  const opportunityRadar = useMemo(() => {
+    if (!hasLiveAccountData) {
+      return [
+        "Connect CRM and opportunity data to activate live account scoring.",
+        "Once account-level pipeline exists, Atlas will rank the best expansion targets here.",
+        "Stakeholder, engagement, and buying-signal logic can only activate after live account records exist.",
+        "This workspace is currently in live mode without account-fed opportunity intelligence.",
+      ];
+    }
+
+    return accounts.slice(0, 4).map((acct) => {
+      if (acct.priority === "High Priority") {
+        return `${acct.name} should move into an executive expansion motion immediately.`;
+      }
+      if (acct.priority === "Expansion Watch") {
+        return `${acct.name} has meaningful upside and should stay in active account review.`;
+      }
+      return `${acct.name} remains on the watchlist but needs stronger account momentum to rise.`;
+    });
+  }, [accounts, hasLiveAccountData]);
+
+  const nextMoves = useMemo(() => {
+    if (!hasLiveAccountData) {
+      return [
+        "Connect CRM account and deal sources so Atlas can calculate real account intelligence.",
+        "Add deal stages and company names consistently to improve account grouping quality.",
+        "Once opportunities are flowing, Atlas will generate next-best account moves automatically.",
+        "Use the connected workspace data model to map real account expansion signals.",
+      ];
+    }
+
+    return accounts.slice(0, 4).map((acct, index) => {
+      if (index === 0) {
+        return `Prioritize executive outreach on ${acct.name} first.`;
+      }
+      if (index === 1) {
+        return `Map buying roles and next-step motion for ${acct.name}.`;
+      }
+      if (index === 2) {
+        return `Keep ${acct.name} in active follow-up while monitoring deal movement.`;
+      }
+      return `Build an account-specific action plan for ${acct.name}.`;
+    });
+  }, [accounts, hasLiveAccountData]);
+
+  if (loading) {
+    return (
+      <div style={styles.page}>
+        <div style={styles.wrap}>
+          <div style={styles.hero}>
+            <h1 style={styles.h1}>Loading Account Intelligence...</h1>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={styles.page}>
+        <div style={styles.wrap}>
+          <div style={styles.errorBox}>{error}</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={styles.page}>
+      <div style={styles.wrap}>
+        <div style={styles.hero}>
+          <div style={styles.eyebrow}>Prioritize the Right Accounts</div>
+          <h1 style={styles.h1}>Account Intelligence</h1>
+          <div style={styles.heroText}>
+            Atlas identifies which accounts have the best combination of engagement,
+            expansion probability, and revenue upside so leadership can focus on the
+            right growth opportunities inside <b>{orgName}</b>.
+          </div>
+
+          <div style={styles.badgeWrap}>
+            {[
+              isDemo ? "Demo Account Mode" : "Live Account Mode",
+              hasLiveAccountData ? "Opportunity Radar Active" : "Opportunity Radar Waiting",
+              hasLiveAccountData ? "Expansion Signals Synced" : "Signals Pending",
+              "Atlas AI Monitoring",
+            ].map((item) => (
+              <div key={item} style={styles.badge}>
+                {item}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <AtlasAccountExpansionSignals clients={accounts} />
+
+        <div style={styles.statsGrid}>
+          {topStats.map((item) => (
+            <SmallStat
+              key={item.label}
+              label={item.label}
+              value={item.value}
+              note={item.note}
+            />
+          ))}
+        </div>
+
+        <div style={styles.twoCol}>
+          <Section title="Executive Summary" subtitle="Overview">
+            <div style={styles.summaryList}>
+              {summaryPoints.map((point) => (
+                <div key={point} style={styles.summaryItem}>
+                  {point}
+                </div>
+              ))}
+            </div>
+          </Section>
+
+          <Section title="Opportunity Radar" subtitle="Signals">
+            <div style={styles.summaryList}>
+              {opportunityRadar.map((point) => (
+                <div key={point} style={styles.summaryItem}>
+                  {point}
+                </div>
+              ))}
+            </div>
+          </Section>
+        </div>
+
+        <div style={styles.twoCol}>
+          <Section title="Revenue Potential by Account" subtitle="Upside">
+            <div style={styles.chartShell}>
+              {!hasLiveAccountData ? (
+                <EmptyState text="No live account revenue potential yet. Add company-linked opportunities to populate this chart." />
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={accounts} barCategoryGap={28}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                    <XAxis dataKey="name" tick={axisTick} stroke="#94a3b8" />
+                    <YAxis
+                      tick={axisTick}
+                      stroke="#94a3b8"
+                      tickFormatter={(v) => moneyCompact(v)}
+                    />
+                    <Tooltip
+                      formatter={(value) => [moneyCompact(value), "Revenue Potential"]}
+                      contentStyle={tooltipStyle}
+                      labelStyle={{ color: "#fff" }}
+                    />
+                    <Bar
+                      dataKey="revenuePotential"
+                      fill="#bffcff"
+                      radius={[12, 12, 0, 0]}
+                      animationDuration={1500}
+                      animationEasing="ease-out"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </Section>
+
+          <Section title="Engagement vs Expansion" subtitle="Positioning">
+            <div style={styles.chartShell}>
+              {!hasLiveAccountData ? (
+                <EmptyState text="No live engagement or expansion data yet. Connect opportunities and account activity to activate this view." />
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <ScatterChart margin={{ top: 12, right: 12, bottom: 6, left: 4 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
+                    <XAxis
+                      type="number"
+                      dataKey="engagement"
+                      name="Engagement"
+                      stroke="#94a3b8"
+                      tick={axisTick}
+                      domain={[0, 100]}
+                    />
+                    <YAxis
+                      type="number"
+                      dataKey="expansion"
+                      name="Expansion"
+                      stroke="#94a3b8"
+                      tick={axisTick}
+                      unit="%"
+                      domain={[0, 100]}
+                    />
+                    <ZAxis type="number" dataKey="revenuePotential" range={[140, 420]} />
+                    <Tooltip
+                      cursor={{ strokeDasharray: "3 3" }}
+                      formatter={(value, name) => {
+                        if (name === "revenuePotential") {
+                          return [moneyCompact(value), "Revenue Potential"];
+                        }
+                        if (name === "expansion") {
+                          return [`${value}%`, "Expansion"];
+                        }
+                        return [value, name];
+                      }}
+                      labelFormatter={() => ""}
+                      contentStyle={tooltipStyle}
+                    />
+                    <Scatter
+                      name="Accounts"
+                      data={accounts}
+                      fill="#bffcff"
+                      animationDuration={1500}
+                    />
+                  </ScatterChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </Section>
+        </div>
+
+        <div style={styles.twoCol}>
+          <Section title="Top Opportunity Accounts" subtitle="Accounts">
+            {!hasLiveAccountData ? (
+              <EmptyState text="No live accounts are being surfaced yet." />
+            ) : (
+              <div style={styles.accountList}>
+                {accounts.map((acct) => (
+                  <div key={acct.name} style={styles.accountCard}>
+                    <div style={styles.accountTop}>
+                      <div>
+                        <div style={styles.accountName}>{acct.name}</div>
+                        <div style={styles.accountMeta}>
+                          {acct.industry} • {acct.buyingSignal}
+                        </div>
+                      </div>
+                      <div style={toneStyle(acct.tone)}>{acct.priority}</div>
+                    </div>
+
+                    <div style={styles.accountGrid}>
+                      <div style={styles.mini}>
+                        <div style={styles.miniLabel}>Engagement</div>
+                        <div style={styles.miniValue}>{acct.engagement}</div>
+                      </div>
+                      <div style={styles.mini}>
+                        <div style={styles.miniLabel}>Expansion</div>
+                        <div style={styles.miniValue}>{acct.expansion}%</div>
+                      </div>
+                      <div style={styles.mini}>
+                        <div style={styles.miniLabel}>Revenue Potential</div>
+                        <div style={styles.miniValue}>{acct.revenueLabel}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
+
+          <Section title="Account Table" subtitle="Detail">
+            {!hasLiveAccountData ? (
+              <EmptyState text="No live account table data yet." />
+            ) : (
+              <div style={styles.tableWrap}>
+                <table style={styles.table}>
+                  <thead>
+                    <tr>
+                      <th style={styles.th}>Account</th>
+                      <th style={styles.th}>Industry</th>
+                      <th style={styles.th}>Engagement</th>
+                      <th style={styles.th}>Expansion</th>
+                      <th style={styles.th}>Potential</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {accounts.map((acct, idx) => (
+                      <tr key={acct.name}>
+                        <td style={styles.td}>
+                          <div style={{ fontWeight: 800, color: "#fff" }}>{acct.name}</div>
+                          <div style={{ marginTop: 6, color: "rgba(203,213,225,0.72)" }}>
+                            {acct.buyingSignal}
+                          </div>
+                        </td>
+                        <td style={styles.td}>{acct.industry}</td>
+                        <td style={styles.td}>{acct.engagement}</td>
+                        <td style={styles.td}>{acct.expansion}%</td>
+                        <td
+                          style={{
+                            ...styles.td,
+                            borderBottom:
+                              idx === accounts.length - 1
+                                ? "none"
+                                : "1px solid rgba(255,255,255,0.06)",
+                          }}
+                        >
+                          {acct.revenueLabel}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Section>
+        </div>
+
+        <Section title="Next Best Account Moves" subtitle="Priorities">
+          <div style={styles.summaryList}>
+            {nextMoves.map((move) => (
+              <div key={move} style={styles.summaryItem}>
+                {move}
+              </div>
+            ))}
+          </div>
+        </Section>
+      </div>
+    </div>
+  );
+}
 
 const styles = {
   page: {
@@ -316,287 +840,26 @@ const styles = {
     color: "#dbe4f0",
     verticalAlign: "top",
   },
-};
-
-function toneStyle(tone) {
-  const map = {
-    High: {
-      border: "1px solid rgba(16,185,129,0.22)",
-      background: "rgba(16,185,129,0.12)",
-      color: "#bbf7d0",
-    },
-    Strong: {
-      border: "1px solid rgba(56,189,248,0.22)",
-      background: "rgba(56,189,248,0.12)",
-      color: "#bae6fd",
-    },
-    Watch: {
-      border: "1px solid rgba(245,158,11,0.22)",
-      background: "rgba(245,158,11,0.12)",
-      color: "#fde68a",
-    },
-  };
-
-  return {
-    display: "inline-flex",
+  emptyState: {
+    minHeight: 180,
+    border: "1px dashed rgba(255,255,255,0.12)",
+    borderRadius: 14,
+    display: "flex",
     alignItems: "center",
-    padding: "7px 11px",
-    borderRadius: 999,
-    fontSize: 11,
-    fontWeight: 800,
-    whiteSpace: "nowrap",
-    ...(map[tone] || map.Strong),
-  };
-}
-
-function Section({ title, subtitle, children }) {
-  return (
-    <div style={styles.section}>
-      <div style={styles.sectionHead}>
-        {subtitle ? <div style={styles.sectionSub}>{subtitle}</div> : null}
-        <div style={styles.sectionTitle}>{title}</div>
-      </div>
-      <div style={styles.sectionBody}>{children}</div>
-    </div>
-  );
-}
-
-function SmallStat({ label, value, note }) {
-  return (
-    <div style={styles.statCard}>
-      <div style={styles.statLabel}>{label}</div>
-      <div style={styles.statValue}>{value}</div>
-      {note ? <div style={styles.statNote}>{note}</div> : null}
-    </div>
-  );
-}
-
-export default function AccountIntelligence() {
-  return (
-    <div style={styles.page}>
-      <div style={styles.wrap}>
-        <div style={styles.hero}>
-          <div style={styles.eyebrow}>Prioritize the Right Accounts</div>
-          <h1 style={styles.h1}>Account Intelligence</h1>
-          <div style={styles.heroText}>
-            Atlas identifies which accounts have the best combination of engagement,
-            expansion probability, and revenue upside so leadership can focus on the
-            right growth opportunities.
-          </div>
-
-          <div style={styles.badgeWrap}>
-            {[
-              "Opportunity Radar Active",
-              "Expansion Signals Synced",
-              "Atlas AI Monitoring",
-            ].map((item) => (
-              <div key={item} style={styles.badge}>
-                {item}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <AtlasAccountExpansionSignals clients={accounts} />
-
-        <div style={styles.statsGrid}>
-          {topStats.map((item) => (
-            <SmallStat
-              key={item.label}
-              label={item.label}
-              value={item.value}
-              note={item.note}
-            />
-          ))}
-        </div>
-
-        <div style={styles.twoCol}>
-          <Section title="Executive Summary" subtitle="Overview">
-            <div style={styles.summaryList}>
-              {summaryPoints.map((point) => (
-                <div key={point} style={styles.summaryItem}>
-                  {point}
-                </div>
-              ))}
-            </div>
-          </Section>
-
-          <Section title="Opportunity Radar" subtitle="Signals">
-            <div style={styles.summaryList}>
-              {opportunityRadar.map((point) => (
-                <div key={point} style={styles.summaryItem}>
-                  {point}
-                </div>
-              ))}
-            </div>
-          </Section>
-        </div>
-
-        <div style={styles.twoCol}>
-          <Section title="Revenue Potential by Account" subtitle="Upside">
-            <div style={styles.chartShell}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={accounts} barCategoryGap={28}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
-                  <XAxis dataKey="name" tick={axisTick} stroke="#94a3b8" />
-                  <YAxis
-                    tick={axisTick}
-                    stroke="#94a3b8"
-                    tickFormatter={(v) => moneyCompact(v)}
-                  />
-                  <Tooltip
-                    formatter={(value) => [moneyCompact(value), "Revenue Potential"]}
-                    contentStyle={tooltipStyle}
-                    labelStyle={{ color: "#fff" }}
-                  />
-                  <Bar
-                    dataKey="revenuePotential"
-                    fill="#bffcff"
-                    radius={[12, 12, 0, 0]}
-                    animationDuration={1500}
-                    animationEasing="ease-out"
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </Section>
-
-          <Section title="Engagement vs Expansion" subtitle="Positioning">
-            <div style={styles.chartShell}>
-              <ResponsiveContainer width="100%" height="100%">
-                <ScatterChart margin={{ top: 12, right: 12, bottom: 6, left: 4 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
-                  <XAxis
-                    type="number"
-                    dataKey="engagement"
-                    name="Engagement"
-                    stroke="#94a3b8"
-                    tick={axisTick}
-                    domain={[50, 100]}
-                  />
-                  <YAxis
-                    type="number"
-                    dataKey="expansion"
-                    name="Expansion"
-                    stroke="#94a3b8"
-                    tick={axisTick}
-                    unit="%"
-                    domain={[40, 100]}
-                  />
-                  <ZAxis type="number" dataKey="revenuePotential" range={[140, 420]} />
-                  <Tooltip
-                    cursor={{ strokeDasharray: "3 3" }}
-                    formatter={(value, name) => {
-                      if (name === "revenuePotential") {
-                        return [moneyCompact(value), "Revenue Potential"];
-                      }
-                      if (name === "expansion") {
-                        return [`${value}%`, "Expansion"];
-                      }
-                      return [value, name];
-                    }}
-                    labelFormatter={() => ""}
-                    contentStyle={tooltipStyle}
-                  />
-                  <Scatter
-                    name="Accounts"
-                    data={accounts}
-                    fill="#bffcff"
-                    animationDuration={1500}
-                  />
-                </ScatterChart>
-              </ResponsiveContainer>
-            </div>
-          </Section>
-        </div>
-
-        <div style={styles.twoCol}>
-          <Section title="Top Opportunity Accounts" subtitle="Accounts">
-            <div style={styles.accountList}>
-              {accounts.map((acct) => (
-                <div key={acct.name} style={styles.accountCard}>
-                  <div style={styles.accountTop}>
-                    <div>
-                      <div style={styles.accountName}>{acct.name}</div>
-                      <div style={styles.accountMeta}>
-                        {acct.industry} • {acct.buyingSignal}
-                      </div>
-                    </div>
-                    <div style={toneStyle(acct.tone)}>{acct.priority}</div>
-                  </div>
-
-                  <div style={styles.accountGrid}>
-                    <div style={styles.mini}>
-                      <div style={styles.miniLabel}>Engagement</div>
-                      <div style={styles.miniValue}>{acct.engagement}</div>
-                    </div>
-                    <div style={styles.mini}>
-                      <div style={styles.miniLabel}>Expansion</div>
-                      <div style={styles.miniValue}>{acct.expansion}%</div>
-                    </div>
-                    <div style={styles.mini}>
-                      <div style={styles.miniLabel}>Revenue Potential</div>
-                      <div style={styles.miniValue}>{acct.revenueLabel}</div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Section>
-
-          <Section title="Account Table" subtitle="Detail">
-            <div style={styles.tableWrap}>
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>Account</th>
-                    <th style={styles.th}>Industry</th>
-                    <th style={styles.th}>Engagement</th>
-                    <th style={styles.th}>Expansion</th>
-                    <th style={styles.th}>Potential</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {accounts.map((acct, idx) => (
-                    <tr key={acct.name}>
-                      <td style={styles.td}>
-                        <div style={{ fontWeight: 800, color: "#fff" }}>{acct.name}</div>
-                        <div style={{ marginTop: 6, color: "rgba(203,213,225,0.72)" }}>
-                          {acct.buyingSignal}
-                        </div>
-                      </td>
-                      <td style={styles.td}>{acct.industry}</td>
-                      <td style={styles.td}>{acct.engagement}</td>
-                      <td style={styles.td}>{acct.expansion}%</td>
-                      <td
-                        style={{
-                          ...styles.td,
-                          borderBottom:
-                            idx === accounts.length - 1
-                              ? "none"
-                              : "1px solid rgba(255,255,255,0.06)",
-                        }}
-                      >
-                        {acct.revenueLabel}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Section>
-        </div>
-
-        <Section title="Next Best Account Moves" subtitle="Priorities">
-          <div style={styles.summaryList}>
-            {nextMoves.map((move) => (
-              <div key={move} style={styles.summaryItem}>
-                {move}
-              </div>
-            ))}
-          </div>
-        </Section>
-      </div>
-    </div>
-  );
-}
+    justifyContent: "center",
+    padding: 18,
+    color: "rgba(226,232,240,0.78)",
+    fontSize: 14,
+    lineHeight: 1.6,
+    textAlign: "center",
+    background: "rgba(4,10,24,0.34)",
+  },
+  errorBox: {
+    border: "1px solid rgba(255,120,120,0.35)",
+    background: "rgba(255,0,0,0.10)",
+    color: "#FFD7D7",
+    borderRadius: 14,
+    padding: 16,
+    fontSize: 14,
+  },
+};
