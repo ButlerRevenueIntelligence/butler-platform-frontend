@@ -37,7 +37,11 @@ export default function Integrations() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const activeOrgName = getActiveOrgName();
+  const [activeOrgName, setActiveOrgNameState] = useState(getActiveOrgName());
+
+useEffect(() => {
+  setActiveOrgNameState(getActiveOrgName());
+}, [loading]);
 
   async function load() {
     try {
