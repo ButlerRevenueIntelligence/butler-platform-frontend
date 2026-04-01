@@ -23,22 +23,7 @@ const ROLE_RANK = {
   sales: 1,
 };
 
-const PLAN_RANK = {
-  ENTERPRISE: 3,
-  GROWTH: 2,
-  SCALE: 1,
-};
-
-const SORT_OPTIONS = {
-  active: "Active First",
-  access: "Highest Access",
-  name: "Name A-Z",
-  plan: "Highest Plan",
-  status: "Health Status",
-};
-
 const rankRole = (r) => ROLE_RANK[String(r || "").toLowerCase()] || 0;
-const rankPlan = (p) => PLAN_RANK[String(p || "").toUpperCase()] || 0;
 
 function roleTone(role) {
   const rank = rankRole(role);
@@ -49,82 +34,21 @@ function roleTone(role) {
   return "#A3A3A3";
 }
 
-function getAccessTone(accessStatus) {
-  const v = String(accessStatus || "").toLowerCase();
-  if (v === "active") return "#22c55e";
-  if (v === "pending") return "#f59e0b";
-  if (v === "suspended") return "#ef4444";
-  return "#94a3b8";
-}
+function scorePill(role) {
+  const tone = roleTone(role);
 
-function getPaymentTone(paymentStatus, billingStatus) {
-  const value = String(paymentStatus || billingStatus || "").toLowerCase();
-  if (value === "paid" || value === "active") return "#22c55e";
-  if (value === "pending" || value === "trialing") return "#f59e0b";
-  if (value === "past_due" || value === "canceled") return "#ef4444";
-  return "#94a3b8";
-}
-
-function getWorkspaceHealth(workspace) {
-  const access = String(workspace?.accessStatus || workspace?.status || "").toLowerCase();
-  const payment = String(
-    workspace?.paymentStatus || workspace?.billingStatus || ""
-  ).toLowerCase();
-
-  if (access === "suspended" || payment === "past_due" || payment === "canceled") {
-    return { label: "Needs Attention", color: "#ef4444", score: 1 };
-  }
-
-  if (access === "pending" || payment === "pending" || payment === "trialing") {
-    return { label: "Review Needed", color: "#f59e0b", score: 2 };
-  }
-
-  return { label: "Healthy", color: "#22c55e", score: 3 };
-}
-
-function pillStyle({ textColor = "#fff", borderColor, bgColor }) {
   return {
     fontSize: 11,
     fontWeight: 900,
     padding: "6px 10px",
     borderRadius: 999,
-    border: `1px solid ${borderColor}`,
-    background: bgColor,
-    color: textColor,
+    border: "1px solid rgba(255,255,255,0.10)",
+    background: "rgba(255,255,255,0.05)",
+    color: tone,
     display: "inline-flex",
     alignItems: "center",
     gap: 8,
-    whiteSpace: "nowrap",
   };
-}
-
-function RolePill({ role }) {
-  const tone = roleTone(role);
-  return (
-    <span
-      style={pillStyle({
-        textColor: tone,
-        borderColor: "rgba(255,255,255,0.10)",
-        bgColor: "rgba(255,255,255,0.05)",
-      })}
-    >
-      {String(role || "member").toUpperCase()}
-    </span>
-  );
-}
-
-function StatusPill({ label, color }) {
-  return (
-    <span
-      style={pillStyle({
-        textColor: color,
-        borderColor: `${color}55`,
-        bgColor: `${color}18`,
-      })}
-    >
-      {label}
-    </span>
-  );
 }
 
 function Section({ title, subtitle, children, rightSlot = null }) {
@@ -142,9 +66,40 @@ function Section({ title, subtitle, children, rightSlot = null }) {
   );
 }
 
-function StatCard({ label, value, note }) {
+function StatCard({ label, value, note, accent = "default" }) {
+  const accentMap = {
+    default: {
+      border: "1px solid rgba(255,255,255,0.08)",
+      background: "rgba(10,16,35,0.40)",
+    },
+    success: {
+      border: "1px solid rgba(34,197,94,0.20)",
+      background: "rgba(34,197,94,0.08)",
+    },
+    warning: {
+      border: "1px solid rgba(245,158,11,0.20)",
+      background: "rgba(245,158,11,0.08)",
+    },
+    danger: {
+      border: "1px solid rgba(239,68,68,0.20)",
+      background: "rgba(239,68,68,0.08)",
+    },
+    info: {
+      border: "1px solid rgba(56,189,248,0.20)",
+      background: "rgba(56,189,248,0.08)",
+    },
+  };
+
+  const style = accentMap[accent] || accentMap.default;
+
   return (
-    <div style={S.statCard}>
+    <div
+      style={{
+        ...S.statCard,
+        border: style.border,
+        background: style.background,
+      }}
+    >
       <div style={S.statLabel}>{label}</div>
       <div style={S.statValue}>{value}</div>
       <div style={S.statNote}>{note}</div>
@@ -167,6 +122,21 @@ function normalizeWorkspaceRow(row) {
 
   if (!orgId) return null;
 
+  const billingStatus =
+    workspace?.billing?.status ||
+    row.billingStatus ||
+    workspace?.paymentStatus ||
+    row.paymentStatus ||
+    "";
+
+  const accessStatus =
+    workspace?.accessStatus ||
+    row.accessStatus ||
+    row.status ||
+    workspace?.status ||
+    row.membershipStatus ||
+    "active";
+
   return {
     orgId: String(orgId),
     orgName:
@@ -177,23 +147,127 @@ function normalizeWorkspaceRow(row) {
       "Workspace",
     orgSlug: workspace?.slug || row.orgSlug || row.slug || "",
     role: row.role || row.orgRole || row.workspaceRole || "member",
-    status:
-      row.status ||
-      workspace?.status ||
-      row.membershipStatus ||
-      workspace?.accessStatus ||
-      row.accessStatus ||
-      "active",
+    status: accessStatus,
     plan: workspace?.plan || row.plan || "",
-    billingStatus: workspace?.billing?.status || row.billingStatus || "",
+    billingStatus,
     type: workspace?.type || row.type || "client",
-    accessStatus: workspace?.accessStatus || row.accessStatus || "active",
-    paymentStatus: workspace?.paymentStatus || row.paymentStatus || "",
-    companyWebsite: workspace?.companyWebsite || row.companyWebsite || "",
-    industry: workspace?.industry || row.industry || "",
-    createdAt: workspace?.createdAt || row.createdAt || null,
-    updatedAt: workspace?.updatedAt || row.updatedAt || null,
+    accessStatus,
+    paymentStatus:
+      workspace?.paymentStatus || row.paymentStatus || billingStatus || "",
+    integrationsConnected:
+      Number(
+        row.integrationsConnected ??
+          workspace?.integrationsConnected ??
+          workspace?.integrations?.connectedCount ??
+          0
+      ) || 0,
+    memberCount:
+      Number(row.memberCount ?? workspace?.memberCount ?? 0) || 0,
+    lastActivityAt:
+      row.lastActivityAt || workspace?.lastActivityAt || workspace?.updatedAt || null,
+    updatedAt: row.updatedAt || workspace?.updatedAt || null,
+    createdAt: row.createdAt || workspace?.createdAt || null,
   };
+}
+
+function getWorkspaceHealth(org) {
+  const access = String(org?.accessStatus || org?.status || "").toLowerCase();
+  const billing = String(
+    org?.billingStatus || org?.paymentStatus || ""
+  ).toLowerCase();
+
+  const hasActiveAccess =
+    access === "active" || access === "approved" || access === "live";
+
+  const billingGood =
+    !billing ||
+    billing === "paid" ||
+    billing === "active" ||
+    billing === "trialing" ||
+    billing === "converted";
+
+  if (!hasActiveAccess || billing === "past_due" || billing === "canceled") {
+    return "needs_attention";
+  }
+
+  if (hasActiveAccess && billingGood) {
+    return "healthy";
+  }
+
+  return "monitor";
+}
+
+function getWorkspaceHealthTone(health) {
+  if (health === "healthy") {
+    return {
+      label: "Healthy",
+      color: "#22C55E",
+      border: "1px solid rgba(34,197,94,0.30)",
+      background: "rgba(34,197,94,0.12)",
+      text: "#DCFCE7",
+    };
+  }
+
+  if (health === "monitor") {
+    return {
+      label: "Monitor",
+      color: "#F59E0B",
+      border: "1px solid rgba(245,158,11,0.30)",
+      background: "rgba(245,158,11,0.12)",
+      text: "#FEF3C7",
+    };
+  }
+
+  return {
+    label: "Needs Attention",
+    color: "#EF4444",
+    border: "1px solid rgba(239,68,68,0.30)",
+    background: "rgba(239,68,68,0.12)",
+    text: "#FEE2E2",
+  };
+}
+
+function healthPill(health) {
+  const tone = getWorkspaceHealthTone(health);
+
+  return {
+    fontSize: 11,
+    fontWeight: 900,
+    padding: "6px 10px",
+    borderRadius: 999,
+    border: tone.border,
+    background: tone.background,
+    color: tone.text,
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+  };
+}
+
+function buildAlerts(org) {
+  const alerts = [];
+  const access = String(org?.accessStatus || org?.status || "").toLowerCase();
+  const billing = String(
+    org?.billingStatus || org?.paymentStatus || ""
+  ).toLowerCase();
+
+  if (access && access !== "active") {
+    alerts.push("Access review");
+  }
+
+  if (billing === "past_due" || billing === "canceled") {
+    alerts.push("Billing issue");
+  }
+
+  if ((org?.integrationsConnected || 0) === 0) {
+    alerts.push("No integrations");
+  }
+
+  if ((org?.memberCount || 0) === 0) {
+    alerts.push("No team members");
+  }
+
+  return alerts;
 }
 
 export default function Workspaces() {
@@ -203,11 +277,11 @@ export default function Workspaces() {
   const [deletingId, setDeletingId] = useState("");
   const [creating, setCreating] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
+  const [search, setSearch] = useState("");
+  const [sortMode, setSortMode] = useState("active_first");
+  const [healthFilter, setHealthFilter] = useState("all");
   const [err, setErr] = useState("");
   const [success, setSuccess] = useState("");
-  const [query, setQuery] = useState("");
-  const [sortBy, setSortBy] = useState("active");
-  const [healthFilter, setHealthFilter] = useState("all");
 
   const [form, setForm] = useState({
     name: "",
@@ -250,7 +324,16 @@ export default function Workspaces() {
   const orgs = useMemo(() => {
     const normalized = (Array.isArray(orgsRaw) ? orgsRaw : [])
       .map(normalizeWorkspaceRow)
-      .filter(Boolean);
+      .filter(Boolean)
+      .map((o) => {
+        const health = getWorkspaceHealth(o);
+        const alerts = buildAlerts(o);
+        return {
+          ...o,
+          health,
+          alerts,
+        };
+      });
 
     const map = new Map();
 
@@ -282,10 +365,17 @@ export default function Workspaces() {
           type: current.type || o.type,
           accessStatus: current.accessStatus || o.accessStatus,
           paymentStatus: current.paymentStatus || o.paymentStatus,
-          companyWebsite: current.companyWebsite || o.companyWebsite,
-          industry: current.industry || o.industry,
-          createdAt: current.createdAt || o.createdAt,
+          integrationsConnected:
+            current.integrationsConnected || o.integrationsConnected,
+          memberCount: current.memberCount || o.memberCount,
+          lastActivityAt: current.lastActivityAt || o.lastActivityAt,
           updatedAt: current.updatedAt || o.updatedAt,
+          createdAt: current.createdAt || o.createdAt,
+          health: current.health || o.health,
+          alerts:
+            Array.isArray(current.alerts) && current.alerts.length
+              ? current.alerts
+              : o.alerts,
         });
       }
     }
@@ -293,14 +383,68 @@ export default function Workspaces() {
     return Array.from(map.values());
   }, [orgsRaw]);
 
+  const filteredOrgs = useMemo(() => {
+    let arr = [...orgs];
+
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      arr = arr.filter((o) => {
+        return (
+          String(o.orgName || "").toLowerCase().includes(q) ||
+          String(o.orgSlug || "").toLowerCase().includes(q) ||
+          String(o.plan || "").toLowerCase().includes(q) ||
+          String(o.type || "").toLowerCase().includes(q)
+        );
+      });
+    }
+
+    if (healthFilter !== "all") {
+      arr = arr.filter((o) => o.health === healthFilter);
+    }
+
+    arr.sort((a, b) => {
+      if (sortMode === "active_first") {
+        const aActive = String(a.orgId) === String(activeOrgId) ? 1 : 0;
+        const bActive = String(b.orgId) === String(activeOrgId) ? 1 : 0;
+        if (aActive !== bActive) return bActive - aActive;
+        const rr = rankRole(b.role) - rankRole(a.role);
+        if (rr !== 0) return rr;
+        return String(a.orgName || "").localeCompare(String(b.orgName || ""));
+      }
+
+      if (sortMode === "name_asc") {
+        return String(a.orgName || "").localeCompare(String(b.orgName || ""));
+      }
+
+      if (sortMode === "name_desc") {
+        return String(b.orgName || "").localeCompare(String(a.orgName || ""));
+      }
+
+      if (sortMode === "health_first") {
+        const healthRank = { healthy: 3, monitor: 2, needs_attention: 1 };
+        const hr = (healthRank[b.health] || 0) - (healthRank[a.health] || 0);
+        if (hr !== 0) return hr;
+        return String(a.orgName || "").localeCompare(String(b.orgName || ""));
+      }
+
+      return 0;
+    });
+
+    return arr;
+  }, [orgs, search, healthFilter, sortMode, activeOrgId]);
+
   const activeOrg =
     orgs.find((o) => String(o.orgId) === String(activeOrgId)) ||
     (activeWorkspace
-      ? normalizeWorkspaceRow({
-          workspace: activeWorkspace,
-          role: "member",
-          status: "active",
-        })
+      ? {
+          ...normalizeWorkspaceRow({
+            workspace: activeWorkspace,
+            role: "member",
+            status: "active",
+          }),
+          health: "healthy",
+          alerts: [],
+        }
       : null);
 
   const stats = useMemo(() => {
@@ -308,16 +452,12 @@ export default function Workspaces() {
     const owners = orgs.filter(
       (o) => String(o.role || "").toLowerCase() === "owner"
     ).length;
-    const admins = orgs.filter(
-      (o) => String(o.role || "").toLowerCase() === "admin"
+    const healthy = orgs.filter((o) => o.health === "healthy").length;
+    const needsAttention = orgs.filter(
+      (o) => o.health === "needs_attention"
     ).length;
-    const managers = orgs.filter(
-      (o) => String(o.role || "").toLowerCase() === "manager"
-    ).length;
-    const healthy = orgs.filter((o) => getWorkspaceHealth(o).score === 3).length;
-    const attention = orgs.filter((o) => getWorkspaceHealth(o).score === 1).length;
 
-    return { total, owners, admins, managers, healthy, attention };
+    return { total, owners, healthy, needsAttention };
   }, [orgs]);
 
   const workspaceBriefing = useMemo(() => {
@@ -326,8 +466,7 @@ export default function Workspaces() {
     }
 
     if (activeOrg) {
-      const health = getWorkspaceHealth(activeOrg);
-      return `Global HQ is currently tracking ${stats.total} workspace environments. The active workspace is ${activeOrg.orgName || activeOrgName || "Current Workspace"}, where your role is ${activeOrg.role || "member"}. Current workspace health is ${health.label.toLowerCase()}. Use this hub to switch organizations, create new environments, and manage workspace context.`;
+      return `Global HQ is currently tracking ${stats.total} workspace environments. The active workspace is ${activeOrg.orgName || activeOrgName || "Current Workspace"}, where your role is ${activeOrg.role || "member"}. Current workspace health is ${getWorkspaceHealthTone(activeOrg.health).label.toLowerCase()}. Use this hub to switch organizations, create new environments, and manage workspace context.`;
     }
 
     return `Global HQ is currently tracking ${stats.total} workspace environments. Select a workspace to activate the correct organization context and x-org-id header.`;
@@ -338,76 +477,6 @@ export default function Workspaces() {
       .sort((a, b) => rankRole(b.role) - rankRole(a.role))
       .slice(0, 3);
   }, [orgs]);
-
-  const filteredOrgs = useMemo(() => {
-    let arr = [...orgs];
-
-    if (query.trim()) {
-      const q = query.trim().toLowerCase();
-      arr = arr.filter((o) =>
-        [
-          o.orgName,
-          o.orgSlug,
-          o.plan,
-          o.role,
-          o.type,
-          o.industry,
-          o.companyWebsite,
-          o.accessStatus,
-          o.paymentStatus,
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase()
-          .includes(q)
-      );
-    }
-
-    if (healthFilter !== "all") {
-      arr = arr.filter((o) => {
-        const health = getWorkspaceHealth(o).label;
-        if (healthFilter === "healthy") return health === "Healthy";
-        if (healthFilter === "review") return health === "Review Needed";
-        if (healthFilter === "attention") return health === "Needs Attention";
-        return true;
-      });
-    }
-
-    arr.sort((a, b) => {
-      if (sortBy === "active") {
-        const aActive = String(a.orgId) === String(activeOrgId) ? 1 : 0;
-        const bActive = String(b.orgId) === String(activeOrgId) ? 1 : 0;
-        if (aActive !== bActive) return bActive - aActive;
-
-        const rr = rankRole(b.role) - rankRole(a.role);
-        if (rr !== 0) return rr;
-
-        return String(a.orgName || "").localeCompare(String(b.orgName || ""));
-      }
-
-      if (sortBy === "access") {
-        const rr = rankRole(b.role) - rankRole(a.role);
-        if (rr !== 0) return rr;
-        return String(a.orgName || "").localeCompare(String(b.orgName || ""));
-      }
-
-      if (sortBy === "plan") {
-        const pr = rankPlan(b.plan) - rankPlan(a.plan);
-        if (pr !== 0) return pr;
-        return String(a.orgName || "").localeCompare(String(b.orgName || ""));
-      }
-
-      if (sortBy === "status") {
-        const hs = getWorkspaceHealth(b).score - getWorkspaceHealth(a).score;
-        if (hs !== 0) return hs;
-        return String(a.orgName || "").localeCompare(String(b.orgName || ""));
-      }
-
-      return String(a.orgName || "").localeCompare(String(b.orgName || ""));
-    });
-
-    return arr;
-  }, [orgs, query, sortBy, healthFilter, activeOrgId]);
 
   function updateForm(key, value) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -576,21 +645,25 @@ export default function Workspaces() {
             label="Total Workspaces"
             value={stats.total}
             note="Organization environments available to this user."
+            accent="info"
           />
           <StatCard
             label="Owner Roles"
             value={stats.owners}
             note="Workspaces where this user has owner-level access."
+            accent="success"
           />
           <StatCard
             label="Healthy Workspaces"
             value={stats.healthy}
             note="Workspaces with active access and healthy billing."
+            accent="success"
           />
           <StatCard
             label="Needs Attention"
-            value={stats.attention}
+            value={stats.needsAttention}
             note="Workspaces that may need billing or access review."
+            accent={stats.needsAttention > 0 ? "danger" : "default"}
           />
         </div>
 
@@ -618,19 +691,27 @@ export default function Workspaces() {
                 </>
               ) : null}
             </div>
-            <div style={{ ...S.currentSub, display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
-              <StatusPill
-                label={`Access ${activeOrg.accessStatus || "active"}`}
-                color={getAccessTone(activeOrg.accessStatus)}
-              />
-              <StatusPill
-                label={`Billing ${activeOrg.paymentStatus || activeOrg.billingStatus || "unknown"}`}
-                color={getPaymentTone(activeOrg.paymentStatus, activeOrg.billingStatus)}
-              />
-              <StatusPill
-                label={getWorkspaceHealth(activeOrg).label}
-                color={getWorkspaceHealth(activeOrg).color}
-              />
+
+            <div style={S.currentHealthRow}>
+              <div style={healthPill(activeOrg.health)}>
+                {getWorkspaceHealthTone(activeOrg.health).label}
+              </div>
+
+              {String(activeOrg.accessStatus || "").toLowerCase() === "active" ? (
+                <div style={S.goodPill}>Access active</div>
+              ) : null}
+
+              {["paid", "active", "trialing", "converted"].includes(
+                String(
+                  activeOrg.billingStatus || activeOrg.paymentStatus || ""
+                ).toLowerCase()
+              ) ? (
+                <div style={S.goodPill}>Billing paid</div>
+              ) : null}
+            </div>
+
+            <div style={S.currentSub}>
+              This workspace is currently setting the active <b>x-org-id</b> context.
             </div>
           </div>
         ) : null}
@@ -658,12 +739,11 @@ export default function Workspaces() {
                 </div>
                 <div style={S.summaryItem}>
                   Access distribution includes <b>{stats.owners}</b> owner roles,{" "}
-                  <b>{stats.admins}</b> admin roles, and <b>{stats.managers}</b> manager
-                  roles.
+                  <b>0</b> admin roles, and <b>0</b> manager roles.
                 </div>
                 <div style={S.summaryItem}>
-                  <b>{stats.healthy}</b> workspace{stats.healthy === 1 ? "" : "s"} currently
-                  look healthy, while <b>{stats.attention}</b> need closer review.
+                  <b>{stats.healthy}</b> workspaces currently look healthy, while{" "}
+                  <b>{stats.needsAttention}</b> need closer review.
                 </div>
                 <div style={S.summaryItem}>
                   Switching here updates the active workspace and the platform’s effective
@@ -678,7 +758,6 @@ export default function Workspaces() {
               <div style={S.leaderList}>
                 {topAccessOrgs.map((o, idx) => {
                   const isActive = String(o.orgId) === String(activeOrgId);
-                  const health = getWorkspaceHealth(o);
 
                   return (
                     <div key={o.orgId || idx} style={S.leaderCard}>
@@ -691,15 +770,17 @@ export default function Workspaces() {
                           </div>
                         </div>
 
-                        <RolePill role={o.role} />
+                        <div style={scorePill(o.role)}>
+                          {String(o.role || "member").toUpperCase()}
+                        </div>
                       </div>
 
                       <div style={S.leaderBottom}>
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                          <div style={S.tag}>
-                            {isActive ? "Active Workspace" : "Available Workspace"}
-                          </div>
-                          <StatusPill label={health.label} color={health.color} />
+                        <div style={S.tag}>
+                          {isActive ? "Active Workspace" : "Available Workspace"}
+                        </div>
+                        <div style={healthPill(o.health)}>
+                          {getWorkspaceHealthTone(o.health).label}
                         </div>
                       </div>
                     </div>
@@ -827,7 +908,8 @@ export default function Workspaces() {
             </form>
           ) : (
             <div style={S.emptyBox}>
-              Create additional environments for clients, business units, or internal operating scopes.
+              Create additional environments for clients, business units, or internal
+              operating scopes.
             </div>
           )}
         </Section>
@@ -838,22 +920,23 @@ export default function Workspaces() {
           rightSlot={
             <div style={S.toolbar}>
               <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search workspaces"
                 style={S.toolbarInput}
               />
+
               <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
+                value={sortMode}
+                onChange={(e) => setSortMode(e.target.value)}
                 style={S.toolbarSelect}
               >
-                {Object.entries(SORT_OPTIONS).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
+                <option value="active_first">Active First</option>
+                <option value="name_asc">Name A-Z</option>
+                <option value="name_desc">Name Z-A</option>
+                <option value="health_first">Health First</option>
               </select>
+
               <select
                 value={healthFilter}
                 onChange={(e) => setHealthFilter(e.target.value)}
@@ -861,15 +944,15 @@ export default function Workspaces() {
               >
                 <option value="all">All Health</option>
                 <option value="healthy">Healthy</option>
-                <option value="review">Review Needed</option>
-                <option value="attention">Needs Attention</option>
+                <option value="monitor">Monitor</option>
+                <option value="needs_attention">Needs Attention</option>
               </select>
             </div>
           }
         >
           {!loading && !filteredOrgs.length ? (
             <div style={S.emptyBox}>
-              No workspaces matched your current filters.
+              No workspaces match your current filters.
             </div>
           ) : null}
 
@@ -880,7 +963,6 @@ export default function Workspaces() {
               const isDeleting = deletingId === o.orgId;
               const canDelete =
                 !isActive && String(o.role || "").toLowerCase() === "owner";
-              const health = getWorkspaceHealth(o);
 
               return (
                 <div
@@ -911,16 +993,13 @@ export default function Workspaces() {
                             {" • "}Type: <b>{o.type}</b>
                           </>
                         ) : null}
-                        {o.industry ? (
-                          <>
-                            {" • "}Industry: <b>{o.industry}</b>
-                          </>
-                        ) : null}
                       </div>
                     </div>
 
                     <div style={S.itemRight}>
-                      <RolePill role={o.role} />
+                      <div style={scorePill(o.role)}>
+                        {String(o.role || "member").toUpperCase()}
+                      </div>
                       <div style={S.tag}>
                         {isActive ? "Active Workspace" : "Available Workspace"}
                       </div>
@@ -928,15 +1007,23 @@ export default function Workspaces() {
                   </div>
 
                   <div style={S.healthRow}>
-                    <StatusPill
-                      label={`Access ${o.accessStatus || "active"}`}
-                      color={getAccessTone(o.accessStatus)}
-                    />
-                    <StatusPill
-                      label={`Billing ${o.paymentStatus || o.billingStatus || "unknown"}`}
-                      color={getPaymentTone(o.paymentStatus, o.billingStatus)}
-                    />
-                    <StatusPill label={health.label} color={health.color} />
+                    {String(o.accessStatus || "").toLowerCase() === "active" ? (
+                      <div style={S.goodPill}>Access active</div>
+                    ) : (
+                      <div style={S.warnPill}>Access review</div>
+                    )}
+
+                    {["paid", "active", "trialing", "converted"].includes(
+                      String(o.billingStatus || o.paymentStatus || "").toLowerCase()
+                    ) ? (
+                      <div style={S.goodPill}>Billing paid</div>
+                    ) : (
+                      <div style={S.warnPill}>Billing review</div>
+                    )}
+
+                    <div style={healthPill(o.health)}>
+                      {getWorkspaceHealthTone(o.health).label}
+                    </div>
                   </div>
 
                   <div style={S.itemFoot}>
@@ -1103,8 +1190,6 @@ const S = {
   statCard: {
     borderRadius: 16,
     padding: "14px 14px 13px",
-    border: "1px solid rgba(255,255,255,0.08)",
-    background: "rgba(10,16,35,0.40)",
     boxShadow: "0 10px 24px rgba(0,0,0,0.14)",
     minHeight: 126,
   },
@@ -1154,9 +1239,16 @@ const S = {
     lineHeight: 1.5,
   },
   currentSub: {
-    marginTop: 6,
+    marginTop: 8,
     opacity: 0.78,
     fontSize: 12,
+  },
+  currentHealthRow: {
+    marginTop: 12,
+    display: "flex",
+    gap: 10,
+    flexWrap: "wrap",
+    alignItems: "center",
   },
   error: {
     padding: 12,
@@ -1255,6 +1347,8 @@ const S = {
     marginTop: 12,
     display: "flex",
     justifyContent: "flex-start",
+    gap: 8,
+    flexWrap: "wrap",
   },
   formGrid: {
     display: "grid",
@@ -1324,6 +1418,29 @@ const S = {
     background: "linear-gradient(90deg,#22c55e,#16a34a)",
     color: "#fff",
   },
+  toolbar: {
+    display: "flex",
+    gap: 10,
+    flexWrap: "wrap",
+    alignItems: "center",
+  },
+  toolbarInput: {
+    minWidth: 220,
+    padding: "12px 14px",
+    borderRadius: 12,
+    border: "1px solid rgba(255,255,255,0.14)",
+    background: "rgba(255,255,255,0.05)",
+    color: "#fff",
+    outline: "none",
+  },
+  toolbarSelect: {
+    padding: "12px 14px",
+    borderRadius: 12,
+    border: "1px solid rgba(255,255,255,0.14)",
+    background: "rgba(255,255,255,0.05)",
+    color: "#fff",
+    outline: "none",
+  },
   list: {
     display: "grid",
     gap: 10,
@@ -1377,17 +1494,17 @@ const S = {
     fontSize: 12,
     lineHeight: 1.45,
   },
-  healthRow: {
-    display: "flex",
-    gap: 8,
-    flexWrap: "wrap",
-    marginTop: 12,
-  },
   actionRow: {
     display: "flex",
     gap: 10,
     marginTop: 14,
     flexWrap: "wrap",
+  },
+  healthRow: {
+    display: "flex",
+    gap: 8,
+    flexWrap: "wrap",
+    marginTop: 12,
   },
   tag: {
     fontSize: 11,
@@ -1396,6 +1513,30 @@ const S = {
     borderRadius: 999,
     background: "rgba(255,255,255,0.05)",
     border: "1px solid rgba(255,255,255,0.10)",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+  },
+  goodPill: {
+    fontSize: 11,
+    fontWeight: 900,
+    padding: "6px 10px",
+    borderRadius: 999,
+    border: "1px solid rgba(34,197,94,0.30)",
+    background: "rgba(34,197,94,0.12)",
+    color: "#DCFCE7",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+  },
+  warnPill: {
+    fontSize: 11,
+    fontWeight: 900,
+    padding: "6px 10px",
+    borderRadius: 999,
+    border: "1px solid rgba(245,158,11,0.30)",
+    background: "rgba(245,158,11,0.12)",
+    color: "#FEF3C7",
     display: "inline-flex",
     alignItems: "center",
     gap: 8,
@@ -1409,28 +1550,5 @@ const S = {
     lineHeight: 1.6,
     color: "#dbe4f0",
     opacity: 0.9,
-  },
-  toolbar: {
-    display: "flex",
-    gap: 8,
-    flexWrap: "wrap",
-    alignItems: "center",
-  },
-  toolbarInput: {
-    minWidth: 220,
-    padding: "10px 12px",
-    borderRadius: 10,
-    border: "1px solid rgba(255,255,255,0.12)",
-    background: "rgba(255,255,255,0.05)",
-    color: "#fff",
-    outline: "none",
-  },
-  toolbarSelect: {
-    padding: "10px 12px",
-    borderRadius: 10,
-    border: "1px solid rgba(255,255,255,0.12)",
-    background: "rgba(255,255,255,0.05)",
-    color: "#fff",
-    outline: "none",
   },
 };
