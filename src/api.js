@@ -508,7 +508,7 @@ export const generateInsights = (payload) =>
 
 // -------------------- Orgs / Legacy --------------------
 export const getMyOrgs = async () => {
-  const res = await apiGet("/org/mine");
+  const res = await apiGet("/organizations/mine");
 
   const list = Array.isArray(res?.orgs)
     ? res.orgs
@@ -518,7 +518,9 @@ export const getMyOrgs = async () => {
 
   if (!getActiveOrgId()) {
     const first = list?.[0];
-    const firstId = oid(first?._id || first?.id || first?.orgId || first?.workspaceId);
+    const firstId = oid(
+      first?._id || first?.id || first?.orgId || first?.workspaceId
+    );
     const firstName =
       first?.name ||
       first?.orgName ||
