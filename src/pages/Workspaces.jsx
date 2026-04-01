@@ -23,7 +23,22 @@ const ROLE_RANK = {
   sales: 1,
 };
 
+const PLAN_RANK = {
+  ENTERPRISE: 3,
+  GROWTH: 2,
+  SCALE: 1,
+};
+
+const SORT_OPTIONS = {
+  active: "Active First",
+  access: "Highest Access",
+  name: "Name A-Z",
+  plan: "Highest Plan",
+  status: "Health Status",
+};
+
 const rankRole = (r) => ROLE_RANK[String(r || "").toLowerCase()] || 0;
+const rankPlan = (p) => PLAN_RANK[String(p || "").toUpperCase()] || 0;
 
 function roleTone(role) {
   const rank = rankRole(role);
@@ -34,21 +49,82 @@ function roleTone(role) {
   return "#A3A3A3";
 }
 
-function scorePill(role) {
-  const tone = roleTone(role);
+function getAccessTone(accessStatus) {
+  const v = String(accessStatus || "").toLowerCase();
+  if (v === "active") return "#22c55e";
+  if (v === "pending") return "#f59e0b";
+  if (v === "suspended") return "#ef4444";
+  return "#94a3b8";
+}
 
+function getPaymentTone(paymentStatus, billingStatus) {
+  const value = String(paymentStatus || billingStatus || "").toLowerCase();
+  if (value === "paid" || value === "active") return "#22c55e";
+  if (value === "pending" || value === "trialing") return "#f59e0b";
+  if (value === "past_due" || value === "canceled") return "#ef4444";
+  return "#94a3b8";
+}
+
+function getWorkspaceHealth(workspace) {
+  const access = String(workspace?.accessStatus || workspace?.status || "").toLowerCase();
+  const payment = String(
+    workspace?.paymentStatus || workspace?.billingStatus || ""
+  ).toLowerCase();
+
+  if (access === "suspended" || payment === "past_due" || payment === "canceled") {
+    return { label: "Needs Attention", color: "#ef4444", score: 1 };
+  }
+
+  if (access === "pending" || payment === "pending" || payment === "trialing") {
+    return { label: "Review Needed", color: "#f59e0b", score: 2 };
+  }
+
+  return { label: "Healthy", color: "#22c55e", score: 3 };
+}
+
+function pillStyle({ textColor = "#fff", borderColor, bgColor }) {
   return {
     fontSize: 11,
     fontWeight: 900,
     padding: "6px 10px",
     borderRadius: 999,
-    border: "1px solid rgba(255,255,255,0.10)",
-    background: "rgba(255,255,255,0.05)",
-    color: tone,
+    border: `1px solid ${borderColor}`,
+    background: bgColor,
+    color: textColor,
     display: "inline-flex",
     alignItems: "center",
     gap: 8,
+    whiteSpace: "nowrap",
   };
+}
+
+function RolePill({ role }) {
+  const tone = roleTone(role);
+  return (
+    <span
+      style={pillStyle({
+        textColor: tone,
+        borderColor: "rgba(255,255,255,0.10)",
+        bgColor: "rgba(255,255,255,0.05)",
+      })}
+    >
+      {String(role || "member").toUpperCase()}
+    </span>
+  );
+}
+
+function StatusPill({ label, color }) {
+  return (
+    <span
+      style={pillStyle({
+        textColor: color,
+        borderColor: `${color}55`,
+        bgColor: `${color}18`,
+      })}
+    >
+      {label}
+    </span>
+  );
 }
 
 function Section({ title, subtitle, children, rightSlot = null }) {
@@ -113,6 +189,10 @@ function normalizeWorkspaceRow(row) {
     type: workspace?.type || row.type || "client",
     accessStatus: workspace?.accessStatus || row.accessStatus || "active",
     paymentStatus: workspace?.paymentStatus || row.paymentStatus || "",
+    companyWebsite: workspace?.companyWebsite || row.companyWebsite || "",
+    industry: workspace?.industry || row.industry || "",
+    createdAt: workspace?.createdAt || row.createdAt || null,
+    updatedAt: workspace?.updatedAt || row.updatedAt || null,
   };
 }
 
@@ -125,6 +205,9 @@ export default function Workspaces() {
   const [showCreate, setShowCreate] = useState(false);
   const [err, setErr] = useState("");
   const [success, setSuccess] = useState("");
+  const [query, setQuery] = useState("");
+  const [sortBy, setSortBy] = useState("active");
+  const [healthFilter, setHealthFilter] = useState("all");
 
   const [form, setForm] = useState({
     name: "",
@@ -199,25 +282,16 @@ export default function Workspaces() {
           type: current.type || o.type,
           accessStatus: current.accessStatus || o.accessStatus,
           paymentStatus: current.paymentStatus || o.paymentStatus,
+          companyWebsite: current.companyWebsite || o.companyWebsite,
+          industry: current.industry || o.industry,
+          createdAt: current.createdAt || o.createdAt,
+          updatedAt: current.updatedAt || o.updatedAt,
         });
       }
     }
 
-    const arr = Array.from(map.values());
-
-    arr.sort((a, b) => {
-      const aActive = String(a.orgId) === String(activeOrgId) ? 1 : 0;
-      const bActive = String(b.orgId) === String(activeOrgId) ? 1 : 0;
-      if (aActive !== bActive) return bActive - aActive;
-
-      const rr = rankRole(b.role) - rankRole(a.role);
-      if (rr !== 0) return rr;
-
-      return String(a.orgName || "").localeCompare(String(b.orgName || ""));
-    });
-
-    return arr;
-  }, [orgsRaw, activeOrgId]);
+    return Array.from(map.values());
+  }, [orgsRaw]);
 
   const activeOrg =
     orgs.find((o) => String(o.orgId) === String(activeOrgId)) ||
@@ -240,8 +314,10 @@ export default function Workspaces() {
     const managers = orgs.filter(
       (o) => String(o.role || "").toLowerCase() === "manager"
     ).length;
+    const healthy = orgs.filter((o) => getWorkspaceHealth(o).score === 3).length;
+    const attention = orgs.filter((o) => getWorkspaceHealth(o).score === 1).length;
 
-    return { total, owners, admins, managers };
+    return { total, owners, admins, managers, healthy, attention };
   }, [orgs]);
 
   const workspaceBriefing = useMemo(() => {
@@ -250,7 +326,8 @@ export default function Workspaces() {
     }
 
     if (activeOrg) {
-      return `Global HQ is currently tracking ${stats.total} workspace environments. The active workspace is ${activeOrg.orgName || activeOrgName || "Current Workspace"}, where your role is ${activeOrg.role || "member"}. Use this hub to switch organizations, create new environments, and manage workspace context.`;
+      const health = getWorkspaceHealth(activeOrg);
+      return `Global HQ is currently tracking ${stats.total} workspace environments. The active workspace is ${activeOrg.orgName || activeOrgName || "Current Workspace"}, where your role is ${activeOrg.role || "member"}. Current workspace health is ${health.label.toLowerCase()}. Use this hub to switch organizations, create new environments, and manage workspace context.`;
     }
 
     return `Global HQ is currently tracking ${stats.total} workspace environments. Select a workspace to activate the correct organization context and x-org-id header.`;
@@ -261,6 +338,76 @@ export default function Workspaces() {
       .sort((a, b) => rankRole(b.role) - rankRole(a.role))
       .slice(0, 3);
   }, [orgs]);
+
+  const filteredOrgs = useMemo(() => {
+    let arr = [...orgs];
+
+    if (query.trim()) {
+      const q = query.trim().toLowerCase();
+      arr = arr.filter((o) =>
+        [
+          o.orgName,
+          o.orgSlug,
+          o.plan,
+          o.role,
+          o.type,
+          o.industry,
+          o.companyWebsite,
+          o.accessStatus,
+          o.paymentStatus,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(q)
+      );
+    }
+
+    if (healthFilter !== "all") {
+      arr = arr.filter((o) => {
+        const health = getWorkspaceHealth(o).label;
+        if (healthFilter === "healthy") return health === "Healthy";
+        if (healthFilter === "review") return health === "Review Needed";
+        if (healthFilter === "attention") return health === "Needs Attention";
+        return true;
+      });
+    }
+
+    arr.sort((a, b) => {
+      if (sortBy === "active") {
+        const aActive = String(a.orgId) === String(activeOrgId) ? 1 : 0;
+        const bActive = String(b.orgId) === String(activeOrgId) ? 1 : 0;
+        if (aActive !== bActive) return bActive - aActive;
+
+        const rr = rankRole(b.role) - rankRole(a.role);
+        if (rr !== 0) return rr;
+
+        return String(a.orgName || "").localeCompare(String(b.orgName || ""));
+      }
+
+      if (sortBy === "access") {
+        const rr = rankRole(b.role) - rankRole(a.role);
+        if (rr !== 0) return rr;
+        return String(a.orgName || "").localeCompare(String(b.orgName || ""));
+      }
+
+      if (sortBy === "plan") {
+        const pr = rankPlan(b.plan) - rankPlan(a.plan);
+        if (pr !== 0) return pr;
+        return String(a.orgName || "").localeCompare(String(b.orgName || ""));
+      }
+
+      if (sortBy === "status") {
+        const hs = getWorkspaceHealth(b).score - getWorkspaceHealth(a).score;
+        if (hs !== 0) return hs;
+        return String(a.orgName || "").localeCompare(String(b.orgName || ""));
+      }
+
+      return String(a.orgName || "").localeCompare(String(b.orgName || ""));
+    });
+
+    return arr;
+  }, [orgs, query, sortBy, healthFilter, activeOrgId]);
 
   function updateForm(key, value) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -436,14 +583,14 @@ export default function Workspaces() {
             note="Workspaces where this user has owner-level access."
           />
           <StatCard
-            label="Admin Roles"
-            value={stats.admins}
-            note="Workspaces where this user has admin-level access."
+            label="Healthy Workspaces"
+            value={stats.healthy}
+            note="Workspaces with active access and healthy billing."
           />
           <StatCard
-            label="Manager Roles"
-            value={stats.managers}
-            note="Workspaces where this user has manager-level operating access."
+            label="Needs Attention"
+            value={stats.attention}
+            note="Workspaces that may need billing or access review."
           />
         </div>
 
@@ -465,9 +612,25 @@ export default function Workspaces() {
                   {" • "}Plan: <b>{activeOrg.plan}</b>
                 </>
               ) : null}
+              {activeOrg.type ? (
+                <>
+                  {" • "}Type: <b>{activeOrg.type}</b>
+                </>
+              ) : null}
             </div>
-            <div style={S.currentSub}>
-              This workspace is currently setting the active <b>x-org-id</b> context.
+            <div style={{ ...S.currentSub, display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+              <StatusPill
+                label={`Access ${activeOrg.accessStatus || "active"}`}
+                color={getAccessTone(activeOrg.accessStatus)}
+              />
+              <StatusPill
+                label={`Billing ${activeOrg.paymentStatus || activeOrg.billingStatus || "unknown"}`}
+                color={getPaymentTone(activeOrg.paymentStatus, activeOrg.billingStatus)}
+              />
+              <StatusPill
+                label={getWorkspaceHealth(activeOrg).label}
+                color={getWorkspaceHealth(activeOrg).color}
+              />
             </div>
           </div>
         ) : null}
@@ -499,8 +662,8 @@ export default function Workspaces() {
                   roles.
                 </div>
                 <div style={S.summaryItem}>
-                  Global HQ ensures the correct organization context is applied before
-                  navigating the rest of Atlas.
+                  <b>{stats.healthy}</b> workspace{stats.healthy === 1 ? "" : "s"} currently
+                  look healthy, while <b>{stats.attention}</b> need closer review.
                 </div>
                 <div style={S.summaryItem}>
                   Switching here updates the active workspace and the platform’s effective
@@ -515,6 +678,7 @@ export default function Workspaces() {
               <div style={S.leaderList}>
                 {topAccessOrgs.map((o, idx) => {
                   const isActive = String(o.orgId) === String(activeOrgId);
+                  const health = getWorkspaceHealth(o);
 
                   return (
                     <div key={o.orgId || idx} style={S.leaderCard}>
@@ -527,14 +691,15 @@ export default function Workspaces() {
                           </div>
                         </div>
 
-                        <div style={scorePill(o.role)}>
-                          {String(o.role || "member").toUpperCase()}
-                        </div>
+                        <RolePill role={o.role} />
                       </div>
 
                       <div style={S.leaderBottom}>
-                        <div style={S.tag}>
-                          {isActive ? "Active Workspace" : "Available Workspace"}
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <div style={S.tag}>
+                            {isActive ? "Active Workspace" : "Available Workspace"}
+                          </div>
+                          <StatusPill label={health.label} color={health.color} />
                         </div>
                       </div>
                     </div>
@@ -560,7 +725,7 @@ export default function Workspaces() {
             </button>
           }
         >
-          {showCreate && (
+          {showCreate ? (
             <form onSubmit={handleCreateWorkspace} style={S.formGrid}>
               <div style={S.formGroup}>
                 <label style={S.label}>Workspace Name</label>
@@ -660,32 +825,62 @@ export default function Workspaces() {
                 </button>
               </div>
             </form>
+          ) : (
+            <div style={S.emptyBox}>
+              Create additional environments for clients, business units, or internal operating scopes.
+            </div>
           )}
         </Section>
 
-        <Section title="Workspace Directory" subtitle="Organization List">
-          {!loading && !orgs.length ? (
+        <Section
+          title="Workspace Directory"
+          subtitle="Organization List"
+          rightSlot={
+            <div style={S.toolbar}>
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search workspaces"
+                style={S.toolbarInput}
+              />
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                style={S.toolbarSelect}
+              >
+                {Object.entries(SORT_OPTIONS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={healthFilter}
+                onChange={(e) => setHealthFilter(e.target.value)}
+                style={S.toolbarSelect}
+              >
+                <option value="all">All Health</option>
+                <option value="healthy">Healthy</option>
+                <option value="review">Review Needed</option>
+                <option value="attention">Needs Attention</option>
+              </select>
+            </div>
+          }
+        >
+          {!loading && !filteredOrgs.length ? (
             <div style={S.emptyBox}>
-              No workspaces found.
-              <div style={{ marginTop: 10 }}>
-                <button
-                  onClick={() => setShowCreate(true)}
-                  style={S.primaryBtn}
-                  type="button"
-                >
-                  Create Your First Workspace
-                </button>
-              </div>
+              No workspaces matched your current filters.
             </div>
           ) : null}
 
           <div style={S.list}>
-            {orgs.map((o) => {
+            {filteredOrgs.map((o) => {
               const isActive = String(o.orgId) === String(activeOrgId);
               const isSwitching = switchingId === o.orgId;
               const isDeleting = deletingId === o.orgId;
               const canDelete =
                 !isActive && String(o.role || "").toLowerCase() === "owner";
+              const health = getWorkspaceHealth(o);
 
               return (
                 <div
@@ -716,17 +911,32 @@ export default function Workspaces() {
                             {" • "}Type: <b>{o.type}</b>
                           </>
                         ) : null}
+                        {o.industry ? (
+                          <>
+                            {" • "}Industry: <b>{o.industry}</b>
+                          </>
+                        ) : null}
                       </div>
                     </div>
 
                     <div style={S.itemRight}>
-                      <div style={scorePill(o.role)}>
-                        {String(o.role || "member").toUpperCase()}
-                      </div>
+                      <RolePill role={o.role} />
                       <div style={S.tag}>
                         {isActive ? "Active Workspace" : "Available Workspace"}
                       </div>
                     </div>
+                  </div>
+
+                  <div style={S.healthRow}>
+                    <StatusPill
+                      label={`Access ${o.accessStatus || "active"}`}
+                      color={getAccessTone(o.accessStatus)}
+                    />
+                    <StatusPill
+                      label={`Billing ${o.paymentStatus || o.billingStatus || "unknown"}`}
+                      color={getPaymentTone(o.paymentStatus, o.billingStatus)}
+                    />
+                    <StatusPill label={health.label} color={health.color} />
                   </div>
 
                   <div style={S.itemFoot}>
@@ -1086,6 +1296,7 @@ const S = {
     border: "none",
     background: "linear-gradient(90deg,#2563eb,#38bdf8)",
     color: "#fff",
+    cursor: "pointer",
   },
   secondaryBtn: {
     borderRadius: 10,
@@ -1103,6 +1314,7 @@ const S = {
     border: "1px solid rgba(239,68,68,0.35)",
     background: "rgba(239,68,68,0.10)",
     color: "#fff",
+    cursor: "pointer",
   },
   activeBtn: {
     borderRadius: 10,
@@ -1124,7 +1336,6 @@ const S = {
     background: "rgba(10,14,28,0.35)",
     color: "rgba(234,240,255,0.92)",
     transition: "all 0.2s ease",
-    cursor: "pointer",
   },
   itemActive: {
     background: "rgba(120,160,255,0.18)",
@@ -1166,6 +1377,12 @@ const S = {
     fontSize: 12,
     lineHeight: 1.45,
   },
+  healthRow: {
+    display: "flex",
+    gap: 8,
+    flexWrap: "wrap",
+    marginTop: 12,
+  },
   actionRow: {
     display: "flex",
     gap: 10,
@@ -1192,5 +1409,28 @@ const S = {
     lineHeight: 1.6,
     color: "#dbe4f0",
     opacity: 0.9,
+  },
+  toolbar: {
+    display: "flex",
+    gap: 8,
+    flexWrap: "wrap",
+    alignItems: "center",
+  },
+  toolbarInput: {
+    minWidth: 220,
+    padding: "10px 12px",
+    borderRadius: 10,
+    border: "1px solid rgba(255,255,255,0.12)",
+    background: "rgba(255,255,255,0.05)",
+    color: "#fff",
+    outline: "none",
+  },
+  toolbarSelect: {
+    padding: "10px 12px",
+    borderRadius: 10,
+    border: "1px solid rgba(255,255,255,0.12)",
+    background: "rgba(255,255,255,0.05)",
+    color: "#fff",
+    outline: "none",
   },
 };
