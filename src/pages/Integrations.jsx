@@ -4,6 +4,7 @@ import {
   connectIntegration,
   disconnectIntegration,
   getActiveOrgName,
+  getActiveWorkspace,
 } from "../api";
 
 const connectorCatalog = [
@@ -37,16 +38,23 @@ export default function Integrations() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const [activeOrgName, setActiveOrgNameState] = useState(getActiveOrgName());
+  const [activeOrgName, setActiveOrgNameState] = useState(() => {
+    const workspace = getActiveWorkspace();
+    return workspace?.name || getActiveOrgName() || "";
+  });
 
-useEffect(() => {
-  setActiveOrgNameState(getActiveOrgName());
-}, [loading]);
+  useEffect(() => {
+    const workspace = getActiveWorkspace();
+    setActiveOrgNameState(workspace?.name || getActiveOrgName() || "");
+  }, [loading]);
 
   async function load() {
     try {
       setLoading(true);
       setError("");
+
+      const workspace = getActiveWorkspace();
+      setActiveOrgNameState(workspace?.name || getActiveOrgName() || "");
 
       const data = await getIntegrations();
       const list = Array.isArray(data?.integrations) ? data.integrations : [];
