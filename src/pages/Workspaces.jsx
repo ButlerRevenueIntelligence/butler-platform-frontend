@@ -105,15 +105,14 @@ function normalizeWorkspaceRow(row) {
       row.status ||
       workspace?.status ||
       row.membershipStatus ||
+      workspace?.accessStatus ||
+      row.accessStatus ||
       "active",
     plan: workspace?.plan || row.plan || "",
-    billingStatus:
-      workspace?.billing?.status || row.billingStatus || "",
+    billingStatus: workspace?.billing?.status || row.billingStatus || "",
     type: workspace?.type || row.type || "client",
-    accessStatus:
-      workspace?.accessStatus || row.accessStatus || "active",
-    paymentStatus:
-      workspace?.paymentStatus || row.paymentStatus || "",
+    accessStatus: workspace?.accessStatus || row.accessStatus || "active",
+    paymentStatus: workspace?.paymentStatus || row.paymentStatus || "",
   };
 }
 
@@ -123,6 +122,7 @@ export default function Workspaces() {
   const [switchingId, setSwitchingId] = useState("");
   const [deletingId, setDeletingId] = useState("");
   const [creating, setCreating] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
   const [err, setErr] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -140,25 +140,25 @@ export default function Workspaces() {
   const activeOrgName = getActiveOrgName();
 
   async function load() {
-  try {
-    setLoading(true);
-    setErr("");
+    try {
+      setLoading(true);
+      setErr("");
 
-    const res = await getMyOrgs();
-    const rows = Array.isArray(res?.orgs)
-      ? res.orgs
-      : Array.isArray(res)
-      ? res
-      : [];
+      const res = await getMyOrgs();
+      const rows = Array.isArray(res?.orgs)
+        ? res.orgs
+        : Array.isArray(res)
+        ? res
+        : [];
 
-    setOrgsRaw(rows);
-  } catch (e) {
-    console.error(e);
-    setErr(e?.message || "Failed to load workspaces");
-  } finally {
-    setLoading(false);
+      setOrgsRaw(rows);
+    } catch (e) {
+      console.error(e);
+      setErr(e?.message || "Failed to load workspaces");
+    } finally {
+      setLoading(false);
+    }
   }
-}
 
   useEffect(() => {
     load();
@@ -196,6 +196,9 @@ export default function Workspaces() {
           status: current.status || o.status,
           plan: current.plan || o.plan,
           billingStatus: current.billingStatus || o.billingStatus,
+          type: current.type || o.type,
+          accessStatus: current.accessStatus || o.accessStatus,
+          paymentStatus: current.paymentStatus || o.paymentStatus,
         });
       }
     }
@@ -276,8 +279,10 @@ export default function Workspaces() {
       setErr("");
       setSuccess("");
 
+      const newWorkspaceName = form.name.trim();
+
       const created = await createWorkspace({
-        name: form.name.trim(),
+        name: newWorkspaceName,
         slug: form.slug.trim() || undefined,
         type: form.type,
         plan: form.plan,
@@ -309,7 +314,8 @@ export default function Workspaces() {
         industry: "",
       });
 
-      setSuccess("Workspace created successfully");
+      setShowCreate(false);
+      setSuccess(`Workspace "${newWorkspaceName}" created and activated`);
       await load();
     } catch (e) {
       console.error(e);
@@ -469,7 +475,18 @@ export default function Workspaces() {
         <div style={S.twoCol}>
           <Section title="Workspace Summary" subtitle="Overview">
             {!loading && !orgs.length ? (
-              <div style={S.emptyBox}>No workspaces found for this user.</div>
+              <div style={S.emptyBox}>
+                No workspaces found.
+                <div style={{ marginTop: 10 }}>
+                  <button
+                    onClick={() => setShowCreate(true)}
+                    style={S.primaryBtn}
+                    type="button"
+                  >
+                    Create Your First Workspace
+                  </button>
+                </div>
+              </div>
             ) : (
               <div style={S.summaryList}>
                 <div style={S.summaryItem}>
@@ -530,111 +547,136 @@ export default function Workspaces() {
           </Section>
         </div>
 
-        <Section title="Create Workspace" subtitle="Provision New Environment">
-          <form onSubmit={handleCreateWorkspace} style={S.formGrid}>
-            <div style={S.formGroup}>
-              <label style={S.label}>Workspace Name</label>
-              <input
-                style={S.input}
-                value={form.name}
-                onChange={(e) => updateForm("name", e.target.value)}
-                placeholder="Global Emerging Market Manager (GEMM)"
-              />
-            </div>
-
-            <div style={S.formGroup}>
-              <label style={S.label}>Custom Slug (optional)</label>
-              <input
-                style={S.input}
-                value={form.slug}
-                onChange={(e) => updateForm("slug", e.target.value)}
-                placeholder="gemm"
-              />
-            </div>
-
-            <div style={S.formRow}>
+        <Section
+          title="Create Workspace"
+          subtitle="Provision New Environment"
+          rightSlot={
+            <button
+              onClick={() => setShowCreate((v) => !v)}
+              style={S.secondaryBtn}
+              type="button"
+            >
+              {showCreate ? "Close" : "New Workspace"}
+            </button>
+          }
+        >
+          {showCreate && (
+            <form onSubmit={handleCreateWorkspace} style={S.formGrid}>
               <div style={S.formGroup}>
-                <label style={S.label}>Workspace Type</label>
-                <select
+                <label style={S.label}>Workspace Name</label>
+                <input
                   style={S.input}
-                  value={form.type}
-                  onChange={(e) => updateForm("type", e.target.value)}
-                >
-                  <option value="client">client</option>
-                  <option value="agency">agency</option>
-                </select>
+                  value={form.name}
+                  onChange={(e) => updateForm("name", e.target.value)}
+                  placeholder="Global Emerging Market Manager (GEMM)"
+                />
               </div>
 
               <div style={S.formGroup}>
-                <label style={S.label}>Plan</label>
-                <select
+                <label style={S.label}>Custom Slug (optional)</label>
+                <input
                   style={S.input}
-                  value={form.plan}
-                  onChange={(e) => updateForm("plan", e.target.value)}
-                >
-                  <option value="SCALE">SCALE</option>
-                  <option value="GROWTH">GROWTH</option>
-                  <option value="ENTERPRISE">ENTERPRISE</option>
-                </select>
+                  value={form.slug}
+                  onChange={(e) => updateForm("slug", e.target.value)}
+                  placeholder="gemm"
+                />
               </div>
-            </div>
 
-            <div style={S.formGroup}>
-              <label style={S.label}>Company Website</label>
-              <input
-                style={S.input}
-                value={form.companyWebsite}
-                onChange={(e) => updateForm("companyWebsite", e.target.value)}
-                placeholder="https://example.com"
-              />
-            </div>
+              <div style={S.formRow}>
+                <div style={S.formGroup}>
+                  <label style={S.label}>Workspace Type</label>
+                  <select
+                    style={S.input}
+                    value={form.type}
+                    onChange={(e) => updateForm("type", e.target.value)}
+                  >
+                    <option value="client">client</option>
+                    <option value="agency">agency</option>
+                  </select>
+                </div>
 
-            <div style={S.formGroup}>
-              <label style={S.label}>Industry</label>
-              <input
-                style={S.input}
-                value={form.industry}
-                onChange={(e) => updateForm("industry", e.target.value)}
-                placeholder="Finance"
-              />
-            </div>
+                <div style={S.formGroup}>
+                  <label style={S.label}>Plan</label>
+                  <select
+                    style={S.input}
+                    value={form.plan}
+                    onChange={(e) => updateForm("plan", e.target.value)}
+                  >
+                    <option value="SCALE">SCALE</option>
+                    <option value="GROWTH">GROWTH</option>
+                    <option value="ENTERPRISE">ENTERPRISE</option>
+                  </select>
+                </div>
+              </div>
 
-            <div style={S.formActions}>
-              <button
-                type="submit"
-                disabled={creating}
-                style={{
-                  ...S.primaryBtn,
-                  opacity: creating ? 0.7 : 1,
-                  cursor: creating ? "not-allowed" : "pointer",
-                }}
-              >
-                {creating ? "Creating Workspace..." : "Create Workspace"}
-              </button>
+              <div style={S.formGroup}>
+                <label style={S.label}>Company Website</label>
+                <input
+                  style={S.input}
+                  value={form.companyWebsite}
+                  onChange={(e) => updateForm("companyWebsite", e.target.value)}
+                  placeholder="https://example.com"
+                />
+              </div>
 
-              <button
-                type="button"
-                style={S.secondaryBtn}
-                onClick={() =>
-                  setForm({
-                    name: "",
-                    slug: "",
-                    type: "client",
-                    plan: "ENTERPRISE",
-                    companyWebsite: "",
-                    industry: "",
-                  })
-                }
-              >
-                Clear
-              </button>
-            </div>
-          </form>
+              <div style={S.formGroup}>
+                <label style={S.label}>Industry</label>
+                <input
+                  style={S.input}
+                  value={form.industry}
+                  onChange={(e) => updateForm("industry", e.target.value)}
+                  placeholder="Finance"
+                />
+              </div>
+
+              <div style={S.formActions}>
+                <button
+                  type="submit"
+                  disabled={creating}
+                  style={{
+                    ...S.primaryBtn,
+                    opacity: creating ? 0.7 : 1,
+                    cursor: creating ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {creating ? "Creating Workspace..." : "Create Workspace"}
+                </button>
+
+                <button
+                  type="button"
+                  style={S.secondaryBtn}
+                  onClick={() =>
+                    setForm({
+                      name: "",
+                      slug: "",
+                      type: "client",
+                      plan: "ENTERPRISE",
+                      companyWebsite: "",
+                      industry: "",
+                    })
+                  }
+                >
+                  Clear
+                </button>
+              </div>
+            </form>
+          )}
         </Section>
 
         <Section title="Workspace Directory" subtitle="Organization List">
           {!loading && !orgs.length ? (
-            <div style={S.emptyBox}>No workspaces found for this user.</div>
+            <div style={S.emptyBox}>
+              No workspaces found.
+              <div style={{ marginTop: 10 }}>
+                <button
+                  onClick={() => setShowCreate(true)}
+                  style={S.primaryBtn}
+                  type="button"
+                >
+                  Create Your First Workspace
+                </button>
+              </div>
+            </div>
           ) : null}
 
           <div style={S.list}>
@@ -708,8 +750,8 @@ export default function Workspaces() {
                         {isSwitching ? "Switching..." : "Switch Workspace"}
                       </button>
                     ) : (
-                      <button style={S.disabledBtn} disabled>
-                        Active
+                      <button style={S.activeBtn} disabled>
+                        Active Workspace
                       </button>
                     )}
 
@@ -1062,14 +1104,13 @@ const S = {
     background: "rgba(239,68,68,0.10)",
     color: "#fff",
   },
-  disabledBtn: {
+  activeBtn: {
     borderRadius: 10,
     padding: "12px 16px",
     fontWeight: 900,
-    border: "1px solid rgba(255,255,255,0.10)",
-    background: "rgba(255,255,255,0.05)",
-    color: "rgba(255,255,255,0.65)",
-    opacity: 0.8,
+    border: "1px solid rgba(34,197,94,0.35)",
+    background: "linear-gradient(90deg,#22c55e,#16a34a)",
+    color: "#fff",
   },
   list: {
     display: "grid",
@@ -1082,10 +1123,14 @@ const S = {
     border: "1px solid rgba(140,170,255,0.18)",
     background: "rgba(10,14,28,0.35)",
     color: "rgba(234,240,255,0.92)",
+    transition: "all 0.2s ease",
+    cursor: "pointer",
   },
   itemActive: {
     background: "rgba(120,160,255,0.18)",
-    border: "1px solid rgba(140,170,255,0.28)",
+    border: "1px solid rgba(140,170,255,0.35)",
+    boxShadow:
+      "0 0 0 1px rgba(140,170,255,0.25), 0 8px 30px rgba(37,99,235,0.25)",
   },
   itemTop: {
     display: "flex",
