@@ -4,7 +4,7 @@ import {
   getActiveOrgId,
   getActiveOrgName,
   getActiveWorkspace,
-  getWorkspaces,
+  getMyOrgs,
   createWorkspace,
   switchWorkspace,
   deleteWorkspace,
@@ -140,19 +140,25 @@ export default function Workspaces() {
   const activeOrgName = getActiveOrgName();
 
   async function load() {
-    try {
-      setLoading(true);
-      setErr("");
-      const res = await getWorkspaces();
-      const rows = Array.isArray(res?.workspaces) ? res.workspaces : [];
-      setOrgsRaw(rows);
-    } catch (e) {
-      console.error(e);
-      setErr(e?.message || "Failed to load workspaces");
-    } finally {
-      setLoading(false);
-    }
+  try {
+    setLoading(true);
+    setErr("");
+
+    const res = await getMyOrgs();
+    const rows = Array.isArray(res?.orgs)
+      ? res.orgs
+      : Array.isArray(res)
+      ? res
+      : [];
+
+    setOrgsRaw(rows);
+  } catch (e) {
+    console.error(e);
+    setErr(e?.message || "Failed to load workspaces");
+  } finally {
+    setLoading(false);
   }
+}
 
   useEffect(() => {
     load();
