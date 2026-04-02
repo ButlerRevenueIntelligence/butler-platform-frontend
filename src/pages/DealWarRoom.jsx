@@ -1,5 +1,5 @@
 // frontend/src/pages/DealWarRoom.jsx
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ResponsiveContainer,
   LineChart,
@@ -13,152 +13,8 @@ import {
   AreaChart,
   Area,
 } from "recharts";
-
+import { getDashboard } from "../api";
 import AtlasDealIntelligencePanel from "../components/atlas/AtlasDealIntelligencePanel";
-
-const topStats = [
-  {
-    label: "Weighted Pipeline",
-    value: "$4.85M",
-    note: "Probability-adjusted open pipeline",
-  },
-  {
-    label: "Late-Stage Exposure",
-    value: "$2.10M",
-    note: "Near-term forecast concentration",
-  },
-  {
-    label: "Win Probability",
-    value: "34%",
-    note: "Modeled close likelihood",
-  },
-  {
-    label: "Deals at Risk",
-    value: "5",
-    note: "Need executive attention",
-  },
-];
-
-const executiveSignals = [
-  "Three late-stage deals represent 58% of near-term forecast concentration.",
-  "Two enterprise opportunities have slipped decision dates in the last 10 days.",
-  "One high-value expansion deal is blocked by procurement timing.",
-  "Leadership attention should stay on blocker removal, owner accountability, and close-plan discipline.",
-];
-
-const stageCards = [
-  {
-    stage: "Discovery",
-    deals: 6,
-    value: "$1.20M",
-    note: "Healthy top-of-funnel motion",
-  },
-  {
-    stage: "Proposal",
-    deals: 4,
-    value: "$1.65M",
-    note: "Strong commercial engagement",
-  },
-  {
-    stage: "Negotiation",
-    deals: 3,
-    value: "$1.10M",
-    note: "Highest forecast impact",
-  },
-  {
-    stage: "Commit",
-    deals: 2,
-    value: "$740K",
-    note: "Needs tight close coordination",
-  },
-];
-
-const forecastTrend = [
-  { period: "30D", baseline: 1200000, commit: 1420000 },
-  { period: "60D", baseline: 1880000, commit: 2140000 },
-  { period: "90D", baseline: 2520000, commit: 2860000 },
-  { period: "120D", baseline: 3180000, commit: 3560000 },
-];
-
-const stagePressure = [
-  { name: "Discovery", value: 42 },
-  { name: "Proposal", value: 69 },
-  { name: "Negotiation", value: 84 },
-  { name: "Commit", value: 78 },
-];
-
-const dealTable = [
-  {
-    name: "Apex Manufacturing Expansion",
-    owner: "Armon",
-    stage: "Negotiation",
-    value: "$620K",
-    close: "42%",
-    risk: "Medium",
-    blocker: "Procurement approval",
-  },
-  {
-    name: "Nova Healthcare Rollout",
-    owner: "Sales Lead",
-    stage: "Commit",
-    value: "$410K",
-    close: "58%",
-    risk: "Medium",
-    blocker: "Decision timing",
-  },
-  {
-    name: "Titan Logistics Attribution Setup",
-    owner: "Growth Team",
-    stage: "Proposal",
-    value: "$285K",
-    close: "31%",
-    risk: "Low",
-    blocker: "Stakeholder alignment",
-  },
-  {
-    name: "Vertex Industrial Revenue OS",
-    owner: "Executive Team",
-    stage: "Negotiation",
-    value: "$770K",
-    close: "47%",
-    risk: "High",
-    blocker: "Budget confirmation",
-  },
-];
-
-const interventionQueue = [
-  {
-    title: "Reconfirm executive sponsor on Vertex Industrial",
-    detail:
-      "Budget approval is stalled and forecast concentration is too high to leave unaddressed.",
-    tone: "high",
-  },
-  {
-    title: "Lock a final commercial timeline for Nova Healthcare",
-    detail:
-      "Close confidence improves materially if legal and decision stakeholders are aligned this week.",
-    tone: "medium",
-  },
-  {
-    title: "Accelerate second-tier proposal opportunities",
-    detail:
-      "Pipeline diversification reduces overreliance on three near-term opportunities.",
-    tone: "medium",
-  },
-  {
-    title: "Run a close-plan review on all negotiation-stage deals",
-    detail:
-      "The current stage mix suggests pressure is clustering too heavily in late-stage motion.",
-    tone: "high",
-  },
-];
-
-const aiNotes = [
-  "Forecast quality is acceptable, but too much near-term revenue depends on a narrow deal cluster.",
-  "The most important move is reducing concentration risk, not simply adding more top-of-funnel volume.",
-  "Commit-stage confidence will improve with clearer owner accountability and decision date discipline.",
-  "War room reporting should stay focused on deal movement, blockers, executive ownership, and projected impact.",
-];
 
 const axisTick = { fill: "#9fb0d0", fontSize: 11 };
 
@@ -417,12 +273,52 @@ const styles = {
     lineHeight: 1.6,
     color: "#dbe4f0",
   },
+  emptyState: {
+    minHeight: 180,
+    border: "1px dashed rgba(255,255,255,0.12)",
+    borderRadius: 14,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 18,
+    color: "rgba(226,232,240,0.78)",
+    fontSize: 14,
+    lineHeight: 1.6,
+    textAlign: "center",
+    background: "rgba(4,10,24,0.34)",
+  },
+  errorBox: {
+    border: "1px solid rgba(255,120,120,0.35)",
+    background: "rgba(255,0,0,0.10)",
+    color: "#FFD7D7",
+    borderRadius: 14,
+    padding: 16,
+    fontSize: 14,
+  },
 };
 
+function safeNum(v, fallback = 0) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 function moneyCompact(num) {
-  if (num >= 1000000) return `$${(num / 1000000).toFixed(1)}M`;
-  if (num >= 1000) return `$${(num / 1000).toFixed(0)}K`;
-  return `$${num}`;
+  const n = safeNum(num);
+  if (n >= 1000000) return `$${(n / 1000000).toFixed(1)}M`;
+  if (n >= 1000) return `$${(n / 1000).toFixed(0)}K`;
+  return `$${n}`;
+}
+
+function normalizeStage(stage = "") {
+  const s = String(stage || "").toLowerCase();
+  if (s.includes("disc")) return "Discovery";
+  if (s.includes("prop")) return "Proposal";
+  if (s.includes("neg")) return "Negotiation";
+  if (s.includes("commit")) return "Commit";
+  if (s.includes("won")) return "Closed Won";
+  if (s.includes("lost")) return "Closed Lost";
+  if (s.includes("follow")) return "Follow-Up";
+  return stage || "Unknown";
 }
 
 function tonePill(tone) {
@@ -483,7 +379,468 @@ function SmallStat({ label, value, note }) {
   );
 }
 
+function EmptyState({ text }) {
+  return <div style={styles.emptyState}>{text}</div>;
+}
+
 export default function DealWarRoom() {
+  const [dashboard, setDashboard] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function load() {
+      try {
+        setLoading(true);
+        setError("");
+        const res = await getDashboard();
+        if (!mounted) return;
+        setDashboard(res || null);
+      } catch (err) {
+        console.error(err);
+        if (!mounted) return;
+        setError(err?.message || "Failed to load Deal War Room");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const workspaceMode = String(dashboard?.workspaceMode || "live").toLowerCase();
+  const isDemo = workspaceMode === "demo";
+  const orgName = dashboard?.activeWorkspace?.name || "Workspace";
+  const deals = Array.isArray(dashboard?.deals) ? dashboard.deals : [];
+
+  const liveDeals = useMemo(() => {
+    return deals.map((deal, idx) => {
+      const stage = normalizeStage(deal?.stage || "");
+      const amount =
+        safeNum(deal?.amount, 0) ||
+        safeNum(deal?.value, 0) ||
+        safeNum(deal?.pipelineValue, 0);
+
+      const probabilityRaw =
+        safeNum(deal?.probability, 0) ||
+        safeNum(deal?.closeProbability, 0) ||
+        safeNum(deal?.winProbability, 0);
+
+      const probability =
+        probabilityRaw > 1 ? probabilityRaw : Math.round(probabilityRaw * 100);
+
+      const risk =
+        probability >= 65 ? "Low" : probability >= 40 ? "Medium" : "High";
+
+      return {
+        name: deal?.name || `Deal ${idx + 1}`,
+        owner:
+          deal?.ownerName ||
+          deal?.owner ||
+          deal?.createdByName ||
+          "Workspace Team",
+        stage,
+        valueNum: amount,
+        value: moneyCompact(amount),
+        close: `${safeNum(probability, 0)}%`,
+        risk,
+        blocker:
+          deal?.nextAction ||
+          deal?.closedReason ||
+          deal?.lastActivityNote ||
+          "Needs next-step definition",
+      };
+    });
+  }, [deals]);
+
+  const openDeals = useMemo(() => {
+    return liveDeals.filter(
+      (d) => d.stage !== "Closed Won" && d.stage !== "Closed Lost"
+    );
+  }, [liveDeals]);
+
+  const weightedPipelineNum = useMemo(() => {
+    return deals.reduce((sum, deal) => {
+      const stage = normalizeStage(deal?.stage || "");
+      if (stage === "Closed Won" || stage === "Closed Lost") return sum;
+
+      const amount =
+        safeNum(deal?.amount, 0) ||
+        safeNum(deal?.value, 0) ||
+        safeNum(deal?.pipelineValue, 0);
+
+      const probabilityRaw =
+        safeNum(deal?.probability, 0) ||
+        safeNum(deal?.closeProbability, 0) ||
+        safeNum(deal?.winProbability, 0);
+
+      const probability = probabilityRaw > 1 ? probabilityRaw / 100 : probabilityRaw || 0;
+      return sum + amount * probability;
+    }, 0);
+  }, [deals]);
+
+  const lateStageExposureNum = useMemo(() => {
+    return deals.reduce((sum, deal) => {
+      const stage = normalizeStage(deal?.stage || "");
+      if (!["Negotiation", "Commit", "Closed Won"].includes(stage)) return sum;
+
+      const amount =
+        safeNum(deal?.amount, 0) ||
+        safeNum(deal?.value, 0) ||
+        safeNum(deal?.pipelineValue, 0);
+
+      return sum + amount;
+    }, 0);
+  }, [deals]);
+
+  const avgCloseProbabilityNum = useMemo(() => {
+    if (!openDeals.length) return 0;
+
+    const total = deals.reduce((sum, deal) => {
+      const stage = normalizeStage(deal?.stage || "");
+      if (stage === "Closed Won" || stage === "Closed Lost") return sum;
+
+      const probabilityRaw =
+        safeNum(deal?.probability, 0) ||
+        safeNum(deal?.closeProbability, 0) ||
+        safeNum(deal?.winProbability, 0);
+
+      const probability = probabilityRaw > 1 ? probabilityRaw : probabilityRaw * 100;
+      return sum + safeNum(probability, 0);
+    }, 0);
+
+    return Math.round(total / openDeals.length);
+  }, [deals, openDeals]);
+
+  const dealsAtRiskNum = useMemo(() => {
+    return openDeals.filter((d) => d.risk === "High").length;
+  }, [openDeals]);
+
+  const stageCards = useMemo(() => {
+    if (isDemo) {
+      return [
+        {
+          stage: "Discovery",
+          deals: 6,
+          value: "$1.20M",
+          note: "Healthy top-of-funnel motion",
+        },
+        {
+          stage: "Proposal",
+          deals: 4,
+          value: "$1.65M",
+          note: "Strong commercial engagement",
+        },
+        {
+          stage: "Negotiation",
+          deals: 3,
+          value: "$1.10M",
+          note: "Highest forecast impact",
+        },
+        {
+          stage: "Commit",
+          deals: 2,
+          value: "$740K",
+          note: "Needs tight close coordination",
+        },
+      ];
+    }
+
+    const stageMap = new Map();
+
+    openDeals.forEach((deal) => {
+      const stage = deal.stage || "Unknown";
+      if (!stageMap.has(stage)) {
+        stageMap.set(stage, {
+          stage,
+          deals: 0,
+          valueNum: 0,
+        });
+      }
+
+      const row = stageMap.get(stage);
+      row.deals += 1;
+      row.valueNum += safeNum(deal.valueNum, 0);
+    });
+
+    return Array.from(stageMap.values())
+      .map((row) => ({
+        stage: row.stage,
+        deals: row.deals,
+        value: moneyCompact(row.valueNum),
+        note:
+          row.deals >= 3
+            ? "Active opportunity concentration"
+            : "Lighter deal density",
+      }))
+      .sort((a, b) => b.deals - a.deals);
+  }, [isDemo, openDeals]);
+
+  const stagePressure = useMemo(() => {
+    if (isDemo) {
+      return [
+        { name: "Discovery", value: 42 },
+        { name: "Proposal", value: 69 },
+        { name: "Negotiation", value: 84 },
+        { name: "Commit", value: 78 },
+      ];
+    }
+
+    return stageCards.map((s) => ({
+      name: s.stage,
+      value: Math.min(100, s.deals * 18 + Math.round(safeNum(safeNum(s.value?.replace?.(/[$KM,.]/g, ""), 0)) / 10000)),
+    }));
+  }, [isDemo, stageCards]);
+
+  const forecastTrend = useMemo(() => {
+    if (isDemo) {
+      return [
+        { period: "30D", baseline: 1200000, commit: 1420000 },
+        { period: "60D", baseline: 1880000, commit: 2140000 },
+        { period: "90D", baseline: 2520000, commit: 2860000 },
+        { period: "120D", baseline: 3180000, commit: 3560000 },
+      ];
+    }
+
+    const weighted = weightedPipelineNum;
+    return [
+      { period: "30D", baseline: weighted * 0.35, commit: weighted * 0.42 },
+      { period: "60D", baseline: weighted * 0.58, commit: weighted * 0.68 },
+      { period: "90D", baseline: weighted * 0.8, commit: weighted * 0.94 },
+      { period: "120D", baseline: weighted * 1.0, commit: weighted * 1.14 },
+    ];
+  }, [isDemo, weightedPipelineNum]);
+
+  const executiveSignals = useMemo(() => {
+    if (isDemo) {
+      return [
+        "Three late-stage deals represent 58% of near-term forecast concentration.",
+        "Two enterprise opportunities have slipped decision dates in the last 10 days.",
+        "One high-value expansion deal is blocked by procurement timing.",
+        "Leadership attention should stay on blocker removal, owner accountability, and close-plan discipline.",
+      ];
+    }
+
+    if (!openDeals.length) {
+      return [
+        "No live open deals are currently loaded in this workspace.",
+        "Once deals are added or synced from connected systems, the war room will show forecast concentration and stage pressure here.",
+        "Leadership views will become more useful as opportunity ownership, stage movement, and next actions are added.",
+        "Start by adding your first active deals so Atlas can model live pressure and close readiness.",
+      ];
+    }
+
+    const highestValueDeal = [...openDeals].sort((a, b) => b.valueNum - a.valueNum)[0];
+    const negotiationCount = openDeals.filter((d) => d.stage === "Negotiation").length;
+    const proposalCount = openDeals.filter((d) => d.stage === "Proposal").length;
+
+    return [
+      `${openDeals.length} live open deals are currently being tracked for ${orgName}.`,
+      `${highestValueDeal?.name || "The top deal"} is the largest current live opportunity in the board.`,
+      `${negotiationCount} deal(s) are currently in negotiation and ${proposalCount} are in proposal-stage motion.`,
+      "Leadership attention should stay focused on next actions, blocker removal, and owner accountability.",
+    ];
+  }, [isDemo, openDeals, orgName]);
+
+  const interventionQueue = useMemo(() => {
+    if (isDemo) {
+      return [
+        {
+          title: "Reconfirm executive sponsor on Vertex Industrial",
+          detail:
+            "Budget approval is stalled and forecast concentration is too high to leave unaddressed.",
+          tone: "high",
+        },
+        {
+          title: "Lock a final commercial timeline for Nova Healthcare",
+          detail:
+            "Close confidence improves materially if legal and decision stakeholders are aligned this week.",
+          tone: "medium",
+        },
+        {
+          title: "Accelerate second-tier proposal opportunities",
+          detail:
+            "Pipeline diversification reduces overreliance on three near-term opportunities.",
+          tone: "medium",
+        },
+        {
+          title: "Run a close-plan review on all negotiation-stage deals",
+          detail:
+            "The current stage mix suggests pressure is clustering too heavily in late-stage motion.",
+          tone: "high",
+        },
+      ];
+    }
+
+    if (!openDeals.length) return [];
+
+    return openDeals.slice(0, 4).map((deal) => ({
+      title: `Review ${deal.name}`,
+      detail:
+        deal.blocker && deal.blocker !== "Needs next-step definition"
+          ? deal.blocker
+          : "Confirm next action, decision path, and close timing.",
+      tone: deal.risk === "High" ? "high" : deal.risk === "Medium" ? "medium" : "low",
+    }));
+  }, [isDemo, openDeals]);
+
+  const aiNotes = useMemo(() => {
+    if (isDemo) {
+      return [
+        "Forecast quality is acceptable, but too much near-term revenue depends on a narrow deal cluster.",
+        "The most important move is reducing concentration risk, not simply adding more top-of-funnel volume.",
+        "Commit-stage confidence will improve with clearer owner accountability and decision date discipline.",
+        "War room reporting should stay focused on deal movement, blockers, executive ownership, and projected impact.",
+      ];
+    }
+
+    if (!openDeals.length) {
+      return [
+        "This workspace does not yet have live deal data in the war room.",
+        "Once live opportunities are added, Atlas will surface pressure, risk, and next-best leadership moves here.",
+        "The best next step is to add deals manually or connect a CRM source.",
+        "After deal activity starts flowing, this page will become a true executive operating view.",
+      ];
+    }
+
+    return [
+      "Atlas is using live opportunity data rather than hardcoded demo war-room numbers.",
+      "Executive visibility improves as deal owners, blockers, and next actions stay up to date.",
+      "Forecast quality gets stronger when stages and close probabilities are actively maintained.",
+      "Keep leadership focused on bottlenecks, pressure concentration, and deal movement velocity.",
+    ];
+  }, [isDemo, openDeals]);
+
+  const topStats = useMemo(() => {
+    if (isDemo) {
+      return [
+        {
+          label: "Weighted Pipeline",
+          value: "$4.85M",
+          note: "Probability-adjusted open pipeline",
+        },
+        {
+          label: "Late-Stage Exposure",
+          value: "$2.10M",
+          note: "Near-term forecast concentration",
+        },
+        {
+          label: "Win Probability",
+          value: "34%",
+          note: "Modeled close likelihood",
+        },
+        {
+          label: "Deals at Risk",
+          value: "5",
+          note: "Need executive attention",
+        },
+      ];
+    }
+
+    return [
+      {
+        label: "Weighted Pipeline",
+        value: moneyCompact(weightedPipelineNum),
+        note: "Probability-adjusted live open pipeline",
+      },
+      {
+        label: "Late-Stage Exposure",
+        value: moneyCompact(lateStageExposureNum),
+        note: "Near-term live forecast concentration",
+      },
+      {
+        label: "Win Probability",
+        value: `${avgCloseProbabilityNum}%`,
+        note: "Average live close likelihood",
+      },
+      {
+        label: "Deals at Risk",
+        value: String(dealsAtRiskNum),
+        note: "High-risk live deals needing attention",
+      },
+    ];
+  }, [
+    isDemo,
+    weightedPipelineNum,
+    lateStageExposureNum,
+    avgCloseProbabilityNum,
+    dealsAtRiskNum,
+  ]);
+
+  const dealTable = useMemo(() => {
+    if (isDemo) {
+      return [
+        {
+          name: "Apex Manufacturing Expansion",
+          owner: "Armon",
+          stage: "Negotiation",
+          value: "$620K",
+          close: "42%",
+          risk: "Medium",
+          blocker: "Procurement approval",
+        },
+        {
+          name: "Nova Healthcare Rollout",
+          owner: "Sales Lead",
+          stage: "Commit",
+          value: "$410K",
+          close: "58%",
+          risk: "Medium",
+          blocker: "Decision timing",
+        },
+        {
+          name: "Titan Logistics Attribution Setup",
+          owner: "Growth Team",
+          stage: "Proposal",
+          value: "$285K",
+          close: "31%",
+          risk: "Low",
+          blocker: "Stakeholder alignment",
+        },
+        {
+          name: "Vertex Industrial Revenue OS",
+          owner: "Executive Team",
+          stage: "Negotiation",
+          value: "$770K",
+          close: "47%",
+          risk: "High",
+          blocker: "Budget confirmation",
+        },
+      ];
+    }
+
+    return openDeals;
+  }, [isDemo, openDeals]);
+
+  if (loading) {
+    return (
+      <div style={styles.page}>
+        <div style={styles.wrap}>
+          <div style={styles.hero}>
+            <h1 style={styles.h1}>Loading Deal War Room...</h1>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={styles.page}>
+        <div style={styles.wrap}>
+          <div style={styles.errorBox}>{error}</div>
+        </div>
+      </div>
+    );
+  }
+
+  const noLiveDeals = !isDemo && !openDeals.length;
+
   return (
     <div style={styles.page}>
       <div style={styles.wrap}>
@@ -495,16 +852,16 @@ export default function DealWarRoom() {
               <div style={styles.heroText}>
                 A focused operating view for leadership to manage late-stage deal
                 movement, forecast concentration, blocker resolution, and next-best
-                actions across the revenue board.
+                actions across the revenue board for <b>{orgName}</b>.
               </div>
             </div>
 
             <div style={styles.badgeWrap}>
               {[
+                isDemo ? "Demo War Room" : "Live War Room",
                 "Forecast Monitoring",
                 "Deal Pressure Live",
                 "Executive Review Active",
-                "Close Plans In Motion",
               ].map((item) => (
                 <div key={item} style={styles.badge}>
                   {item}
@@ -537,89 +894,101 @@ export default function DealWarRoom() {
           </Section>
 
           <Section title="Stage Distribution" subtitle="Pipeline Mix">
-            <div style={styles.stageGrid}>
-              {stageCards.map((item) => (
-                <div key={item.stage} style={styles.stageCard}>
-                  <div style={styles.stageName}>{item.stage}</div>
-                  <div style={styles.stageMeta}>{item.deals} deals</div>
-                  <div style={styles.stageValue}>{item.value}</div>
-                  <div style={styles.stageMeta}>{item.note}</div>
-                </div>
-              ))}
-            </div>
+            {stageCards.length ? (
+              <div style={styles.stageGrid}>
+                {stageCards.map((item) => (
+                  <div key={item.stage} style={styles.stageCard}>
+                    <div style={styles.stageName}>{item.stage}</div>
+                    <div style={styles.stageMeta}>{item.deals} deals</div>
+                    <div style={styles.stageValue}>{item.value}</div>
+                    <div style={styles.stageMeta}>{item.note}</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState text="No live stage distribution is available yet. Add or sync deals to populate the war room." />
+            )}
           </Section>
         </div>
 
         <div style={styles.twoCol}>
           <Section title="Forecast Trend" subtitle="Modeled Outlook">
-            <div style={styles.chartShell}>
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={forecastTrend}>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="rgba(255,255,255,0.08)"
-                  />
-                  <XAxis dataKey="period" tick={axisTick} stroke="#94a3b8" />
-                  <YAxis
-                    tick={axisTick}
-                    stroke="#94a3b8"
-                    tickFormatter={(v) => moneyCompact(v)}
-                  />
-                  <Tooltip
-                    formatter={(value, name) => [moneyCompact(value), name]}
-                    contentStyle={tooltipStyle}
-                    labelStyle={{ color: "#fff" }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="baseline"
-                    stroke="#93c5fd"
-                    strokeWidth={3}
-                    dot={{ r: 3, fill: "#93c5fd" }}
-                    activeDot={{ r: 6 }}
-                    animationDuration={1400}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="commit"
-                    stroke="#86efac"
-                    strokeWidth={3}
-                    dot={{ r: 3, fill: "#86efac" }}
-                    activeDot={{ r: 6 }}
-                    animationDuration={1700}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+            {noLiveDeals ? (
+              <EmptyState text="No live forecast trend yet. Add or sync deals to generate a forecast curve." />
+            ) : (
+              <div style={styles.chartShell}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={forecastTrend}>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="rgba(255,255,255,0.08)"
+                    />
+                    <XAxis dataKey="period" tick={axisTick} stroke="#94a3b8" />
+                    <YAxis
+                      tick={axisTick}
+                      stroke="#94a3b8"
+                      tickFormatter={(v) => moneyCompact(v)}
+                    />
+                    <Tooltip
+                      formatter={(value, name) => [moneyCompact(value), name]}
+                      contentStyle={tooltipStyle}
+                      labelStyle={{ color: "#fff" }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="baseline"
+                      stroke="#93c5fd"
+                      strokeWidth={3}
+                      dot={{ r: 3, fill: "#93c5fd" }}
+                      activeDot={{ r: 6 }}
+                      animationDuration={1400}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="commit"
+                      stroke="#86efac"
+                      strokeWidth={3}
+                      dot={{ r: 3, fill: "#86efac" }}
+                      activeDot={{ r: 6 }}
+                      animationDuration={1700}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </Section>
 
           <Section title="Stage Pressure" subtitle="Risk Model">
-            <div style={styles.chartShell}>
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={stagePressure}>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="rgba(255,255,255,0.08)"
-                  />
-                  <XAxis dataKey="name" tick={axisTick} stroke="#94a3b8" />
-                  <YAxis tick={axisTick} stroke="#94a3b8" domain={[0, 100]} />
-                  <Tooltip
-                    formatter={(value) => [`${value}/100`, "Pressure"]}
-                    contentStyle={tooltipStyle}
-                    labelStyle={{ color: "#fff" }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="value"
-                    stroke="#facc15"
-                    fill="#facc15"
-                    fillOpacity={0.28}
-                    strokeWidth={3}
-                    animationDuration={1500}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+            {noLiveDeals ? (
+              <EmptyState text="No live stage pressure yet. Deal movement is required to model war-room pressure." />
+            ) : (
+              <div style={styles.chartShell}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={stagePressure}>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="rgba(255,255,255,0.08)"
+                    />
+                    <XAxis dataKey="name" tick={axisTick} stroke="#94a3b8" />
+                    <YAxis tick={axisTick} stroke="#94a3b8" domain={[0, 100]} />
+                    <Tooltip
+                      formatter={(value) => [`${value}/100`, "Pressure"]}
+                      contentStyle={tooltipStyle}
+                      labelStyle={{ color: "#fff" }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="value"
+                      stroke="#facc15"
+                      fill="#facc15"
+                      fillOpacity={0.28}
+                      strokeWidth={3}
+                      animationDuration={1500}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </Section>
         </div>
 
@@ -627,52 +996,64 @@ export default function DealWarRoom() {
 
         <div style={styles.twoCol}>
           <Section title="Top Active Opportunities" subtitle="Deal Board">
-            <div style={styles.tableWrap}>
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>Deal</th>
-                    <th style={styles.th}>Owner</th>
-                    <th style={styles.th}>Stage</th>
-                    <th style={styles.th}>Value</th>
-                    <th style={styles.th}>Close</th>
-                    <th style={styles.th}>Risk</th>
-                    <th style={styles.th}>Primary Blocker</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dealTable.map((row) => (
-                    <tr key={row.name}>
-                      <td style={styles.td}>{row.name}</td>
-                      <td style={styles.td}>{row.owner}</td>
-                      <td style={styles.td}>{row.stage}</td>
-                      <td style={styles.td}>{row.value}</td>
-                      <td style={styles.td}>{row.close}</td>
-                      <td style={styles.td}>
-                        <span style={riskPill(row.risk)}>{row.risk}</span>
-                      </td>
-                      <td style={styles.td}>{row.blocker}</td>
+            {dealTable.length ? (
+              <div style={styles.tableWrap}>
+                <table style={styles.table}>
+                  <thead>
+                    <tr>
+                      <th style={styles.th}>Deal</th>
+                      <th style={styles.th}>Owner</th>
+                      <th style={styles.th}>Stage</th>
+                      <th style={styles.th}>Value</th>
+                      <th style={styles.th}>Close</th>
+                      <th style={styles.th}>Risk</th>
+                      <th style={styles.th}>Primary Blocker</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {dealTable.map((row) => (
+                      <tr key={row.name}>
+                        <td style={styles.td}>{row.name}</td>
+                        <td style={styles.td}>{row.owner}</td>
+                        <td style={styles.td}>{row.stage}</td>
+                        <td style={styles.td}>{row.value}</td>
+                        <td style={styles.td}>{row.close}</td>
+                        <td style={styles.td}>
+                          <span style={riskPill(row.risk)}>{row.risk}</span>
+                        </td>
+                        <td style={styles.td}>{row.blocker}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptyState text="No live opportunities are in the war room yet." />
+            )}
           </Section>
 
           <Section title="Executive Intervention Queue" subtitle="Priorities">
-            <div style={styles.queueList}>
-              {interventionQueue.map((item) => (
-                <div key={item.title} style={styles.queueCard}>
-                  <div style={styles.queueTop}>
-                    <div style={styles.queueTitle}>{item.title}</div>
-                    <div style={tonePill(item.tone)}>
-                      {item.tone === "high" ? "Immediate" : "Priority"}
+            {interventionQueue.length ? (
+              <div style={styles.queueList}>
+                {interventionQueue.map((item) => (
+                  <div key={item.title} style={styles.queueCard}>
+                    <div style={styles.queueTop}>
+                      <div style={styles.queueTitle}>{item.title}</div>
+                      <div style={tonePill(item.tone)}>
+                        {item.tone === "high"
+                          ? "Immediate"
+                          : item.tone === "low"
+                          ? "Watch"
+                          : "Priority"}
+                      </div>
                     </div>
+                    <div style={styles.queueBody}>{item.detail}</div>
                   </div>
-                  <div style={styles.queueBody}>{item.detail}</div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState text="No live intervention queue yet. Atlas will populate this once deal data is present." />
+            )}
           </Section>
         </div>
 
@@ -688,29 +1069,33 @@ export default function DealWarRoom() {
           </Section>
 
           <Section title="Stage Pressure by Category" subtitle="Board Pressure">
-            <div style={styles.chartShell}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stagePressure}>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="rgba(255,255,255,0.08)"
-                  />
-                  <XAxis dataKey="name" tick={axisTick} stroke="#94a3b8" />
-                  <YAxis tick={axisTick} stroke="#94a3b8" domain={[0, 100]} />
-                  <Tooltip
-                    formatter={(value) => [`${value}/100`, "Pressure"]}
-                    contentStyle={tooltipStyle}
-                    labelStyle={{ color: "#fff" }}
-                  />
-                  <Bar
-                    dataKey="value"
-                    fill="#67e8f9"
-                    radius={[10, 10, 0, 0]}
-                    animationDuration={1400}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            {noLiveDeals ? (
+              <EmptyState text="No live board pressure is available yet." />
+            ) : (
+              <div style={styles.chartShell}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={stagePressure}>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="rgba(255,255,255,0.08)"
+                    />
+                    <XAxis dataKey="name" tick={axisTick} stroke="#94a3b8" />
+                    <YAxis tick={axisTick} stroke="#94a3b8" domain={[0, 100]} />
+                    <Tooltip
+                      formatter={(value) => [`${value}/100`, "Pressure"]}
+                      contentStyle={tooltipStyle}
+                      labelStyle={{ color: "#fff" }}
+                    />
+                    <Bar
+                      dataKey="value"
+                      fill="#67e8f9"
+                      radius={[10, 10, 0, 0]}
+                      animationDuration={1400}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </Section>
         </div>
       </div>
