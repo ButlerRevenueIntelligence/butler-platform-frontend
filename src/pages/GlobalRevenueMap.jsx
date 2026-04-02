@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from "react";
-import mapboxgl from "mapbox-gl";
 import Map, { Marker, Popup, NavigationControl } from "react-map-gl/mapbox";
 import "mapbox-gl/dist/mapbox-gl.css";
 import {
@@ -18,10 +17,6 @@ import { getDashboard } from "../api";
 const rawToken = import.meta.env.VITE_MAPBOX_TOKEN || "";
 const MAPBOX_TOKEN =
   rawToken && rawToken !== "YOUR_MAPBOX_PUBLIC_TOKEN" ? rawToken : "";
-
-if (MAPBOX_TOKEN) {
-  mapboxgl.accessToken = MAPBOX_TOKEN;
-}
 
 const hasMapboxToken = Boolean(MAPBOX_TOKEN);
 
@@ -183,7 +178,12 @@ function EmptyState({ text }) {
 function RegionMarker({ region, onClick }) {
   const size = Math.max(
     16,
-    Math.min(34, Math.round((safeNum(region.pipelineNum, 0) / Math.max(region.maxPipeline || 1, 1)) * 28 + 8))
+    Math.min(
+      34,
+      Math.round(
+        (safeNum(region.pipelineNum, 0) / Math.max(region.maxPipeline || 1, 1)) * 28 + 8
+      )
+    )
   );
 
   return (
@@ -218,6 +218,7 @@ export default function GlobalRevenueMap() {
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [mapError, setMapError] = useState("");
 
   const initialView = useMemo(
     () => ({
@@ -307,11 +308,7 @@ export default function GlobalRevenueMap() {
 
     deals.forEach((deal) => {
       const regionName = parseRegionFromText(
-        deal?.region ||
-          deal?.country ||
-          deal?.location ||
-          deal?.territory ||
-          ""
+        deal?.region || deal?.country || deal?.location || deal?.territory || ""
       );
 
       if (!grouped.has(regionName)) {
@@ -345,11 +342,7 @@ export default function GlobalRevenueMap() {
       }
 
       const accountName =
-        deal?.accountName ||
-        deal?.company ||
-        deal?.clientName ||
-        deal?.name ||
-        "Account";
+        deal?.accountName || deal?.company || deal?.clientName || deal?.name || "Account";
 
       if (!row.accounts.includes(accountName)) {
         row.accounts.push(accountName);
@@ -453,7 +446,9 @@ export default function GlobalRevenueMap() {
 
     return [
       `${topRegion?.name || "A leading region"} is currently the strongest live concentration zone.`,
-      `${moneyCompact(revenue)} in revenue and ${moneyCompact(pipelineValue)} in pipeline are being tracked across ${mapRegions.length} live regions.`,
+      `${moneyCompact(revenue)} in revenue and ${moneyCompact(
+        pipelineValue
+      )} in pipeline are being tracked across ${mapRegions.length} live regions.`,
       "Regional execution should remain concentrated where live opportunity density and close performance are strongest.",
       "Atlas is using workspace deal distribution to map territory-level revenue and pipeline concentration.",
     ];
@@ -566,6 +561,8 @@ export default function GlobalRevenueMap() {
             <div style={styles.mapShell}>
               {noLiveGeoData ? (
                 <EmptyState text="No live geographic opportunity data yet. Add region, country, location, or territory fields to live deals to activate the map." />
+              ) : mapError ? (
+                <EmptyState text={mapError} />
               ) : (
                 <>
                   <div style={styles.mapHud}>
@@ -599,10 +596,15 @@ export default function GlobalRevenueMap() {
                   <Map
                     initialViewState={initialView}
                     mapboxAccessToken={MAPBOX_TOKEN || undefined}
+                    mapLib={import("mapbox-gl")}
                     mapStyle={hasMapboxToken ? "mapbox://styles/mapbox/dark-v11" : fallbackMapStyle}
                     projection={hasMapboxToken ? "globe" : "mercator"}
                     attributionControl={false}
                     style={{ width: "100%", height: "100%" }}
+                    onError={(evt) => {
+                      console.error("Map error:", evt);
+                      setMapError("Map failed to load. The rest of the territory intelligence is still available below.");
+                    }}
                     onClick={() => setSelectedRegion(null)}
                     onLoad={(e) => {
                       const map = e.target;
@@ -616,10 +618,16 @@ export default function GlobalRevenueMap() {
                             "space-color": "rgb(3, 7, 18)",
                             "star-intensity": 0.2,
                           });
-                        } catch {}
+                        } catch (err) {
+                          console.error("Map fog error:", err);
+                        }
                       }
 
-                      map.resize();
+                      try {
+                        map.resize();
+                      } catch (err) {
+                        console.error("Map resize error:", err);
+                      }
 
                       setTimeout(() => {
                         try {
@@ -628,7 +636,9 @@ export default function GlobalRevenueMap() {
                             zoom: 1.15,
                             speed: 0.5,
                           });
-                        } catch {}
+                        } catch (err) {
+                          console.error("Map flyTo error:", err);
+                        }
                       }, 250);
                     }}
                   >
