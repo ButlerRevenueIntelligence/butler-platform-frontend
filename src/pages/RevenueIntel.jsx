@@ -1,7 +1,11 @@
-// frontend/src/pages/RevenueIntel.jsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getRevenueIntelBoard, seedDemoData } from "../api";
+import {
+  getRevenueIntelBoard,
+  seedDemoData,
+  getActiveWorkspace,
+  getActiveOrgName,
+} from "../api";
 import DealDrawer from "../components/DealDrawer.jsx";
 
 const safeNum = (v) => {
@@ -224,6 +228,22 @@ function boardHasMeaningfulData(board) {
   return overdue > 0 || dueToday > 0 || upcoming > 0 || reactCount > 0 || won > 0 || lost > 0;
 }
 
+function isAtlasDemoWorkspace() {
+  const activeWorkspace = getActiveWorkspace?.();
+  const activeName =
+    activeWorkspace?.name ||
+    getActiveOrgName?.() ||
+    localStorage.getItem("activeOrgName") ||
+    "";
+
+  const normalized = String(activeName).trim().toLowerCase();
+
+  return (
+    normalized === "atlas demo company" ||
+    normalized.includes("atlas demo")
+  );
+}
+
 export default function RevenueIntel() {
   const nav = useNavigate();
 
@@ -237,6 +257,8 @@ export default function RevenueIntel() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerDealId, setDrawerDealId] = useState("");
   const [drawerDeal, setDrawerDeal] = useState(null);
+
+  const atlasDemoWorkspace = useMemo(() => isAtlasDemoWorkspace(), []);
 
   const openDealDrawerById = (id, dealObj = null) => {
     if (!id) return;
@@ -283,10 +305,37 @@ export default function RevenueIntel() {
     load();
   }, [load]);
 
+  const showDemoFallback = useMemo(() => {
+    return atlasDemoWorkspace && !boardHasMeaningfulData(data);
+  }, [atlasDemoWorkspace, data]);
+
   const effectiveData = useMemo(() => {
     if (boardHasMeaningfulData(data)) return data;
-    return buildDemoRevenueIntelBoard(reactivateAfterDays);
-  }, [data, reactivateAfterDays]);
+    if (showDemoFallback) return buildDemoRevenueIntelBoard(reactivateAfterDays);
+
+    return {
+      execution: {
+        overdue: [],
+        dueToday: [],
+        upcoming: [],
+        counts: { overdue: 0, dueToday: 0, upcoming: 0 },
+      },
+      reactivation: {
+        items: [],
+        count: 0,
+        reactivateAfterDays,
+      },
+      winLoss: {
+        won: 0,
+        lost: 0,
+        winRate: 0,
+        avgWon: 0,
+        avgLost: 0,
+        avgCycleDaysWon: 0,
+        avgCycleDaysLost: 0,
+      },
+    };
+  }, [data, reactivateAfterDays, showDemoFallback]);
 
   const exec = effectiveData?.execution || {
     overdue: [],
@@ -380,10 +429,17 @@ export default function RevenueIntel() {
       });
     }
 
-    if (items.length === 0) {
+    if (items.length === 0 && allExecutionDeals.length > 0) {
       items.push({
         title: "Execution is stable",
         body: "No major workflow pressure detected. Focus on pipeline growth and faster conversions.",
+      });
+    }
+
+    if (!allExecutionDeals.length && !reactCount) {
+      items.push({
+        title: "No live revenue board data yet",
+        body: "Connect your live workflow or create deals and activities so Atlas can surface execution pressure, reactivation, and win/loss intelligence.",
       });
     }
 
@@ -391,6 +447,10 @@ export default function RevenueIntel() {
   }, [overdueCount, reactCount, wl, avgProbability, allExecutionDeals.length]);
 
   const executiveSummary = useMemo(() => {
+    if (!allExecutionDeals.length && !reactCount && !safeNum(wl.won) && !safeNum(wl.lost)) {
+      return "This workspace does not have live command-center activity yet. Once deals, next actions, and outcomes begin flowing into Atlas, this page will start showing execution pressure, reactivation candidates, and win/loss intelligence.";
+    }
+
     if (overdueCount > 0) {
       return `Atlas detects elevated execution pressure with ${overdueCount} overdue actions and ${dueTodayCount} actions due today. Priority should be given to clearing stalled opportunities, protecting forecast movement, and restoring sales momentum.`;
     }
@@ -400,7 +460,7 @@ export default function RevenueIntel() {
     }
 
     return `The revenue engine is operating with controlled execution pressure. Atlas recommends shifting focus toward opportunity creation, faster follow-up, and improving close rates across active pipeline.`;
-  }, [overdueCount, dueTodayCount, reactCount]);
+  }, [overdueCount, dueTodayCount, reactCount, allExecutionDeals.length, wl]);
 
   const signals = useMemo(() => {
     const list = [];
@@ -411,6 +471,10 @@ export default function RevenueIntel() {
     if (safeNum(wl.winRate) > 0) list.push(`✓ Current win rate is ${wl.winRate}%`);
     if (allExecutionDeals.length > 0) {
       list.push(`• ${allExecutionDeals.length} active execution opportunities tracked`);
+    }
+
+    if (!list.length) {
+      list.push("• No live execution signals detected yet");
     }
 
     return list.slice(0, 5);
@@ -438,14 +502,19 @@ export default function RevenueIntel() {
       items.push(`Average closed-won sales cycle is ${wl.avgCycleDaysWon} days.`);
     }
 
+    if (!items.length) {
+      items.push("Atlas will begin surfacing execution intelligence here once live deal activity is present in the workspace.");
+    }
+
     return items.slice(0, 5);
   }, [weightedValue, totalPipeline, avgProbability, overdueCount, reactCount, wl]);
 
   const systemHealthLabel = useMemo(() => {
+    if (!allExecutionDeals.length && !reactCount) return "No Live Data";
     if (riskTone === "bad") return "High Pressure";
     if (riskTone === "warn") return "Watch Closely";
     return "Stable";
-  }, [riskTone]);
+  }, [riskTone, allExecutionDeals.length, reactCount]);
 
   const pressureFillWidth = `${clamp(executionPressureScore, 0, 100)}%`;
 
@@ -709,16 +778,18 @@ export default function RevenueIntel() {
             {loading ? "Loading..." : "Refresh"}
           </button>
 
-          <button onClick={onSeedDemo} disabled={loading || seeding} style={S.btnGhost}>
-            {seeding ? "Seeding..." : "Seed Demo Data"}
-          </button>
+          {atlasDemoWorkspace ? (
+            <button onClick={onSeedDemo} disabled={loading || seeding} style={S.btnGhost}>
+              {seeding ? "Seeding..." : "Seed Demo Data"}
+            </button>
+          ) : null}
         </div>
       </div>
 
-      {!boardHasMeaningfulData(data) ? (
+      {showDemoFallback ? (
         <div style={S.demoBanner}>
-          Demo board data is currently being shown because the live Command Center feed is empty.
-          Once your backend returns execution items, reactivation items, or win/loss data, this page will automatically switch to live workspace data.
+          Demo board data is currently being shown for the Atlas Demo Company workspace because the live Command Center feed is empty.
+          Once the backend returns execution items, reactivation items, or win/loss data, this page will automatically switch to live workspace data.
         </div>
       ) : null}
 
@@ -843,7 +914,7 @@ export default function RevenueIntel() {
                 ))
               ) : (
                 <div style={{ marginTop: 10, opacity: 0.85, fontSize: 13 }}>
-                  Nothing overdue. That’s elite.
+                  No overdue actions detected.
                 </div>
               )}
             </div>
@@ -877,7 +948,7 @@ export default function RevenueIntel() {
                 ))
               ) : (
                 <div style={{ marginTop: 10, opacity: 0.85, fontSize: 13 }}>
-                  No “today” actions. Clear runway.
+                  No actions due today.
                 </div>
               )}
             </div>
@@ -972,30 +1043,22 @@ export default function RevenueIntel() {
           <div style={S.insightCard}>
             <div style={{ fontWeight: 900, marginBottom: 10 }}>Atlas AI Insights</div>
             <div style={{ display: "grid", gap: 10 }}>
-              {aiInsights.length ? (
-                aiInsights.map((item, idx) => (
-                  <div key={idx} style={{ fontSize: 13, opacity: 0.9, lineHeight: 1.55 }}>
-                    • {item}
-                  </div>
-                ))
-              ) : (
-                <div style={{ fontSize: 13, opacity: 0.84 }}>No AI insights available yet.</div>
-              )}
+              {aiInsights.map((item, idx) => (
+                <div key={idx} style={{ fontSize: 13, opacity: 0.9, lineHeight: 1.55 }}>
+                  • {item}
+                </div>
+              ))}
             </div>
           </div>
 
           <div style={S.insightCard}>
             <div style={{ fontWeight: 900, marginBottom: 10 }}>Signals</div>
             <div style={{ display: "grid", gap: 10 }}>
-              {signals.length ? (
-                signals.map((item, idx) => (
-                  <div key={idx} style={{ fontSize: 13, opacity: 0.9, lineHeight: 1.55 }}>
-                    {item}
-                  </div>
-                ))
-              ) : (
-                <div style={{ fontSize: 13, opacity: 0.84 }}>No active signals detected.</div>
-              )}
+              {signals.map((item, idx) => (
+                <div key={idx} style={{ fontSize: 13, opacity: 0.9, lineHeight: 1.55 }}>
+                  {item}
+                </div>
+              ))}
             </div>
           </div>
 
