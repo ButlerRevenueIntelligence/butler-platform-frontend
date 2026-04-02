@@ -1,6 +1,4 @@
 import React, { useEffect, useMemo, useState } from "react";
-import Map, { Marker, Popup, NavigationControl } from "react-map-gl/mapbox";
-import "mapbox-gl/dist/mapbox-gl.css";
 import {
   ResponsiveContainer,
   BarChart,
@@ -13,38 +11,6 @@ import {
   Tooltip,
 } from "recharts";
 import { getDashboard } from "../api";
-
-const rawToken = import.meta.env.VITE_MAPBOX_TOKEN || "";
-const MAPBOX_TOKEN =
-  rawToken && rawToken !== "YOUR_MAPBOX_PUBLIC_TOKEN" ? rawToken : "";
-
-const hasMapboxToken = Boolean(MAPBOX_TOKEN);
-
-const fallbackMapStyle = {
-  version: 8,
-  sources: {
-    "carto-dark": {
-      type: "raster",
-      tiles: [
-        "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
-        "https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
-        "https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
-        "https://d.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
-      ],
-      tileSize: 256,
-      attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
-    },
-  },
-  layers: [
-    {
-      id: "carto-dark-layer",
-      type: "raster",
-      source: "carto-dark",
-      minzoom: 0,
-      maxzoom: 22,
-    },
-  ],
-};
 
 const axisTick = { fill: "#9fb0d0", fontSize: 11 };
 
@@ -108,16 +74,6 @@ function parseRegionFromText(value = "") {
   return "North America";
 }
 
-function getRegionCoordinates(name) {
-  if (name === "Europe") {
-    return { lat: 50.1109, lng: 8.6821 };
-  }
-  if (name === "Asia") {
-    return { lat: 1.3521, lng: 103.8198 };
-  }
-  return { lat: 37.0902, lng: -95.7129 };
-}
-
 function toneStyle(tone) {
   const map = {
     Strong: {
@@ -175,59 +131,10 @@ function EmptyState({ text }) {
   return <div style={styles.emptyState}>{text}</div>;
 }
 
-function RegionMarker({ region, onClick }) {
-  const size = Math.max(
-    16,
-    Math.min(
-      34,
-      Math.round(
-        (safeNum(region.pipelineNum, 0) / Math.max(region.maxPipeline || 1, 1)) * 28 + 8
-      )
-    )
-  );
-
-  return (
-    <Marker longitude={region.lng} latitude={region.lat} anchor="center">
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onClick(region);
-        }}
-        title={region.name}
-        style={{
-          width: size,
-          height: size,
-          borderRadius: 999,
-          background:
-            region.tone === "Strong"
-              ? "radial-gradient(circle at 35% 35%, #d8fbff, #38bdf8 58%, #0ea5e9 100%)"
-              : region.tone === "Stable"
-              ? "radial-gradient(circle at 35% 35%, #e0f2fe, #60a5fa 58%, #2563eb 100%)"
-              : "radial-gradient(circle at 35% 35%, #fef3c7, #f59e0b 58%, #d97706 100%)",
-          border: "2px solid rgba(255,255,255,0.92)",
-          boxShadow: "0 0 0 8px rgba(56,189,248,0.10), 0 12px 26px rgba(0,0,0,0.36)",
-          cursor: "pointer",
-        }}
-      />
-    </Marker>
-  );
-}
-
 export default function GlobalRevenueMap() {
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [mapError, setMapError] = useState("");
-
-  const initialView = useMemo(
-    () => ({
-      longitude: 10,
-      latitude: 22,
-      zoom: 1.15,
-    }),
-    []
-  );
 
   useEffect(() => {
     let mounted = true;
@@ -267,8 +174,6 @@ export default function GlobalRevenueMap() {
       return [
         {
           name: "North America",
-          lat: 37.0902,
-          lng: -95.7129,
           revenue: "$3.8M",
           pipeline: "$9.2M",
           closeRate: "36%",
@@ -279,8 +184,6 @@ export default function GlobalRevenueMap() {
         },
         {
           name: "Europe",
-          lat: 50.1109,
-          lng: 8.6821,
           revenue: "$1.4M",
           pipeline: "$4.7M",
           closeRate: "29%",
@@ -291,8 +194,6 @@ export default function GlobalRevenueMap() {
         },
         {
           name: "Asia",
-          lat: 1.3521,
-          lng: 103.8198,
           revenue: "$600K",
           pipeline: "$2.1M",
           closeRate: "22%",
@@ -312,11 +213,8 @@ export default function GlobalRevenueMap() {
       );
 
       if (!grouped.has(regionName)) {
-        const coords = getRegionCoordinates(regionName);
         grouped.set(regionName, {
           name: regionName,
-          lat: coords.lat,
-          lng: coords.lng,
           revenueNum: 0,
           pipelineNum: 0,
           accounts: [],
@@ -349,7 +247,7 @@ export default function GlobalRevenueMap() {
       }
     });
 
-    const arr = Array.from(grouped.values()).map((row) => {
+    return Array.from(grouped.values()).map((row) => {
       const closeRate =
         row.dealCount > 0 ? `${Math.round((row.wonCount / row.dealCount) * 100)}%` : "0%";
 
@@ -365,24 +263,7 @@ export default function GlobalRevenueMap() {
         tone,
       };
     });
-
-    const maxPipeline = Math.max(...arr.map((r) => safeNum(r.pipelineNum, 0)), 1);
-
-    return arr.map((r) => ({
-      ...r,
-      maxPipeline,
-    }));
   }, [isDemo, deals]);
-
-  const [selectedRegion, setSelectedRegion] = useState(null);
-
-  useEffect(() => {
-    if (mapRegions.length) {
-      setSelectedRegion(mapRegions[0]);
-    } else {
-      setSelectedRegion(null);
-    }
-  }, [mapRegions]);
 
   const topRegion = useMemo(() => {
     if (!mapRegions.length) return null;
@@ -561,170 +442,8 @@ export default function GlobalRevenueMap() {
             <div style={styles.mapShell}>
               {noLiveGeoData ? (
                 <EmptyState text="No live geographic opportunity data yet. Add region, country, location, or territory fields to live deals to activate the map." />
-              ) : mapError ? (
-                <EmptyState text={mapError} />
               ) : (
-                <>
-                  <div style={styles.mapHud}>
-                    <div style={styles.mapHudHead}>
-                      <div style={styles.mapHudTitle}>Atlas Territory Command</div>
-                    </div>
-
-                    <div style={styles.mapHudBody}>
-                      <div style={styles.mapHudMetric}>
-                        <div style={styles.mapHudLabel}>Top Active Region</div>
-                        <div style={styles.mapHudValue}>{topRegion?.name || "No Data"}</div>
-                        <div style={styles.mapHudSub}>
-                          {topRegion
-                            ? "Highest revenue concentration and strongest near-term execution density."
-                            : "No live territory concentration available yet."}
-                        </div>
-                      </div>
-
-                      <div style={styles.mapHudMetric}>
-                        <div style={styles.mapHudLabel}>Region Revenue</div>
-                        <div style={styles.mapHudValue}>{topRegion?.revenue || "$0"}</div>
-                      </div>
-
-                      <div style={styles.mapHudMetric}>
-                        <div style={styles.mapHudLabel}>Open Pipeline</div>
-                        <div style={styles.mapHudValue}>{topRegion?.pipeline || "$0"}</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <Map
-                    initialViewState={initialView}
-                    mapboxAccessToken={MAPBOX_TOKEN || undefined}
-                    mapLib={import("mapbox-gl")}
-                    mapStyle={hasMapboxToken ? "mapbox://styles/mapbox/dark-v11" : fallbackMapStyle}
-                    projection={hasMapboxToken ? "globe" : "mercator"}
-                    attributionControl={false}
-                    style={{ width: "100%", height: "100%" }}
-                    onError={(evt) => {
-                      console.error("Map error:", evt);
-                      setMapError("Map failed to load. The rest of the territory intelligence is still available below.");
-                    }}
-                    onClick={() => setSelectedRegion(null)}
-                    onLoad={(e) => {
-                      const map = e.target;
-
-                      if (hasMapboxToken) {
-                        try {
-                          map.setFog({
-                            color: "rgb(10, 15, 35)",
-                            "high-color": "rgb(36, 92, 223)",
-                            "horizon-blend": 0.08,
-                            "space-color": "rgb(3, 7, 18)",
-                            "star-intensity": 0.2,
-                          });
-                        } catch (err) {
-                          console.error("Map fog error:", err);
-                        }
-                      }
-
-                      try {
-                        map.resize();
-                      } catch (err) {
-                        console.error("Map resize error:", err);
-                      }
-
-                      setTimeout(() => {
-                        try {
-                          map.flyTo({
-                            center: [10, 22],
-                            zoom: 1.15,
-                            speed: 0.5,
-                          });
-                        } catch (err) {
-                          console.error("Map flyTo error:", err);
-                        }
-                      }, 250);
-                    }}
-                  >
-                    <NavigationControl position="top-right" />
-
-                    {mapRegions.map((region) => (
-                      <RegionMarker
-                        key={region.name}
-                        region={region}
-                        onClick={setSelectedRegion}
-                      />
-                    ))}
-
-                    {selectedRegion ? (
-                      <Popup
-                        longitude={selectedRegion.lng}
-                        latitude={selectedRegion.lat}
-                        anchor="top"
-                        closeButton={false}
-                        closeOnClick={false}
-                        offset={22}
-                        className="atlas-map-popup"
-                      >
-                        <div
-                          style={{
-                            minWidth: 230,
-                            padding: 12,
-                            borderRadius: 14,
-                            color: "#fff",
-                            background:
-                              "linear-gradient(180deg, rgba(8,14,28,0.98), rgba(5,9,18,0.96))",
-                            border: "1px solid rgba(255,255,255,0.10)",
-                            boxShadow: "0 18px 40px rgba(0,0,0,0.35)",
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              gap: 10,
-                            }}
-                          >
-                            <div style={{ fontWeight: 900, fontSize: 15 }}>
-                              {selectedRegion.name}
-                            </div>
-                            <div style={toneStyle(selectedRegion.tone)}>
-                              {selectedRegion.tone}
-                            </div>
-                          </div>
-
-                          <div
-                            style={{
-                              marginTop: 10,
-                              display: "grid",
-                              gap: 6,
-                              fontSize: 12,
-                              color: "rgba(226,232,240,0.9)",
-                            }}
-                          >
-                            <div>Revenue {selectedRegion.revenue}</div>
-                            <div>Pipeline {selectedRegion.pipeline}</div>
-                            <div>Close Rate {selectedRegion.closeRate}</div>
-                          </div>
-
-                          <div
-                            style={{
-                              marginTop: 10,
-                              fontSize: 11,
-                              lineHeight: 1.5,
-                              color: "rgba(203,213,225,0.74)",
-                            }}
-                          >
-                            Key accounts: {selectedRegion.accounts.join(", ") || "None"}
-                          </div>
-                        </div>
-                      </Popup>
-                    ) : null}
-                  </Map>
-
-                  {!hasMapboxToken ? (
-                    <div style={styles.mapStatus}>
-                      Fallback map active — add VITE_MAPBOX_TOKEN for full Mapbox globe
-                    </div>
-                  ) : null}
-                </>
+                <EmptyState text="Interactive map temporarily disabled while we finish stabilizing the map engine. Regional revenue, pipeline, and territory intelligence remain available below." />
               )}
             </div>
           </Section>
