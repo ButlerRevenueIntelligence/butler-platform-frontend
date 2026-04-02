@@ -34,8 +34,10 @@ export default function Clients() {
   const [name, setName] = useState("");
   const [industry, setIndustry] = useState("");
   const [website, setWebsite] = useState("");
-  const [ownerName, setOwnerName] = useState("");
-  const [ownerEmail, setOwnerEmail] = useState("");
+  const [primaryContactName, setPrimaryContactName] = useState("");
+  const [primaryContactEmail, setPrimaryContactEmail] = useState("");
+  const [primaryContactPhone, setPrimaryContactPhone] = useState("");
+  const [status, setStatus] = useState("active");
   const [notes, setNotes] = useState("");
   const [creating, setCreating] = useState(false);
 
@@ -44,10 +46,10 @@ export default function Clients() {
       setLoading(true);
       setError("");
       const res = await getClients();
-      setClients(res?.clients || []);
+      setClients(Array.isArray(res?.clients) ? res.clients : []);
     } catch (e) {
       console.error(e);
-      setError(e?.message || "Failed to load accounts");
+      setError(e?.message || "Failed to load clients");
     } finally {
       setLoading(false);
     }
@@ -60,24 +62,30 @@ export default function Clients() {
   const enrichedClients = useMemo(() => {
     return (clients || []).map((c, idx) => {
       const hasWebsite = !!safe(c?.website).trim();
-      const hasOwner = !!safe(c?.ownerName).trim() || !!safe(c?.ownerEmail).trim();
+      const hasContact =
+        !!safe(c?.primaryContactName).trim() ||
+        !!safe(c?.primaryContactEmail).trim() ||
+        !!safe(c?.primaryContactPhone).trim();
       const hasIndustry = !!safe(c?.industry).trim();
       const hasNotes = !!safe(c?.notes).trim();
 
       let engagementScore = 35;
       if (hasWebsite) engagementScore += 20;
-      if (hasOwner) engagementScore += 20;
+      if (hasContact) engagementScore += 20;
       if (hasIndustry) engagementScore += 10;
       if (hasNotes) engagementScore += 10;
       engagementScore += (idx % 4) * 3;
 
-      const expansionProbability = Math.min(82, 45 + (idx % 5) * 7 + (hasNotes ? 6 : 0));
+      const expansionProbability = Math.min(
+        82,
+        45 + (idx % 5) * 7 + (hasNotes ? 6 : 0)
+      );
 
       return {
         ...c,
         engagementScore,
         expansionProbability,
-        domain: domainFromWebsite(c?.website),
+        derivedDomain: domainFromWebsite(c?.website),
       };
     });
   }, [clients]);
@@ -85,9 +93,13 @@ export default function Clients() {
   const summaryStats = useMemo(() => {
     const total = enrichedClients.length;
     const withWebsite = enrichedClients.filter((c) => safe(c?.website).trim()).length;
-    const withOwner = enrichedClients.filter(
-      (c) => safe(c?.ownerName).trim() || safe(c?.ownerEmail).trim()
+    const withContact = enrichedClients.filter(
+      (c) =>
+        safe(c?.primaryContactName).trim() ||
+        safe(c?.primaryContactEmail).trim() ||
+        safe(c?.primaryContactPhone).trim()
     ).length;
+
     const avgEngagement =
       total > 0
         ? Math.round(
@@ -95,15 +107,15 @@ export default function Clients() {
           )
         : 0;
 
-    return { total, withWebsite, withOwner, avgEngagement };
+    return { total, withWebsite, withContact, avgEngagement };
   }, [enrichedClients]);
 
   const accountBriefing = useMemo(() => {
     if (!summaryStats.total) {
-      return "No accounts are currently loaded in this workspace. Add account records to begin organizing client data, owner visibility, website coverage, and engagement context.";
+      return "No clients are currently loaded in this workspace. Add client records to begin organizing company data, primary contact visibility, website coverage, and engagement context.";
     }
 
-    return `This workspace currently includes ${summaryStats.total} accounts. ${summaryStats.withWebsite} have website coverage, ${summaryStats.withOwner} include owner visibility, and the current average engagement score is ${summaryStats.avgEngagement}. Use this page to manage account records and keep account information organized.`;
+    return `This workspace currently includes ${summaryStats.total} clients. ${summaryStats.withWebsite} have website coverage, ${summaryStats.withContact} include primary contact visibility, and the current average engagement score is ${summaryStats.avgEngagement}. Use this page to manage client records and keep account information organized.`;
   }, [summaryStats]);
 
   const S = useMemo(() => {
@@ -152,9 +164,10 @@ export default function Clients() {
         justifyContent: "space-between",
         gap: 16,
         marginBottom: 16,
+        flexWrap: "wrap",
       },
       title: { margin: 0, fontSize: 32, fontWeight: 900 },
-      sub: { marginTop: 8, opacity: 0.8, fontSize: 14 },
+      sub: { marginTop: 8, opacity: 0.8, fontSize: 14, lineHeight: 1.5 },
       card,
       heroCard: {
         ...card,
@@ -203,6 +216,13 @@ export default function Clients() {
         border: "1px solid rgba(255,0,0,0.25)",
         background: "rgba(255,0,0,0.10)",
       },
+      success: {
+        marginTop: 10,
+        borderRadius: 12,
+        padding: 12,
+        border: "1px solid rgba(34,197,94,0.25)",
+        background: "rgba(34,197,94,0.10)",
+      },
       tag: {
         fontSize: 12,
         fontWeight: 900,
@@ -236,7 +256,7 @@ export default function Clients() {
     setError("");
 
     if (!name.trim()) {
-      setError("Account name is required.");
+      setError("Client name is required.");
       return;
     }
 
@@ -247,8 +267,10 @@ export default function Clients() {
         name: name.trim(),
         industry: industry.trim(),
         website: website.trim(),
-        ownerName: ownerName.trim(),
-        ownerEmail: ownerEmail.trim(),
+        primaryContactName: primaryContactName.trim(),
+        primaryContactEmail: primaryContactEmail.trim().toLowerCase(),
+        primaryContactPhone: primaryContactPhone.trim(),
+        status,
         notes: notes.trim(),
       };
 
@@ -257,14 +279,16 @@ export default function Clients() {
       setName("");
       setIndustry("");
       setWebsite("");
-      setOwnerName("");
-      setOwnerEmail("");
+      setPrimaryContactName("");
+      setPrimaryContactEmail("");
+      setPrimaryContactPhone("");
+      setStatus("active");
       setNotes("");
 
       await load();
     } catch (e2) {
       console.error(e2);
-      setError(e2?.message || "Failed to create account");
+      setError(e2?.message || "Failed to create client");
     } finally {
       setCreating(false);
     }
@@ -272,7 +296,7 @@ export default function Clients() {
 
   async function onDelete(id) {
     setError("");
-    const ok = window.confirm("Delete this account? This cannot be undone.");
+    const ok = window.confirm("Delete this client? This cannot be undone.");
     if (!ok) return;
 
     try {
@@ -280,7 +304,7 @@ export default function Clients() {
       await load();
     } catch (e) {
       console.error(e);
-      setError(e?.message || "Failed to delete account");
+      setError(e?.message || "Failed to delete client");
     }
   }
 
@@ -290,20 +314,20 @@ export default function Clients() {
 
       <div style={S.topRow}>
         <div>
-          <h1 style={S.title}>Accounts</h1>
+          <h1 style={S.title}>Clients</h1>
           <div style={S.sub}>
-            Track account records, engagement context, owner visibility, and website coverage for the current workspace.
+            Track client records, primary contacts, website coverage, and account context for the active workspace.
           </div>
         </div>
 
         <div style={{ minWidth: 260 }}>
-          <OrgSwitcher onSwitched={() => load()} />
+          <OrgSwitcher onSwitched={load} />
         </div>
       </div>
 
       <div style={S.heroCard}>
         <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 10 }}>
-          Account Briefing
+          Client Briefing
         </div>
         <div style={{ fontSize: 14, opacity: 0.92, lineHeight: 1.65 }}>
           {accountBriefing}
@@ -314,27 +338,27 @@ export default function Clients() {
 
       <div style={S.signalGrid}>
         <div style={S.signalCard}>
-          <div style={S.signalLabel}>TOTAL ACCOUNTS</div>
+          <div style={S.signalLabel}>TOTAL CLIENTS</div>
           <div style={S.signalValue}>{summaryStats.total}</div>
-          <div style={S.signalSub}>Total account records in the active workspace.</div>
+          <div style={S.signalSub}>Total client records in the active workspace.</div>
         </div>
 
         <div style={S.signalCard}>
           <div style={S.signalLabel}>AVG ENGAGEMENT SCORE</div>
           <div style={S.signalValue}>{summaryStats.avgEngagement}</div>
-          <div style={S.signalSub}>Estimated signal quality across account records.</div>
+          <div style={S.signalSub}>Estimated signal quality across client records.</div>
         </div>
 
         <div style={S.signalCard}>
           <div style={S.signalLabel}>WEBSITE COVERAGE</div>
           <div style={S.signalValue}>{summaryStats.withWebsite}</div>
-          <div style={S.signalSub}>Accounts with website data available.</div>
+          <div style={S.signalSub}>Clients with website data available.</div>
         </div>
 
         <div style={S.signalCard}>
-          <div style={S.signalLabel}>OWNER VISIBILITY</div>
-          <div style={S.signalValue}>{summaryStats.withOwner}</div>
-          <div style={S.signalSub}>Accounts with named owner or email visibility.</div>
+          <div style={S.signalLabel}>CONTACT VISIBILITY</div>
+          <div style={S.signalValue}>{summaryStats.withContact}</div>
+          <div style={S.signalSub}>Clients with primary contact details added.</div>
         </div>
       </div>
 
@@ -342,14 +366,14 @@ export default function Clients() {
 
       <div style={S.card}>
         <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 10 }}>
-          Create Account
+          Create Client
         </div>
 
         <form onSubmit={onCreate}>
           <div style={S.grid3}>
             <input
               style={S.input}
-              placeholder="Account name *"
+              placeholder="Client name *"
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
@@ -361,7 +385,7 @@ export default function Clients() {
             />
             <input
               style={S.input}
-              placeholder="Website (https://...)"
+              placeholder="Website"
               value={website}
               onChange={(e) => setWebsite(e.target.value)}
             />
@@ -369,19 +393,42 @@ export default function Clients() {
 
           <div style={{ height: 12 }} />
 
+          <div style={S.grid3}>
+            <input
+              style={S.input}
+              placeholder="Primary contact name"
+              value={primaryContactName}
+              onChange={(e) => setPrimaryContactName(e.target.value)}
+            />
+            <input
+              style={S.input}
+              placeholder="Primary contact email"
+              value={primaryContactEmail}
+              onChange={(e) => setPrimaryContactEmail(e.target.value)}
+            />
+            <input
+              style={S.input}
+              placeholder="Primary contact phone"
+              value={primaryContactPhone}
+              onChange={(e) => setPrimaryContactPhone(e.target.value)}
+            />
+          </div>
+
+          <div style={{ height: 12 }} />
+
           <div style={S.grid2}>
-            <input
+            <select
               style={S.input}
-              placeholder="Owner name"
-              value={ownerName}
-              onChange={(e) => setOwnerName(e.target.value)}
-            />
-            <input
-              style={S.input}
-              placeholder="Owner email"
-              value={ownerEmail}
-              onChange={(e) => setOwnerEmail(e.target.value)}
-            />
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+            >
+              <option value="active">active</option>
+              <option value="paused">paused</option>
+              <option value="prospect">prospect</option>
+              <option value="archived">archived</option>
+            </select>
+
+            <div />
           </div>
 
           <div style={{ height: 12 }} />
@@ -397,7 +444,7 @@ export default function Clients() {
 
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <button type="submit" style={S.btn} disabled={creating}>
-              {creating ? "Creating..." : "Create Account"}
+              {creating ? "Creating..." : "Create Client"}
             </button>
 
             <button type="button" style={S.btnGhost} onClick={() => nav("/overview")}>
@@ -421,7 +468,7 @@ export default function Clients() {
             flexWrap: "wrap",
           }}
         >
-          <div style={{ fontSize: 16, fontWeight: 900 }}>Account Directory</div>
+          <div style={{ fontSize: 16, fontWeight: 900 }}>Client Directory</div>
           <div style={S.tag}>{clients.length} total</div>
         </div>
 
@@ -434,7 +481,7 @@ export default function Clients() {
             {enrichedClients.map((c) => {
               const id = c?._id || c?.id;
               const websiteLabel = safe(c?.website).trim();
-              const domain = c?.domain;
+              const domain = c?.derivedDomain || safe(c?.domain).trim();
 
               return (
                 <div key={id} style={S.item}>
@@ -448,7 +495,7 @@ export default function Clients() {
                       }}
                     >
                       <div style={{ fontWeight: 900, fontSize: 14 }}>
-                        {safe(c?.name || "Account")}
+                        {safe(c?.name || "Client")}
                       </div>
 
                       <div style={S.scorePill(c.engagementScore)}>
@@ -456,6 +503,7 @@ export default function Clients() {
                       </div>
 
                       <div style={S.tag}>Expansion {c.expansionProbability}%</div>
+                      <div style={S.tag}>{safe(c?.status || "active")}</div>
                     </div>
 
                     <div style={{ ...S.meta, marginTop: 8 }}>
@@ -477,8 +525,11 @@ export default function Clients() {
                       )}
 
                       <div style={{ marginTop: 6, opacity: 0.8 }}>
-                        Owner: <strong>{safe(c?.ownerName || "—")}</strong> •{" "}
-                        {safe(c?.ownerEmail || "—")}
+                        Contact: <strong>{safe(c?.primaryContactName || "—")}</strong> •{" "}
+                        {safe(c?.primaryContactEmail || "—")}
+                        {safe(c?.primaryContactPhone).trim()
+                          ? ` • ${safe(c?.primaryContactPhone)}`
+                          : ""}
                       </div>
 
                       {safe(c?.notes).trim() ? (
@@ -509,7 +560,7 @@ export default function Clients() {
             })}
           </div>
         ) : (
-          <div style={{ opacity: 0.85 }}>No accounts yet. Create one above.</div>
+          <div style={{ opacity: 0.85 }}>No clients yet. Create one above.</div>
         )}
       </div>
     </div>
