@@ -16,6 +16,7 @@ const connectorCatalog = [
   { id: "ga4", name: "Google Analytics 4", category: "Analytics" },
   { id: "stripe", name: "Stripe", category: "Payments" },
   { id: "shopify", name: "Shopify", category: "Commerce" },
+  { id: "excel", name: "Excel / CSV Import", category: "Manual Data Import" },
 ];
 
 const statusColor = {
@@ -31,6 +32,40 @@ function formatDate(value) {
   return d.toLocaleString();
 }
 
+function normalizeStatus(value) {
+  const s = String(value || "").trim().toLowerCase();
+  if (s === "connected" || s === "syncing" || s === "disconnected") return s;
+  return "disconnected";
+}
+
+function isAtlasDemoWorkspace(name = "", workspace = null) {
+  const workspaceName = String(workspace?.name || name || "").trim().toLowerCase();
+  const slug = String(workspace?.slug || "").trim().toLowerCase();
+  return slug === "atlas-demo-company" || workspaceName === "atlas demo company";
+}
+
+function getWorkspaceModeLabel(isDemoWorkspace, live) {
+  if (live?.mode) {
+    const mode = String(live.mode).trim().toLowerCase();
+    if (mode === "demo") return isDemoWorkspace ? "Demo workspace" : "Live workspace";
+    if (mode === "live") return "Live workspace";
+    return String(live.mode);
+  }
+  return isDemoWorkspace ? "Demo workspace" : "Live workspace";
+}
+
+function getSyncLabel(connectorId, live, isDemoWorkspace) {
+  if (live?.lastSync) return `Last sync: ${formatDate(live.lastSync)}`;
+
+  if (connectorId === "excel") {
+    return isDemoWorkspace
+      ? "Manual spreadsheet import available"
+      : "Upload Excel or CSV files manually";
+  }
+
+  return "No sync yet";
+}
+
 export default function Integrations() {
   const [integrations, setIntegrations] = useState({});
   const [loading, setLoading] = useState(true);
@@ -38,13 +73,19 @@ export default function Integrations() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  const [activeWorkspace, setActiveWorkspace] = useState(() => getActiveWorkspace());
   const [activeOrgName, setActiveOrgNameState] = useState(() => {
     const workspace = getActiveWorkspace();
     return workspace?.name || getActiveOrgName() || "";
   });
 
+  const demoWorkspace = useMemo(() => {
+    return isAtlasDemoWorkspace(activeOrgName, activeWorkspace);
+  }, [activeOrgName, activeWorkspace]);
+
   useEffect(() => {
     const workspace = getActiveWorkspace();
+    setActiveWorkspace(workspace);
     setActiveOrgNameState(workspace?.name || getActiveOrgName() || "");
   }, [loading]);
 
@@ -54,6 +95,7 @@ export default function Integrations() {
       setError("");
 
       const workspace = getActiveWorkspace();
+      setActiveWorkspace(workspace);
       setActiveOrgNameState(workspace?.name || getActiveOrgName() || "");
 
       const data = await getIntegrations();
@@ -61,7 +103,10 @@ export default function Integrations() {
 
       const map = {};
       list.forEach((i) => {
-        map[i.id] = i;
+        const key = i?.id || i?.provider || i?.key;
+        if (key) {
+          map[key] = i;
+        }
       });
 
       setIntegrations(map);
@@ -78,6 +123,12 @@ export default function Integrations() {
   }, []);
 
   async function handleConnect(id) {
+    if (id === "excel") {
+      setSuccess("Excel / CSV import flow can be added next.");
+      setError("");
+      return;
+    }
+
     try {
       setBusyId(id);
       setError("");
@@ -88,7 +139,10 @@ export default function Integrations() {
 
       const map = {};
       list.forEach((i) => {
-        map[i.id] = i;
+        const key = i?.id || i?.provider || i?.key;
+        if (key) {
+          map[key] = i;
+        }
       });
 
       setIntegrations(map);
@@ -102,6 +156,12 @@ export default function Integrations() {
   }
 
   async function handleDisconnect(id) {
+    if (id === "excel") {
+      setSuccess("Excel / CSV import is a manual workflow and does not need disconnecting.");
+      setError("");
+      return;
+    }
+
     try {
       setBusyId(id);
       setError("");
@@ -112,7 +172,10 @@ export default function Integrations() {
 
       const map = {};
       list.forEach((i) => {
-        map[i.id] = i;
+        const key = i?.id || i?.provider || i?.key;
+        if (key) {
+          map[key] = i;
+        }
       });
 
       setIntegrations(map);
@@ -128,7 +191,10 @@ export default function Integrations() {
   }
 
   const connectedCount = useMemo(() => {
-    return Object.values(integrations).filter((i) => i?.status === "connected").length;
+    return Object.entries(integrations).filter(([id, i]) => {
+      if (id === "excel") return false;
+      return normalizeStatus(i?.status) === "connected";
+    }).length;
   }, [integrations]);
 
   return (
@@ -190,6 +256,19 @@ export default function Integrations() {
             }}
           >
             Active Workspace: {activeOrgName || "Unknown"}
+          </div>
+
+          <div
+            style={{
+              padding: "8px 12px",
+              borderRadius: 999,
+              border: "1px solid rgba(255,255,255,0.08)",
+              background: "rgba(255,255,255,0.05)",
+              fontSize: 12,
+              fontWeight: 700,
+            }}
+          >
+            Workspace Mode: {demoWorkspace ? "Demo" : "Live"}
           </div>
 
           <div
@@ -270,10 +349,15 @@ export default function Integrations() {
       >
         {connectorCatalog.map((c) => {
           const live = integrations[c.id];
-          const status = live?.status || "disconnected";
+          const status =
+            c.id === "excel"
+              ? "disconnected"
+              : normalizeStatus(live?.status || "disconnected");
           const color = statusColor[status] || "#64748b";
           const isConnected = status === "connected";
           const isBusy = busyId === c.id;
+          const modeLabel = getWorkspaceModeLabel(demoWorkspace, live);
+          const syncLabel = getSyncLabel(c.id, live, demoWorkspace);
 
           return (
             <div
@@ -328,7 +412,7 @@ export default function Integrations() {
                   minHeight: 16,
                 }}
               >
-                {live?.mode ? `Mode: ${live.mode}` : "Mode: demo"}
+                Mode: {modeLabel}
               </div>
 
               <div
@@ -339,14 +423,13 @@ export default function Integrations() {
                   minHeight: 16,
                 }}
               >
-                {live?.lastSync ? `Last sync: ${formatDate(live.lastSync)}` : "No sync yet"}
+                {syncLabel}
               </div>
 
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                {!isConnected ? (
+              {c.id === "excel" ? (
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                   <button
                     onClick={() => handleConnect(c.id)}
-                    disabled={!!busyId}
                     style={{
                       padding: "8px 12px",
                       borderRadius: 10,
@@ -355,32 +438,17 @@ export default function Integrations() {
                       color: "#fff",
                       fontWeight: 700,
                       fontSize: 12,
-                      cursor: !!busyId ? "not-allowed" : "pointer",
-                      opacity: !!busyId ? 0.7 : 1,
+                      cursor: "pointer",
                     }}
                   >
-                    {isBusy ? "Connecting..." : "Connect"}
+                    Manual Import
                   </button>
-                ) : (
-                  <>
+                </div>
+              ) : (
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  {!isConnected ? (
                     <button
-                      disabled
-                      style={{
-                        padding: "8px 12px",
-                        borderRadius: 10,
-                        border: "1px solid rgba(34,197,94,0.30)",
-                        background: "rgba(34,197,94,0.12)",
-                        color: "#DCFCE7",
-                        fontWeight: 700,
-                        fontSize: 12,
-                        opacity: 0.95,
-                      }}
-                    >
-                      Connected
-                    </button>
-
-                    <button
-                      onClick={() => handleDisconnect(c.id)}
+                      onClick={() => handleConnect(c.id)}
                       disabled={!!busyId}
                       style={{
                         padding: "8px 12px",
@@ -394,11 +462,47 @@ export default function Integrations() {
                         opacity: !!busyId ? 0.7 : 1,
                       }}
                     >
-                      {isBusy ? "Disconnecting..." : "Disconnect"}
+                      {isBusy ? "Connecting..." : "Connect"}
                     </button>
-                  </>
-                )}
-              </div>
+                  ) : (
+                    <>
+                      <button
+                        disabled
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: 10,
+                          border: "1px solid rgba(34,197,94,0.30)",
+                          background: "rgba(34,197,94,0.12)",
+                          color: "#DCFCE7",
+                          fontWeight: 700,
+                          fontSize: 12,
+                          opacity: 0.95,
+                        }}
+                      >
+                        Connected
+                      </button>
+
+                      <button
+                        onClick={() => handleDisconnect(c.id)}
+                        disabled={!!busyId}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: 10,
+                          border: "1px solid rgba(255,255,255,0.08)",
+                          background: "rgba(255,255,255,0.05)",
+                          color: "#fff",
+                          fontWeight: 700,
+                          fontSize: 12,
+                          cursor: !!busyId ? "not-allowed" : "pointer",
+                          opacity: !!busyId ? 0.7 : 1,
+                        }}
+                      >
+                        {isBusy ? "Disconnecting..." : "Disconnect"}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
