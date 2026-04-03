@@ -410,7 +410,9 @@ export default function Dashboard() {
   const [insightsLoading, setInsightsLoading] = useState(false);
   const [insightSeed, setInsightSeed] = useState(Date.now());
 
-  const isDev = !!import.meta.env.DEV;
+  const isDev =
+  !!import.meta.env.DEV &&
+  (dashboard?.workspaceMode === "demo" || dashboard?.org?.slug === "demo");
   const [demoLoading, setDemoLoading] = useState(false);
   const [demoMsg, setDemoMsg] = useState("");
 
@@ -727,9 +729,9 @@ export default function Dashboard() {
     : new Date().toLocaleDateString();
 
   const isDemo =
-    dashboard?.org?.isDemo ||
-    dashboard?.org?.slug === "demo" ||
-    (dashboard?.org?.name || "").toLowerCase().includes("butler");
+  dashboard?.workspaceMode === "demo" ||
+  dashboard?.org?.isDemo === true ||
+  dashboard?.org?.slug === "demo";
 
   const workspaceName = isDemo
     ? "Atlas Executive Demo"
