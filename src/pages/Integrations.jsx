@@ -39,6 +39,19 @@ function formatDate(value) {
   return d.toLocaleString();
 }
 
+function getWorkspaceModeLabel(workspace) {
+  const name = String(workspace?.name || "").trim().toLowerCase();
+  const slug = String(workspace?.slug || "").trim().toLowerCase();
+  const explicitMode = String(workspace?.workspaceMode || "").trim().toLowerCase();
+
+  const isDemoWorkspace =
+    explicitMode === "demo" ||
+    slug === "atlas-demo-company" ||
+    name === "atlas demo company";
+
+  return isDemoWorkspace ? "demo" : "Live workspace";
+}
+
 export default function Integrations() {
   const [integrations, setIntegrations] = useState({});
   const [loading, setLoading] = useState(true);
@@ -54,9 +67,15 @@ export default function Integrations() {
     return workspace?.name || getActiveOrgName() || "";
   });
 
+  const [workspaceModeLabel, setWorkspaceModeLabel] = useState(() => {
+    const workspace = getActiveWorkspace();
+    return getWorkspaceModeLabel(workspace);
+  });
+
   useEffect(() => {
     const workspace = getActiveWorkspace();
     setActiveOrgNameState(workspace?.name || getActiveOrgName() || "");
+    setWorkspaceModeLabel(getWorkspaceModeLabel(workspace));
   }, [loading]);
 
   async function load() {
@@ -66,6 +85,7 @@ export default function Integrations() {
 
       const workspace = getActiveWorkspace();
       setActiveOrgNameState(workspace?.name || getActiveOrgName() || "");
+      setWorkspaceModeLabel(getWorkspaceModeLabel(workspace));
 
       const data = await getIntegrations();
       const list = Array.isArray(data?.integrations) ? data.integrations : [];
@@ -179,6 +199,8 @@ export default function Integrations() {
           summary.metricsInserted || 0
         }, Skipped: ${summary.skipped || 0}`
       );
+
+      await load();
     } catch (err) {
       console.error(err);
       setError(err?.message || "Failed to import spreadsheet");
@@ -259,6 +281,20 @@ export default function Integrations() {
             }}
           >
             Active Workspace: {activeOrgName || "Unknown"}
+          </div>
+
+          <div
+            style={{
+              padding: "8px 12px",
+              borderRadius: 999,
+              border: "1px solid rgba(255,255,255,0.08)",
+              background: "rgba(255,255,255,0.05)",
+              fontSize: 12,
+              fontWeight: 700,
+              textTransform: "capitalize",
+            }}
+          >
+            Workspace Mode: {workspaceModeLabel}
           </div>
 
           <div
@@ -395,13 +431,14 @@ export default function Integrations() {
                   opacity: 0.75,
                   marginBottom: 6,
                   minHeight: 16,
+                  textTransform: live?.mode === "demo" ? "lowercase" : "none",
                 }}
               >
                 {c.manual
-                  ? "Mode: Live workspace"
+                  ? `Mode: ${workspaceModeLabel}`
                   : live?.mode
                   ? `Mode: ${live.mode}`
-                  : "Mode: Live workspace"}
+                  : `Mode: ${workspaceModeLabel}`}
               </div>
 
               <div
