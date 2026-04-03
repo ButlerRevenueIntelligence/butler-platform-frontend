@@ -1,5 +1,4 @@
-  // frontend/src/pages/Dashboard.jsx
-import React, { useEffect, useMemo, useState } from "react";
+  import React, { useEffect, useMemo, useState } from "react";
 import {
   apiGet,
   getDashboard,
@@ -38,7 +37,6 @@ import OpportunityRadar from "../components/atlas/OpportunityRadar";
 import RevenueTimeline from "../components/atlas/RevenueTimeline";
 import LiveRevenueSnapshot from "../components/atlas/LiveRevenueSnapshot";
 import DealRiskDetectionAI from "../components/atlas/DealRiskDetectionAI";
-import ExecutiveSummary from "../components/ExecutiveSummary";
 import PaywallModal from "../components/PaywallModal";
 
 import {
@@ -182,39 +180,13 @@ const integrationMeta = (i) => {
   return `Last sync: ${d.toLocaleString()}`;
 };
 
-const buildLocalInsights = (kpis, seed = 0, hasLiveData = false) => {
+const buildLocalInsights = (kpis, seed = 0) => {
   const jitter = (base, range = 6) => {
     const r = Math.sin((seed + base) * 999) * 10000;
     const frac = r - Math.floor(r);
     const delta = (frac - 0.5) * range * 2;
     return clamp(Math.round(base + delta), 60, 97);
   };
-
-  if (!hasLiveData) {
-    return [
-      {
-        type: "OPPORTUNITY",
-        impact: "SETUP",
-        confidence: 100,
-        title: "Connect data sources to begin live reporting",
-        body: "Atlas is ready, but this workspace does not have live revenue, pipeline, or attribution data yet.",
-      },
-      {
-        type: "OPPORTUNITY",
-        impact: "SETUP",
-        confidence: 100,
-        title: "Add your first deal or import a spreadsheet",
-        body: "Once deals, metrics, or spreadsheet data are added, Atlas will begin showing forecasting, stage visibility, and revenue insights.",
-      },
-      {
-        type: "OPPORTUNITY",
-        impact: "SETUP",
-        confidence: 100,
-        title: "Invite your team and connect your stack",
-        body: "Connect CRM, ads, analytics, payments, or Excel/CSV imports to activate workspace intelligence.",
-      },
-    ];
-  }
 
   const items = [];
 
@@ -246,6 +218,14 @@ const buildLocalInsights = (kpis, seed = 0, hasLiveData = false) => {
         body: "Run controlled experiments (landing page + offer tests) to lift conversion rate while maintaining CAC.",
       });
     }
+  } else {
+    items.push({
+      type: "OPPORTUNITY",
+      impact: "HIGH IMPACT",
+      confidence: jitter(78),
+      title: "Connect data sources to unlock attribution",
+      body: "Once ads + CRM are connected, the platform will show true revenue attribution and predictable pipeline forecasting.",
+    });
   }
 
   if (kpis.coverage >= 4) {
@@ -264,7 +244,7 @@ const buildLocalInsights = (kpis, seed = 0, hasLiveData = false) => {
       title: "Pipeline is workable, but needs lift",
       body: "Aim for 4x coverage to stabilize forecasting and reduce revenue volatility.",
     });
-  } else if (kpis.pipelineValue > 0 || kpis.revenue30 > 0) {
+  } else {
     items.push({
       type: "WARNING",
       impact: "HIGH IMPACT",
@@ -282,7 +262,7 @@ const buildLocalInsights = (kpis, seed = 0, hasLiveData = false) => {
       title: "CAC is elevated",
       body: "Reduce CAC by tightening ICP targeting, adding retargeting, and improving landing page conversion rate.",
     });
-  } else if (kpis.cac > 0) {
+  } else {
     items.push({
       type: "SUCCESS",
       impact: "MEDIUM IMPACT",
@@ -369,7 +349,10 @@ function normalizeScenarios(res) {
 }
 
 function MiniRegionMarker({ region, onClick }) {
-  const size = Math.max(14, Math.min(26, Math.round((region.pipeline / 1_000_000) * 1.4 + 10)));
+  const size = Math.max(
+    14,
+    Math.min(26, Math.round((safeNum(region.pipeline) / 1_000_000) * 1.4 + 10))
+  );
 
   return (
     <Marker longitude={region.lng} latitude={region.lat} anchor="center">
@@ -392,7 +375,7 @@ function MiniRegionMarker({ region, onClick }) {
               ? "radial-gradient(circle at 35% 35%, #d8fbff, #22c55e 58%, #0891b2 100%)"
               : region.signal >= 35
               ? "radial-gradient(circle at 35% 35%, #fef3c7, #f59e0b 58%, #d97706 100%)"
-              : "radial-gradient(circle at 35% 35%, #fecdd3, #fb7185 58%, #be123c 100%)",
+              : "radial-gradient(circle at 35% 35%, #cbd5e1, #64748b 58%, #334155 100%)",
           boxShadow: "0 0 0 8px rgba(56,189,248,0.10), 0 10px 24px rgba(0,0,0,0.35)",
         }}
       />
@@ -428,9 +411,7 @@ export default function Dashboard() {
   const [insightsLoading, setInsightsLoading] = useState(false);
   const [insightSeed, setInsightSeed] = useState(Date.now());
 
-  const isDev =
-  !!import.meta.env.DEV &&
-  (dashboard?.workspaceMode === "demo" || dashboard?.org?.slug === "demo");
+  const isDev = !!import.meta.env.DEV;
   const [demoLoading, setDemoLoading] = useState(false);
   const [demoMsg, setDemoMsg] = useState("");
 
@@ -447,6 +428,44 @@ export default function Dashboard() {
   const [inviteMsg, setInviteMsg] = useState("");
   const [inviteErr, setInviteErr] = useState("");
   const [showPaywall, setShowPaywall] = useState(false);
+
+  const [clients, setClients] = useState([]);
+  const [clientsLoading, setClientsLoading] = useState(false);
+
+  const [showClientModal, setShowClientModal] = useState(false);
+  const [showDealModal, setShowDealModal] = useState(false);
+
+  const [clientForm, setClientForm] = useState({
+    name: "",
+    website: "",
+    industry: "",
+    primaryContactName: "",
+    primaryContactEmail: "",
+    primaryContactPhone: "",
+    status: "active",
+    notes: "",
+  });
+
+  const [dealForm, setDealForm] = useState({
+    name: "",
+    amount: "",
+    stage: "Discovery",
+    probability: "0.5",
+    clientId: "",
+    closeDate: "",
+    nextAction: "",
+    nextActionDueAt: "",
+    closedReason: "",
+    competitor: "",
+    reactivationAt: "",
+  });
+
+  const [clientSubmitting, setClientSubmitting] = useState(false);
+  const [dealSubmitting, setDealSubmitting] = useState(false);
+  const [clientModalMsg, setClientModalMsg] = useState("");
+  const [clientModalErr, setClientModalErr] = useState("");
+  const [dealModalMsg, setDealModalMsg] = useState("");
+  const [dealModalErr, setDealModalErr] = useState("");
 
   async function checkAccess() {
     const me = await apiGet("/me");
@@ -511,12 +530,31 @@ export default function Dashboard() {
     }
   }
 
+  async function loadClients() {
+    try {
+      setClientsLoading(true);
+      const res = await getClients();
+      const list = Array.isArray(res?.clients)
+        ? res.clients
+        : Array.isArray(res)
+        ? res
+        : [];
+      setClients(list);
+      return list;
+    } catch (e) {
+      console.error("Clients load error:", e);
+      return [];
+    } finally {
+      setClientsLoading(false);
+    }
+  }
+
   useEffect(() => {
     let alive = true;
 
     (async () => {
       if (!alive) return;
-      await loadDashboardData();
+      await Promise.all([loadDashboardData(), loadClients()]);
     })();
 
     return () => {
@@ -534,6 +572,146 @@ export default function Dashboard() {
 
     return () => clearInterval(interval);
   }, []);
+
+  function resetClientForm() {
+    setClientForm({
+      name: "",
+      website: "",
+      industry: "",
+      primaryContactName: "",
+      primaryContactEmail: "",
+      primaryContactPhone: "",
+      status: "active",
+      notes: "",
+    });
+    setClientModalMsg("");
+    setClientModalErr("");
+  }
+
+  function resetDealForm(nextClientId = "") {
+    setDealForm({
+      name: "",
+      amount: "",
+      stage: "Discovery",
+      probability: "0.5",
+      clientId: nextClientId,
+      closeDate: "",
+      nextAction: "",
+      nextActionDueAt: "",
+      closedReason: "",
+      competitor: "",
+      reactivationAt: "",
+    });
+    setDealModalMsg("");
+    setDealModalErr("");
+  }
+
+  async function openClientModal() {
+    resetClientForm();
+    setShowClientModal(true);
+  }
+
+  async function openDealModal() {
+    const list = clients.length ? clients : await loadClients();
+    const firstClientId = list?.[0]?._id || list?.[0]?.id || "";
+    resetDealForm(firstClientId);
+    setShowDealModal(true);
+  }
+
+  async function handleCreateClientSubmit(e) {
+    e.preventDefault();
+    setClientModalMsg("");
+    setClientModalErr("");
+
+    if (!clientForm.name.trim()) {
+      setClientModalErr("Client name is required.");
+      return;
+    }
+
+    try {
+      setClientSubmitting(true);
+
+      const res = await createClient({
+        ...clientForm,
+        name: clientForm.name.trim(),
+        website: clientForm.website.trim(),
+        industry: clientForm.industry.trim(),
+        primaryContactName: clientForm.primaryContactName.trim(),
+        primaryContactEmail: clientForm.primaryContactEmail.trim(),
+        primaryContactPhone: clientForm.primaryContactPhone.trim(),
+        notes: clientForm.notes.trim(),
+      });
+
+      const createdClient = res?.client || null;
+      const freshClients = await loadClients();
+      await loadDashboardData();
+
+      setClientModalMsg("Client created successfully.");
+
+      const createdClientId =
+        createdClient?._id ||
+        createdClient?.id ||
+        freshClients?.[0]?._id ||
+        freshClients?.[0]?.id ||
+        "";
+
+      setShowClientModal(false);
+      resetClientForm();
+
+      if (createdClientId) {
+        resetDealForm(createdClientId);
+      }
+    } catch (e) {
+      console.error("Create client error:", e);
+      setClientModalErr(e?.message || "Failed to create client.");
+    } finally {
+      setClientSubmitting(false);
+    }
+  }
+
+  async function handleCreateDealSubmit(e) {
+    e.preventDefault();
+    setDealModalMsg("");
+    setDealModalErr("");
+
+    if (!dealForm.name.trim()) {
+      setDealModalErr("Deal name is required.");
+      return;
+    }
+
+    if (!dealForm.clientId) {
+      setDealModalErr("Please select a client.");
+      return;
+    }
+
+    try {
+      setDealSubmitting(true);
+
+      await createDeal({
+        name: dealForm.name.trim(),
+        amount: Number(dealForm.amount || 0),
+        stage: dealForm.stage,
+        probability: Number(dealForm.probability || 0.5),
+        clientId: dealForm.clientId,
+        closeDate: dealForm.closeDate || null,
+        nextAction: dealForm.nextAction.trim(),
+        nextActionDueAt: dealForm.nextActionDueAt || null,
+        closedReason: dealForm.closedReason.trim(),
+        competitor: dealForm.competitor.trim(),
+        reactivationAt: dealForm.reactivationAt || null,
+      });
+
+      await loadDashboardData();
+      setShowDealModal(false);
+      resetDealForm(clients?.[0]?._id || clients?.[0]?.id || "");
+      setDealModalMsg("Deal created successfully.");
+    } catch (e) {
+      console.error("Create deal error:", e);
+      setDealModalErr(e?.message || "Failed to create deal.");
+    } finally {
+      setDealSubmitting(false);
+    }
+  }
 
   async function onLoadDemoData() {
     if (demoLoading) return;
@@ -558,7 +736,7 @@ export default function Dashboard() {
 
       localStorage.setItem(guardKey, "1");
       setDemoMsg("✅ Demo data loaded. Refreshing…");
-      await loadDashboardData();
+      await Promise.all([loadDashboardData(), loadClients()]);
       setDemoMsg("✅ Demo data loaded successfully.");
       setTimeout(() => setDemoMsg(""), 3500);
     } catch (e) {
@@ -669,27 +847,27 @@ export default function Dashboard() {
     () => (Array.isArray(pipeline?.deals) ? pipeline.deals : []),
     [pipeline]
   );
-  
- const hasMetricsData = useMemo(() => {
-  return metrics.some(
-    (m) => safeNum(m.revenue) > 0 || safeNum(m.spend) > 0 || safeNum(m.leads) > 0
-  );
-}, [metrics]);
 
-const hasDealsData = useMemo(() => {
-  return deals.some((d) => safeNum(d?.amount ?? d?.value ?? d?.pipelineValue) > 0);
-}, [deals]);
+  const hasLiveData = useMemo(() => {
+    const hasMetrics = metrics.some(
+      (m) => safeNum(m.revenue) > 0 || safeNum(m.spend) > 0 || safeNum(m.leads) > 0
+    );
 
-const hasAttributionData = useMemo(() => {
-  return channelChart.some(
-    (c) => safeNum(c.revenue) > 0 || safeNum(c.spend) > 0 || safeNum(c.leads) > 0
-  );
-}, [channelChart]);
+    const hasDeals = deals.some(
+      (d) => safeNum(d?.amount ?? d?.value ?? d?.pipelineValue) > 0
+    );
 
-const scenarioList = useMemo(() => {
-  if (Array.isArray(serverScenarios) && serverScenarios.length) return serverScenarios;
-  return hasLiveData ? FALLBACK_SCENARIOS : [FALLBACK_SCENARIOS[0]];
-}, [serverScenarios, hasLiveData]);
+    const hasAttribution = channelChart.some(
+      (c) => safeNum(c.revenue) > 0 || safeNum(c.spend) > 0 || safeNum(c.leads) > 0
+    );
+
+    return hasMetrics || hasDeals || hasAttribution;
+  }, [metrics, deals, channelChart]);
+
+  const scenarioList = useMemo(() => {
+    if (Array.isArray(serverScenarios) && serverScenarios.length) return serverScenarios;
+    return FALLBACK_SCENARIOS;
+  }, [serverScenarios]);
 
   const activeScenario = useMemo(() => {
     const found = scenarioList.find((s) => s.key === scenarioKey);
@@ -697,6 +875,22 @@ const scenarioList = useMemo(() => {
   }, [scenarioList, scenarioKey]);
 
   const kpis = useMemo(() => {
+    if (!hasLiveData) {
+      return {
+        revenue30: 0,
+        spend30: 0,
+        leads30: 0,
+        pipelineValue: 0,
+        cac: 0,
+        forecast90: 0,
+        coverage: 0,
+        wow: null,
+        healthScore: 0,
+        risk: { label: "No Data Yet", tone: "warn" },
+        scenario: activeScenario,
+      };
+    }
+
     const m = activeScenario?.multipliers || {
       revenue: 1,
       spend: 1,
@@ -731,16 +925,11 @@ const scenarioList = useMemo(() => {
     const coverage = revenue30 > 0 ? pipelineValue / revenue30 : 0;
     const wow = calcWoW(metrics);
 
-    const hasKpiData =
-      revenue30 > 0 || spend30 > 0 || leads30 > 0 || pipelineValue > 0;
-
-    const base = hasKpiData ? clamp(coverage * 25, 20, 100) : 0;
-    const boost = hasKpiData && wow != null ? clamp(wow, -10, 10) : 0;
+    const base = clamp(coverage * 25, 20, 100);
+    const boost = wow == null ? 0 : clamp(wow, -10, 10);
     const healthScore = clamp(base + boost, 0, 100);
 
-    const risk = hasKpiData
-      ? riskFromCoverage(coverage)
-      : { label: "No Live Data", tone: "warn" };
+    const risk = riskFromCoverage(coverage);
 
     return {
       revenue30,
@@ -755,7 +944,7 @@ const scenarioList = useMemo(() => {
       risk,
       scenario: activeScenario,
     };
-  }, [dashboard, metrics, pipeline, deals, activeScenario]);
+  }, [dashboard, metrics, pipeline, deals, activeScenario, hasLiveData]);
 
   const lastUpdatedLabel = dashboard?.lastUpdated
     ? new Date(dashboard.lastUpdated).toLocaleString()
@@ -768,15 +957,11 @@ const scenarioList = useMemo(() => {
     : new Date().toLocaleDateString();
 
   const isDemo =
-  dashboard?.workspaceMode === "demo" ||
-  dashboard?.org?.isDemo ||
-  dashboard?.org?.slug === "atlas-demo-company";
+    dashboard?.org?.isDemo ||
+    dashboard?.org?.slug === "demo" ||
+    (dashboard?.org?.name || "").toLowerCase().includes("butler");
 
-const workspaceName = isDemo
-  ? "Atlas Executive Demo"
-  : dashboard?.org?.name || "Atlas Workspace";
-
-const orgName = dashboard?.org?.name || dashboard?.orgName || "Atlas Workspace";
+  const orgName = dashboard?.org?.name || dashboard?.orgName || "Atlas Workspace";
 
   const targets = useMemo(() => {
     const monthlyRevenueGoal =
@@ -785,7 +970,8 @@ const orgName = dashboard?.org?.name || dashboard?.orgName || "Atlas Workspace";
       0;
 
     const quarterlyRevenueGoal =
-      safeNum(dashboard?.targets?.quarterlyRevenueGoal) || monthlyRevenueGoal * 3;
+      safeNum(dashboard?.targets?.quarterlyRevenueGoal) ||
+      (monthlyRevenueGoal > 0 ? monthlyRevenueGoal * 3 : 0);
 
     const currentMonthRevenue = safeNum(kpis.revenue30);
     const currentQuarterForecast = safeNum(kpis.forecast90);
@@ -806,83 +992,86 @@ const orgName = dashboard?.org?.name || dashboard?.orgName || "Atlas Workspace";
   }, [dashboard, kpis]);
 
   const liveRevenueSnapshot = useMemo(() => {
-  const projectedRevenue = safeNum(kpis.forecast90);
-  const pipelineValue = safeNum(kpis.pipelineValue);
-
-  const dealsAtRisk = hasDealsData
-    ? Math.max(
-        0,
-        deals.filter((d) => {
-          const staleDays = safeNum(d?.daysInStage ?? d?.staleDays ?? d?.ageDays);
-          const probability = safeNum(d?.probability ?? d?.closeProbability ?? 0);
-          return staleDays > 18 || probability < 35;
-        }).length
-      )
-    : 0;
-
-  const activeOpportunities = Array.isArray(deals)
-    ? deals.filter((d) => {
-        const stage = normalizeStage(d?.stage || d?.status);
-        return stage !== "Closed Won" && stage !== "Closed Lost";
-      }).length
-    : 0;
-
-  const forecastConfidence = hasLiveData
-    ? clamp(
-        Math.round((safeNum(rss?.score) || safeNum(kpis.healthScore)) * 0.95),
-        55,
-        98
-      )
-    : 0;
-
-  return {
-    projectedRevenue,
-    pipelineValue,
-    dealsAtRisk,
-    activeOpportunities,
-    forecastConfidence,
-  };
-}, [kpis, rss, deals, hasDealsData, hasLiveData]);
- 
-const dealRiskItems = useMemo(() => {
-  const sortedDeals = [...(Array.isArray(deals) ? deals : [])]
-    .map((d) => {
-      const value = safeNum(d?.amount ?? d?.value ?? d?.pipelineValue);
-      const stage = normalizeStage(d?.stage || d?.status);
-      const staleDays = safeNum(d?.daysInStage ?? d?.staleDays ?? d?.ageDays);
-      const probability = safeNum(d?.probability ?? d?.closeProbability ?? 0);
-
-      let risk = "Watch";
-      let reason = "Atlas AI suggests this deal should be monitored closely.";
-
-      if (staleDays > 30 || probability < 35) {
-        risk = "High";
-        reason =
-          "Atlas AI detected stalled movement, weak next-step clarity, and elevated close risk.";
-      } else if (staleDays > 18 || probability < 50) {
-        risk = "Medium";
-        reason =
-          "Opportunity is aging in stage longer than expected and follow-up velocity is slowing.";
-      }
-
+    if (!hasLiveData) {
       return {
-        title: d?.name || d?.title || "Opportunity",
-        stage,
-        risk,
-        value,
-        reason,
+        projectedRevenue: 0,
+        pipelineValue: 0,
+        dealsAtRisk: 0,
+        activeOpportunities: 0,
+        forecastConfidence: 0,
       };
-    })
-    .filter((d) => d.value > 0)
-    .sort((a, b) => {
-      const riskWeight = { High: 3, Medium: 2, Watch: 1 };
-      return (riskWeight[b.risk] || 0) - (riskWeight[a.risk] || 0) || b.value - a.value;
-    });
+    }
 
-  return sortedDeals.slice(0, 4);
-}, [deals]);
- 
-    async function onGenerateInsights() {
+    const projectedRevenue = Math.max(
+      safeNum(kpis.forecast90),
+      safeNum(kpis.revenue30) * 3
+    );
+
+    const pipelineValue = safeNum(kpis.pipelineValue);
+    const dealsAtRisk = Math.max(
+      0,
+      Math.round((safeNum(rss?.score) < 70 ? 3 : 1) + safeNum(dashboard?.staleDeals || 0))
+    );
+    const activeOpportunities = Array.isArray(deals) ? deals.length : 0;
+
+    const forecastConfidence = clamp(
+      Math.round((safeNum(rss?.score) || safeNum(kpis.healthScore)) * 0.95),
+      55,
+      98
+    );
+
+    return {
+      projectedRevenue,
+      pipelineValue,
+      dealsAtRisk,
+      activeOpportunities,
+      forecastConfidence,
+    };
+  }, [kpis, rss, dashboard, deals, hasLiveData]);
+
+  const dealRiskItems = useMemo(() => {
+    if (!hasLiveData) return [];
+
+    const sortedDeals = [...(Array.isArray(deals) ? deals : [])]
+      .map((d, idx) => {
+        const value = safeNum(d?.amount ?? d?.value ?? d?.pipelineValue);
+        const stage = normalizeStage(d?.stage || d?.status);
+        const staleDays = safeNum(d?.daysInStage ?? d?.staleDays ?? d?.ageDays);
+        const probability = safeNum(d?.probability ?? d?.closeProbability ?? 0);
+
+        let risk = "Watch";
+        let reason = "Atlas AI suggests this deal should be monitored closely.";
+
+        if (staleDays > 30 || probability < 35) {
+          risk = "High";
+          reason =
+            "Atlas AI detected stalled movement, weak next-step clarity, and elevated close risk.";
+        } else if (staleDays > 18 || probability < 50) {
+          risk = "Medium";
+          reason =
+            "Opportunity is aging in stage longer than expected and follow-up velocity is slowing.";
+        } else {
+          reason =
+            "Multiple timing and activity signals suggest this opportunity should remain on the watchlist.";
+        }
+
+        return {
+          title: d?.name || d?.title || `Opportunity ${idx + 1}`,
+          stage,
+          risk,
+          value,
+          reason,
+        };
+      })
+      .sort((a, b) => {
+        const riskWeight = { High: 3, Medium: 2, Watch: 1 };
+        return (riskWeight[b.risk] || 0) - (riskWeight[a.risk] || 0) || b.value - a.value;
+      });
+
+    return sortedDeals.slice(0, 4);
+  }, [deals, hasLiveData]);
+
+  async function onGenerateInsights() {
     try {
       setInsightsLoading(true);
       setError("");
@@ -981,175 +1170,168 @@ const dealRiskItems = useMemo(() => {
       .sort((a, b) => b.value - a.value);
   }, [deals]);
 
-  const insights = useMemo(
-  () => buildLocalInsights(kpis, insightSeed, hasLiveData),
-  [kpis, insightSeed, hasLiveData]
-);
+  const insights = useMemo(() => {
+    if (!hasLiveData) return [];
+    return buildLocalInsights(kpis, insightSeed);
+  }, [kpis, insightSeed, hasLiveData]);
+
   const displayedInsights = aiInsights?.length ? aiInsights : insights;
 
   const donutColors = ["#7C5CFF", "#22C55E", "#F59E0B", "#38BDF8", "#FB7185", "#A3A3A3"];
 
   const rsi = useMemo(() => {
-  if (!hasLiveData) {
-    return { score: 0, tier: "No Live Data" };
-  }
+    if (!hasLiveData) {
+      return { score: 0, tier: "No Data Yet" };
+    }
 
-  const score =
-    rss?.ok && Number.isFinite(Number(rss.score))
-      ? Number(rss.score)
-      : clamp(Math.round(kpis.healthScore), 0, 100);
+    const score =
+      rss?.ok && Number.isFinite(Number(rss.score))
+        ? Number(rss.score)
+        : clamp(Math.round(kpis.healthScore), 0, 100);
 
-  const tier =
-    score >= 85
-      ? "Strong"
-      : score >= 70
-      ? "Controlled Volatility"
-      : score >= 55
-      ? "Watchlist"
-      : "High Risk";
+    const tier =
+      score >= 85
+        ? "Strong"
+        : score >= 70
+        ? "Controlled Volatility"
+        : score >= 55
+        ? "Watchlist"
+        : "High Risk";
 
-  return { score, tier };
-}, [rss, kpis, hasLiveData]);
+    return { score, tier };
+  }, [rss, kpis, hasLiveData]);
 
   const overviewSignals = useMemo(() => {
-  if (!hasLiveData) {
-    return [
-      "No live revenue data yet",
-      "No live pipeline data yet",
-      "No live attribution data yet",
-      "Connect integrations or upload a spreadsheet to activate reporting",
-    ];
-  }
+    if (!hasLiveData) return [];
 
-  const items = [];
+    const items = [];
 
-  if (kpis.wow != null) {
-    items.push(
-      kpis.wow >= 0
-        ? `Revenue momentum is up ${Math.abs(kpis.wow).toFixed(1)}% week over week`
-        : `Revenue momentum is down ${Math.abs(kpis.wow).toFixed(1)}% week over week`
-    );
-  }
+    if (kpis.wow != null) {
+      items.push(
+        kpis.wow >= 0
+          ? `Revenue momentum is up ${Math.abs(kpis.wow).toFixed(1)}% week over week`
+          : `Revenue momentum is down ${Math.abs(kpis.wow).toFixed(1)}% week over week`
+      );
+    }
 
-  if (kpis.coverage < 2) {
-    items.push("Pipeline coverage is below target and needs immediate lift");
-  } else if (kpis.coverage < 4) {
-    items.push("Pipeline coverage is workable but not yet elite");
-  } else {
-    items.push("Pipeline coverage is strong and protecting forecast stability");
-  }
+    if (kpis.coverage < 2) {
+      items.push("Pipeline coverage is below target and needs immediate lift");
+    } else if (kpis.coverage < 4) {
+      items.push("Pipeline coverage is workable but not yet elite");
+    } else {
+      items.push("Pipeline coverage is strong and protecting forecast stability");
+    }
 
-  if (channelChart.length) {
-    items.push(
-      `${channelChart[0]?.channel || "Top channel"} is currently leading attributed revenue`
-    );
-  }
+    if (channelChart.length) {
+      items.push(
+        `${channelChart[0]?.channel || "Top channel"} is currently leading attributed revenue`
+      );
+    }
 
-  if (integrations.length < 2) {
-    items.push("More integrations should be connected to unlock fuller attribution visibility");
-  }
+    if (integrations.length < 2) {
+      items.push("More integrations should be connected to unlock fuller attribution visibility");
+    }
 
-  if (safeNum(kpis.cac) > 500) {
-    items.push("Customer acquisition cost is elevated and should be reviewed");
-  }
+    if (safeNum(kpis.cac) > 500) {
+      items.push("Customer acquisition cost is elevated and should be reviewed");
+    }
 
-  return items.slice(0, 5);
-}, [kpis, channelChart, integrations, hasLiveData]);
+    return items.slice(0, 5);
+  }, [kpis, channelChart, integrations, hasLiveData]);
 
   const regionalSignals = useMemo(() => {
-  const pipelineBase = safeNum(kpis.pipelineValue || 0);
-  const revenueBase = safeNum(kpis.revenue30 || 0);
+    if (!hasLiveData) {
+      return [
+        {
+          region: "North America",
+          signal: 0,
+          revenue: 0,
+          pipeline: 0,
+          note: "No live regional data yet.",
+          lat: 37.0902,
+          lng: -95.7129,
+        },
+        {
+          region: "Europe",
+          signal: 0,
+          revenue: 0,
+          pipeline: 0,
+          note: "No live regional data yet.",
+          lat: 50.1109,
+          lng: 8.6821,
+        },
+        {
+          region: "Asia",
+          signal: 0,
+          revenue: 0,
+          pipeline: 0,
+          note: "No live regional data yet.",
+          lat: 1.3521,
+          lng: 103.8198,
+        },
+        {
+          region: "LATAM",
+          signal: 0,
+          revenue: 0,
+          pipeline: 0,
+          note: "No live regional data yet.",
+          lat: -15.7801,
+          lng: -47.9292,
+        },
+      ];
+    }
 
-  if (!hasLiveData) {
+    const pipelineBase = safeNum(kpis.pipelineValue || 0);
+    const revenueBase = safeNum(kpis.revenue30 || 0);
+
     return [
       {
         region: "North America",
-        signal: 0,
-        revenue: 0,
-        pipeline: 0,
-        note: "No live regional data yet.",
+        signal: 72,
+        revenue: revenueBase * 0.46,
+        pipeline: pipelineBase * 0.44,
+        note: "Strongest current execution zone",
         lat: 37.0902,
         lng: -95.7129,
       },
       {
         region: "Europe",
-        signal: 0,
-        revenue: 0,
-        pipeline: 0,
-        note: "No live regional data yet.",
+        signal: 44,
+        revenue: revenueBase * 0.24,
+        pipeline: pipelineBase * 0.27,
+        note: "Healthy pipeline, moderate close pressure",
         lat: 50.1109,
         lng: 8.6821,
       },
       {
         region: "Asia",
-        signal: 0,
-        revenue: 0,
-        pipeline: 0,
-        note: "No live regional data yet.",
+        signal: 38,
+        revenue: revenueBase * 0.18,
+        pipeline: pipelineBase * 0.19,
+        note: "Emerging expansion territory",
         lat: 1.3521,
         lng: 103.8198,
       },
       {
         region: "LATAM",
-        signal: 0,
-        revenue: 0,
-        pipeline: 0,
-        note: "No live regional data yet.",
+        signal: 21,
+        revenue: revenueBase * 0.12,
+        pipeline: pipelineBase * 0.1,
+        note: "Early-stage opportunity density",
         lat: -15.7801,
         lng: -47.9292,
       },
-    ];
-  }
+    ].sort((a, b) => b.signal - a.signal);
+  }, [kpis, hasLiveData]);
 
-  return [
-    {
-      region: "North America",
-      signal: 72,
-      revenue: revenueBase * 0.46,
-      pipeline: pipelineBase * 0.44,
-      note: "Strongest current execution zone",
-      lat: 37.0902,
-      lng: -95.7129,
-    },
-    {
-      region: "Europe",
-      signal: 44,
-      revenue: revenueBase * 0.24,
-      pipeline: pipelineBase * 0.27,
-      note: "Healthy pipeline, moderate close pressure",
-      lat: 50.1109,
-      lng: 8.6821,
-    },
-    {
-      region: "Asia",
-      signal: 38,
-      revenue: revenueBase * 0.18,
-      pipeline: pipelineBase * 0.19,
-      note: "Emerging expansion territory",
-      lat: 1.3521,
-      lng: 103.8198,
-    },
-    {
-      region: "LATAM",
-      signal: 21,
-      revenue: revenueBase * 0.12,
-      pipeline: pipelineBase * 0.1,
-      note: "Early-stage opportunity density",
-      lat: -15.7801,
-      lng: -47.9292,
-    },
-  ].sort((a, b) => b.signal - a.signal);
-}, [kpis, hasLiveData]);
-
-
-  const revenueFlows = useMemo(
-    () => [
+  const revenueFlows = useMemo(() => {
+    if (!hasLiveData) return [];
+    return [
       { from: "North America", to: "Europe" },
       { from: "North America", to: "Asia" },
       { from: "Europe", to: "Asia" },
-    ],
-    []
-  );
+    ];
+  }, [hasLiveData]);
 
   const revenueFlowGeoJson = useMemo(() => {
     return {
@@ -1529,6 +1711,116 @@ const dealRiskItems = useMemo(() => {
         background: "rgba(34,197,94,0.12)",
         color: "rgba(234,240,255,0.95)",
       },
+      secondaryBtn: {
+        borderRadius: 999,
+        padding: "10px 14px",
+        border: "1px solid rgba(255,255,255,0.10)",
+        background: "rgba(255,255,255,0.035)",
+        color: "#EAF0FF",
+        fontWeight: 800,
+        fontSize: 12,
+        cursor: "pointer",
+      },
+      modalOverlay: {
+        position: "fixed",
+        inset: 0,
+        zIndex: 1000,
+        background: "rgba(2,6,23,0.70)",
+        backdropFilter: "blur(8px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+      },
+      modalCard: {
+        width: "min(900px, 100%)",
+        maxHeight: "90vh",
+        overflowY: "auto",
+        borderRadius: 18,
+        border: "1px solid rgba(255,255,255,0.10)",
+        background:
+          "linear-gradient(180deg, rgba(8,14,28,0.98), rgba(5,9,18,0.96))",
+        boxShadow: "0 22px 60px rgba(0,0,0,0.45)",
+        padding: 18,
+      },
+      modalHeaderRow: {
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "space-between",
+        gap: 12,
+        marginBottom: 14,
+      },
+      modalEyebrow: {
+        fontSize: 10,
+        textTransform: "uppercase",
+        letterSpacing: "0.14em",
+        color: "rgba(148,163,184,0.78)",
+        fontWeight: 800,
+      },
+      modalTitle: {
+        marginTop: 4,
+        fontSize: 22,
+        lineHeight: 1.1,
+        fontWeight: 900,
+        color: "#fff",
+      },
+      modalCloseBtn: {
+        border: "1px solid rgba(255,255,255,0.10)",
+        background: "rgba(255,255,255,0.04)",
+        color: "#EAF0FF",
+        borderRadius: 999,
+        width: 36,
+        height: 36,
+        cursor: "pointer",
+        fontSize: 14,
+        fontWeight: 900,
+      },
+      modalForm: {
+        display: "grid",
+        gap: 14,
+      },
+      formGrid2: {
+        display: "grid",
+        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+        gap: 12,
+      },
+      fieldWrap: {
+        display: "grid",
+        gap: 6,
+      },
+      fieldLabel: {
+        fontSize: 11,
+        fontWeight: 800,
+        letterSpacing: "0.06em",
+        textTransform: "uppercase",
+        color: "rgba(226,232,240,0.72)",
+      },
+      input: {
+        padding: 12,
+        borderRadius: 10,
+        border: "1px solid rgba(255,255,255,0.12)",
+        background: "rgba(255,255,255,0.04)",
+        color: "#EAF0FF",
+        outline: "none",
+        width: "100%",
+      },
+      textarea: {
+        padding: 12,
+        borderRadius: 10,
+        border: "1px solid rgba(255,255,255,0.12)",
+        background: "rgba(255,255,255,0.04)",
+        color: "#EAF0FF",
+        outline: "none",
+        width: "100%",
+        resize: "vertical",
+      },
+      modalActionRow: {
+        display: "flex",
+        justifyContent: "flex-end",
+        gap: 10,
+        flexWrap: "wrap",
+        marginTop: 4,
+      },
     };
   }, []);
 
@@ -1567,10 +1859,22 @@ const dealRiskItems = useMemo(() => {
 
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap", justifyContent: "flex-end" }}>
           <div style={{ minWidth: 260 }}>
-            <OrgSwitcher onSwitched={loadDashboardData} />
+            <OrgSwitcher
+              onSwitched={async () => {
+                await Promise.all([loadDashboardData(), loadClients()]);
+              }}
+            />
           </div>
 
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            <button onClick={openClientModal} style={S.actionBtn}>
+              Add Client
+            </button>
+
+            <button onClick={openDealModal} style={S.actionBtn}>
+              Add Deal
+            </button>
+
             {isDev ? (
               <button
                 onClick={onLoadDemoData}
@@ -1669,11 +1973,17 @@ const dealRiskItems = useMemo(() => {
       </div>
 
       <div style={S.signalStrip}>
-        {overviewSignals.map((signal, idx) => (
-          <div key={`${signal}-${idx}`} style={S.signalPill}>
-            {signal}
+        {overviewSignals.length ? (
+          overviewSignals.map((signal, idx) => (
+            <div key={`${signal}-${idx}`} style={S.signalPill}>
+              {signal}
+            </div>
+          ))
+        ) : (
+          <div style={S.signalPill}>
+            No live signals yet. Connect integrations, upload a spreadsheet, or add deals to activate Atlas intelligence.
           </div>
-        ))}
+        )}
       </div>
 
       <div style={S.card}>
@@ -1687,38 +1997,38 @@ const dealRiskItems = useMemo(() => {
                 Mode: <strong>Live Workspace</strong> — waiting for real data
               </div>
             </>
-           ) : (
-             <>
-               <div>
-                 <ExecutiveBriefing kpis={kpis} />
-                 Revenue is{" "}
-                 {kpis.wow == null ? (
-                   <strong>steady</strong>
-                 ) : (
-                   <strong style={kpis.wow >= 0 ? S.statusGood : S.statusBad}>
-                     {kpis.wow >= 0 ? "up" : "down"} {Math.abs(kpis.wow).toFixed(1)}% WoW
-                   </strong>
-                 )}
-               </div>
-               <div>
-                 Pipeline coverage is <strong>{kpis.coverage.toFixed(1)}x</strong> (
-                 <span style={riskStyle}>
-                   <strong>{kpis.risk.label}</strong>
-                 </span>
-                 )
-               </div>
-               <div>
-                 90-day forecast suggests <strong>{money(kpis.forecast90)}</strong>
-               </div>
-               <div style={{ marginTop: 4, opacity: 0.8, fontSize: 12 }}>
-                 Mode: <strong>{kpis.scenario?.label || "Current"}</strong> —{" "}
-                 {kpis.scenario?.note || "Actual performance"}
-               </div>
-             </>
-           )}
-         </div>
-       </div>
-   
+          ) : (
+            <>
+              <div>
+                <ExecutiveBriefing kpis={kpis} />
+                Revenue is{" "}
+                {kpis.wow == null ? (
+                  <strong>steady</strong>
+                ) : (
+                  <strong style={kpis.wow >= 0 ? S.statusGood : S.statusBad}>
+                    {kpis.wow >= 0 ? "up" : "down"} {Math.abs(kpis.wow).toFixed(1)}% WoW
+                  </strong>
+                )}
+              </div>
+              <div>
+                Pipeline coverage is <strong>{kpis.coverage.toFixed(1)}x</strong> (
+                <span style={riskStyle}>
+                  <strong>{kpis.risk.label}</strong>
+                </span>
+                )
+              </div>
+              <div>
+                90-day forecast suggests <strong>{money(kpis.forecast90)}</strong>
+              </div>
+              <div style={{ marginTop: 4, opacity: 0.8, fontSize: 12 }}>
+                Mode: <strong>{kpis.scenario?.label || "Current"}</strong> —{" "}
+                {kpis.scenario?.note || "Actual performance"}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
       <div style={{ marginTop: 12, marginBottom: 12 }}>
         <LiveRevenueSnapshot
           projectedRevenue={liveRevenueSnapshot.projectedRevenue}
@@ -1730,7 +2040,16 @@ const dealRiskItems = useMemo(() => {
       </div>
 
       <div style={{ marginBottom: 12 }}>
-        <DealRiskDetectionAI deals={dealRiskItems} />
+        {dealRiskItems.length ? (
+          <DealRiskDetectionAI deals={dealRiskItems} />
+        ) : (
+          <div style={S.card}>
+            <div style={S.sectionTitle}>Deal Risk Detection AI</div>
+            <div style={S.helperText}>
+              No deal intelligence yet. Add deals to start monitoring opportunity risk, stalled movement, and close pressure.
+            </div>
+          </div>
+        )}
       </div>
 
       <div style={S.navGrid}>
@@ -1875,50 +2194,59 @@ const dealRiskItems = useMemo(() => {
             <div style={S.card}>
               <div style={S.sectionTitle}>Revenue vs Spend (30 Days)</div>
               <div style={S.chartShell}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={metrics} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
-                    <defs>
-                      <linearGradient id="revFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#00c6ff" stopOpacity={0.28} />
-                        <stop offset="100%" stopColor="#00c6ff" stopOpacity={0.03} />
-                      </linearGradient>
-                      <linearGradient id="spendFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#7C5CFF" stopOpacity={0.22} />
-                        <stop offset="100%" stopColor="#7C5CFF" stopOpacity={0.03} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.10)" />
-                    <XAxis dataKey="x" tick={axisTick} tickMargin={8} stroke="#94a3b8" />
-                    <YAxis
-                      tick={axisTick}
-                      tickMargin={8}
-                      stroke="#94a3b8"
-                      tickFormatter={moneyCompact}
-                    />
-                    <Tooltip
-                      formatter={(value, name) => [money(value), name]}
-                      contentStyle={tooltipStyle}
-                      labelStyle={{ color: "#fff" }}
-                    />
-                    <Legend wrapperStyle={legendStyle} />
-                    <Area
-                      type="monotone"
-                      dataKey="spend"
-                      stroke="#7C5CFF"
-                      fill="url(#spendFill)"
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="revenue"
-                      stroke="#00c6ff"
-                      fill="url(#revFill)"
-                      strokeWidth={3}
-                      dot={false}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+                {metrics.length ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={metrics} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+                      <defs>
+                        <linearGradient id="revFill" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#00c6ff" stopOpacity={0.28} />
+                          <stop offset="100%" stopColor="#00c6ff" stopOpacity={0.03} />
+                        </linearGradient>
+                        <linearGradient id="spendFill" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#7C5CFF" stopOpacity={0.22} />
+                          <stop offset="100%" stopColor="#7C5CFF" stopOpacity={0.03} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.10)" />
+                      <XAxis dataKey="x" tick={axisTick} tickMargin={8} stroke="#94a3b8" />
+                      <YAxis
+                        tick={axisTick}
+                        tickMargin={8}
+                        stroke="#94a3b8"
+                        tickFormatter={moneyCompact}
+                      />
+                      <Tooltip
+                        formatter={(value, name) => [money(value), name]}
+                        contentStyle={tooltipStyle}
+                        labelStyle={{ color: "#fff" }}
+                      />
+                      <Legend wrapperStyle={legendStyle} />
+                      <Area
+                        type="monotone"
+                        dataKey="spend"
+                        stroke="#7C5CFF"
+                        fill="url(#spendFill)"
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="revenue"
+                        stroke="#00c6ff"
+                        fill="url(#revFill)"
+                        strokeWidth={3}
+                        dot={false}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div style={{ opacity: 0.85 }}>
+                    No revenue or spend data yet.
+                    <div style={{ opacity: 0.7, marginTop: 6, fontSize: 13 }}>
+                      Upload a spreadsheet or connect sources to populate the 30-day trendline.
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1963,16 +2291,25 @@ const dealRiskItems = useMemo(() => {
           <div style={S.card}>
             <div style={S.sectionTitle}>Leads (30 Days)</div>
             <div style={S.chartShell}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={metrics} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.10)" />
-                  <XAxis dataKey="x" tick={axisTick} tickMargin={8} stroke="#94a3b8" />
-                  <YAxis tick={axisTick} tickMargin={8} stroke="#94a3b8" />
-                  <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "#fff" }} />
-                  <Legend wrapperStyle={legendStyle} />
-                  <Bar dataKey="leads" fill="#38BDF8" radius={[10, 10, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              {metrics.length ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={metrics} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.10)" />
+                    <XAxis dataKey="x" tick={axisTick} tickMargin={8} stroke="#94a3b8" />
+                    <YAxis tick={axisTick} tickMargin={8} stroke="#94a3b8" />
+                    <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: "#fff" }} />
+                    <Legend wrapperStyle={legendStyle} />
+                    <Bar dataKey="leads" fill="#38BDF8" radius={[10, 10, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div style={{ opacity: 0.85 }}>
+                  No lead data yet.
+                  <div style={{ opacity: 0.7, marginTop: 6, fontSize: 13 }}>
+                    Connect sources or upload a spreadsheet to populate lead activity.
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -2030,7 +2367,9 @@ const dealRiskItems = useMemo(() => {
                       <div style={S.miniMapHudLabel}>Top Active Region</div>
                       <div style={S.miniMapHudValue}>{regionalSignals[0]?.region || "—"}</div>
                       <div style={S.miniMapHudSub}>
-                        Highest revenue concentration and strongest leadership priority.
+                        {hasLiveData
+                          ? "Highest revenue concentration and strongest leadership priority."
+                          : "No live regional data yet."}
                       </div>
                     </div>
 
@@ -2090,7 +2429,7 @@ const dealRiskItems = useMemo(() => {
                       paint={{
                         "line-color": "#38BDF8",
                         "line-width": 2,
-                        "line-opacity": 0.55,
+                        "line-opacity": hasLiveData ? 0.55 : 0,
                       }}
                     />
                   </Source>
@@ -2179,13 +2518,7 @@ const dealRiskItems = useMemo(() => {
                       </div>
 
                       <div style={{ marginTop: 6, fontSize: 12, opacity: 0.78, lineHeight: 1.45 }}>
-                        {idx === 0
-                          ? "Highest current revenue concentration and strongest leadership priority."
-                          : idx === 1
-                          ? "Healthy operating zone with room for stronger close execution."
-                          : idx === 2
-                          ? "Emerging territory with developing opportunity flow."
-                          : "Lower-density region with longer-term upside potential."}
+                        {r.note}
                       </div>
                     </div>
                   ))}
@@ -2207,8 +2540,11 @@ const dealRiskItems = useMemo(() => {
               <div style={S.sectionTitle}>AI-Powered Insights</div>
               <button
                 onClick={handleRunAiAnalysis}
-                disabled={insightsLoading}
-                style={{ ...S.actionBtn, ...(insightsLoading ? S.actionBtnDisabled : {}) }}
+                disabled={insightsLoading || !hasLiveData}
+                style={{
+                  ...S.actionBtn,
+                  ...((insightsLoading || !hasLiveData) ? S.actionBtnDisabled : {}),
+                }}
               >
                 {insightsLoading ? "Generating..." : "Generate New Insights"}
               </button>
@@ -2219,20 +2555,26 @@ const dealRiskItems = useMemo(() => {
             </div>
 
             <div style={{ marginTop: 12 }}>
-              <div style={S.insightWrap}>
-                {displayedInsights.map((it, idx) => (
-                  <div key={`${it.title}-${idx}`} style={S.insightItem(it.type)}>
-                    <div style={S.insightTop}>
-                      <div style={S.tag(it.type)}>
-                        {it.type} <span style={{ opacity: 0.7 }}>•</span> {it.impact}
+              {displayedInsights.length ? (
+                <div style={S.insightWrap}>
+                  {displayedInsights.map((it, idx) => (
+                    <div key={`${it.title}-${idx}`} style={S.insightItem(it.type)}>
+                      <div style={S.insightTop}>
+                        <div style={S.tag(it.type)}>
+                          {it.type} <span style={{ opacity: 0.7 }}>•</span> {it.impact}
+                        </div>
+                        <div style={S.confidence}>{it.confidence}% CONFIDENCE</div>
                       </div>
-                      <div style={S.confidence}>{it.confidence}% CONFIDENCE</div>
+                      <div style={S.insightTitle}>{it.title}</div>
+                      <div style={S.insightBody}>{it.body}</div>
                     </div>
-                    <div style={S.insightTitle}>{it.title}</div>
-                    <div style={S.insightBody}>{it.body}</div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={S.signalPill}>
+                  No AI insights yet. Atlas will generate them after real workspace data is added.
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -2241,11 +2583,19 @@ const dealRiskItems = useMemo(() => {
           <div style={S.card}>
             <div style={S.sectionTitle}>Atlas AI Signals</div>
             <div style={S.list}>
-              {overviewSignals.map((signal, idx) => (
-                <div key={`${signal}-side-${idx}`} style={S.pillCard}>
-                  <div style={S.pillMeta}>{signal}</div>
+              {overviewSignals.length ? (
+                overviewSignals.map((signal, idx) => (
+                  <div key={`${signal}-side-${idx}`} style={S.pillCard}>
+                    <div style={S.pillMeta}>{signal}</div>
+                  </div>
+                ))
+              ) : (
+                <div style={S.pillCard}>
+                  <div style={S.pillMeta}>
+                    No live signals yet. This panel activates when Atlas receives real workspace data.
+                  </div>
                 </div>
-              ))}
+              )}
             </div>
           </div>
 
@@ -2450,10 +2800,376 @@ const dealRiskItems = useMemo(() => {
         </div>
       </div>
 
-      <PaywallModal
-        open={showPaywall}
-        onClose={() => setShowPaywall(false)}
-      />
+      {showClientModal ? (
+        <div style={S.modalOverlay} onClick={() => setShowClientModal(false)}>
+          <div style={S.modalCard} onClick={(e) => e.stopPropagation()}>
+            <div style={S.modalHeaderRow}>
+              <div>
+                <div style={S.modalEyebrow}>Manual Entry</div>
+                <div style={S.modalTitle}>Add Client</div>
+              </div>
+
+              <button
+                onClick={() => setShowClientModal(false)}
+                style={S.modalCloseBtn}
+                type="button"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateClientSubmit} style={S.modalForm}>
+              <div style={S.formGrid2}>
+                <div style={S.fieldWrap}>
+                  <label style={S.fieldLabel}>Client Name</label>
+                  <input
+                    value={clientForm.name}
+                    onChange={(e) =>
+                      setClientForm((prev) => ({ ...prev, name: e.target.value }))
+                    }
+                    placeholder="Global Emerging Market Manager"
+                    style={S.input}
+                  />
+                </div>
+
+                <div style={S.fieldWrap}>
+                  <label style={S.fieldLabel}>Website</label>
+                  <input
+                    value={clientForm.website}
+                    onChange={(e) =>
+                      setClientForm((prev) => ({ ...prev, website: e.target.value }))
+                    }
+                    placeholder="www.gemm.me"
+                    style={S.input}
+                  />
+                </div>
+
+                <div style={S.fieldWrap}>
+                  <label style={S.fieldLabel}>Industry</label>
+                  <input
+                    value={clientForm.industry}
+                    onChange={(e) =>
+                      setClientForm((prev) => ({ ...prev, industry: e.target.value }))
+                    }
+                    placeholder="Finance"
+                    style={S.input}
+                  />
+                </div>
+
+                <div style={S.fieldWrap}>
+                  <label style={S.fieldLabel}>Status</label>
+                  <select
+                    value={clientForm.status}
+                    onChange={(e) =>
+                      setClientForm((prev) => ({ ...prev, status: e.target.value }))
+                    }
+                    style={S.input}
+                  >
+                    <option value="active">active</option>
+                    <option value="paused">paused</option>
+                    <option value="prospect">prospect</option>
+                    <option value="archived">archived</option>
+                  </select>
+                </div>
+
+                <div style={S.fieldWrap}>
+                  <label style={S.fieldLabel}>Primary Contact Name</label>
+                  <input
+                    value={clientForm.primaryContactName}
+                    onChange={(e) =>
+                      setClientForm((prev) => ({
+                        ...prev,
+                        primaryContactName: e.target.value,
+                      }))
+                    }
+                    placeholder="Charles"
+                    style={S.input}
+                  />
+                </div>
+
+                <div style={S.fieldWrap}>
+                  <label style={S.fieldLabel}>Primary Contact Email</label>
+                  <input
+                    value={clientForm.primaryContactEmail}
+                    onChange={(e) =>
+                      setClientForm((prev) => ({
+                        ...prev,
+                        primaryContactEmail: e.target.value,
+                      }))
+                    }
+                    placeholder="cd@drccompany.com"
+                    style={S.input}
+                  />
+                </div>
+
+                <div style={S.fieldWrap}>
+                  <label style={S.fieldLabel}>Primary Contact Phone</label>
+                  <input
+                    value={clientForm.primaryContactPhone}
+                    onChange={(e) =>
+                      setClientForm((prev) => ({
+                        ...prev,
+                        primaryContactPhone: e.target.value,
+                      }))
+                    }
+                    placeholder="+1 555 555 5555"
+                    style={S.input}
+                  />
+                </div>
+              </div>
+
+              <div style={S.fieldWrap}>
+                <label style={S.fieldLabel}>Notes</label>
+                <textarea
+                  value={clientForm.notes}
+                  onChange={(e) =>
+                    setClientForm((prev) => ({ ...prev, notes: e.target.value }))
+                  }
+                  placeholder="Add any relationship or context notes here..."
+                  style={S.textarea}
+                  rows={4}
+                />
+              </div>
+
+              {clientModalMsg ? <div style={S.success}>{clientModalMsg}</div> : null}
+              {clientModalErr ? <div style={S.error}>{clientModalErr}</div> : null}
+
+              <div style={S.modalActionRow}>
+                <button
+                  type="button"
+                  onClick={() => setShowClientModal(false)}
+                  style={S.secondaryBtn}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={clientSubmitting}
+                  style={{
+                    ...S.actionBtn,
+                    ...(clientSubmitting ? S.actionBtnDisabled : {}),
+                  }}
+                >
+                  {clientSubmitting ? "Creating..." : "Create Client"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {showDealModal ? (
+        <div style={S.modalOverlay} onClick={() => setShowDealModal(false)}>
+          <div style={S.modalCard} onClick={(e) => e.stopPropagation()}>
+            <div style={S.modalHeaderRow}>
+              <div>
+                <div style={S.modalEyebrow}>Pipeline Entry</div>
+                <div style={S.modalTitle}>Add Deal</div>
+              </div>
+
+              <button
+                onClick={() => setShowDealModal(false)}
+                style={S.modalCloseBtn}
+                type="button"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateDealSubmit} style={S.modalForm}>
+              <div style={S.formGrid2}>
+                <div style={S.fieldWrap}>
+                  <label style={S.fieldLabel}>Deal Name</label>
+                  <input
+                    value={dealForm.name}
+                    onChange={(e) =>
+                      setDealForm((prev) => ({ ...prev, name: e.target.value }))
+                    }
+                    placeholder="Enterprise Expansion Program"
+                    style={S.input}
+                  />
+                </div>
+
+                <div style={S.fieldWrap}>
+                  <label style={S.fieldLabel}>Client</label>
+                  <select
+                    value={dealForm.clientId}
+                    onChange={(e) =>
+                      setDealForm((prev) => ({ ...prev, clientId: e.target.value }))
+                    }
+                    style={S.input}
+                  >
+                    <option value="">
+                      {clientsLoading ? "Loading clients..." : "Select client"}
+                    </option>
+                    {clients.map((client) => (
+                      <option
+                        key={client?._id || client?.id}
+                        value={client?._id || client?.id}
+                      >
+                        {client?.name || "Client"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={S.fieldWrap}>
+                  <label style={S.fieldLabel}>Amount</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={dealForm.amount}
+                    onChange={(e) =>
+                      setDealForm((prev) => ({ ...prev, amount: e.target.value }))
+                    }
+                    placeholder="85000"
+                    style={S.input}
+                  />
+                </div>
+
+                <div style={S.fieldWrap}>
+                  <label style={S.fieldLabel}>Stage</label>
+                  <select
+                    value={dealForm.stage}
+                    onChange={(e) =>
+                      setDealForm((prev) => ({ ...prev, stage: e.target.value }))
+                    }
+                    style={S.input}
+                  >
+                    <option value="Discovery">Discovery</option>
+                    <option value="Proposal">Proposal</option>
+                    <option value="Follow-Up">Follow-Up</option>
+                    <option value="Negotiation">Negotiation</option>
+                    <option value="Closed Won">Closed Won</option>
+                    <option value="Closed Lost">Closed Lost</option>
+                  </select>
+                </div>
+
+                <div style={S.fieldWrap}>
+                  <label style={S.fieldLabel}>Probability</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={dealForm.probability}
+                    onChange={(e) =>
+                      setDealForm((prev) => ({ ...prev, probability: e.target.value }))
+                    }
+                    placeholder="0.50"
+                    style={S.input}
+                  />
+                </div>
+
+                <div style={S.fieldWrap}>
+                  <label style={S.fieldLabel}>Close Date</label>
+                  <input
+                    type="date"
+                    value={dealForm.closeDate}
+                    onChange={(e) =>
+                      setDealForm((prev) => ({ ...prev, closeDate: e.target.value }))
+                    }
+                    style={S.input}
+                  />
+                </div>
+
+                <div style={S.fieldWrap}>
+                  <label style={S.fieldLabel}>Next Action</label>
+                  <input
+                    value={dealForm.nextAction}
+                    onChange={(e) =>
+                      setDealForm((prev) => ({ ...prev, nextAction: e.target.value }))
+                    }
+                    placeholder="Schedule decision call"
+                    style={S.input}
+                  />
+                </div>
+
+                <div style={S.fieldWrap}>
+                  <label style={S.fieldLabel}>Next Action Due</label>
+                  <input
+                    type="date"
+                    value={dealForm.nextActionDueAt}
+                    onChange={(e) =>
+                      setDealForm((prev) => ({
+                        ...prev,
+                        nextActionDueAt: e.target.value,
+                      }))
+                    }
+                    style={S.input}
+                  />
+                </div>
+
+                <div style={S.fieldWrap}>
+                  <label style={S.fieldLabel}>Competitor</label>
+                  <input
+                    value={dealForm.competitor}
+                    onChange={(e) =>
+                      setDealForm((prev) => ({ ...prev, competitor: e.target.value }))
+                    }
+                    placeholder="Optional"
+                    style={S.input}
+                  />
+                </div>
+
+                <div style={S.fieldWrap}>
+                  <label style={S.fieldLabel}>Closed Reason</label>
+                  <input
+                    value={dealForm.closedReason}
+                    onChange={(e) =>
+                      setDealForm((prev) => ({ ...prev, closedReason: e.target.value }))
+                    }
+                    placeholder="Optional"
+                    style={S.input}
+                  />
+                </div>
+
+                <div style={S.fieldWrap}>
+                  <label style={S.fieldLabel}>Reactivation Date</label>
+                  <input
+                    type="date"
+                    value={dealForm.reactivationAt}
+                    onChange={(e) =>
+                      setDealForm((prev) => ({
+                        ...prev,
+                        reactivationAt: e.target.value,
+                      }))
+                    }
+                    style={S.input}
+                  />
+                </div>
+              </div>
+
+              {dealModalMsg ? <div style={S.success}>{dealModalMsg}</div> : null}
+              {dealModalErr ? <div style={S.error}>{dealModalErr}</div> : null}
+
+              <div style={S.modalActionRow}>
+                <button
+                  type="button"
+                  onClick={() => setShowDealModal(false)}
+                  style={S.secondaryBtn}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={dealSubmitting}
+                  style={{
+                    ...S.actionBtn,
+                    ...(dealSubmitting ? S.actionBtnDisabled : {}),
+                  }}
+                >
+                  {dealSubmitting ? "Creating..." : "Create Deal"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      <PaywallModal open={showPaywall} onClose={() => setShowPaywall(false)} />
     </div>
   );
 }
