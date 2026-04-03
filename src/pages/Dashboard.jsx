@@ -182,13 +182,39 @@ const integrationMeta = (i) => {
   return `Last sync: ${d.toLocaleString()}`;
 };
 
-const buildLocalInsights = (kpis, seed = 0) => {
+const buildLocalInsights = (kpis, seed = 0, hasLiveData = false) => {
   const jitter = (base, range = 6) => {
     const r = Math.sin((seed + base) * 999) * 10000;
     const frac = r - Math.floor(r);
     const delta = (frac - 0.5) * range * 2;
     return clamp(Math.round(base + delta), 60, 97);
   };
+
+  if (!hasLiveData) {
+    return [
+      {
+        type: "OPPORTUNITY",
+        impact: "SETUP",
+        confidence: 100,
+        title: "Connect data sources to begin live reporting",
+        body: "Atlas is ready, but this workspace does not have live revenue, pipeline, or attribution data yet.",
+      },
+      {
+        type: "OPPORTUNITY",
+        impact: "SETUP",
+        confidence: 100,
+        title: "Add your first deal or import a spreadsheet",
+        body: "Once deals, metrics, or spreadsheet data are added, Atlas will begin showing forecasting, stage visibility, and revenue insights.",
+      },
+      {
+        type: "OPPORTUNITY",
+        impact: "SETUP",
+        confidence: 100,
+        title: "Invite your team and connect your stack",
+        body: "Connect CRM, ads, analytics, payments, or Excel/CSV imports to activate workspace intelligence.",
+      },
+    ];
+  }
 
   const items = [];
 
@@ -220,14 +246,6 @@ const buildLocalInsights = (kpis, seed = 0) => {
         body: "Run controlled experiments (landing page + offer tests) to lift conversion rate while maintaining CAC.",
       });
     }
-  } else {
-    items.push({
-      type: "OPPORTUNITY",
-      impact: "HIGH IMPACT",
-      confidence: jitter(78),
-      title: "Connect data sources to unlock attribution",
-      body: "Once ads + CRM are connected, the platform will show true revenue attribution and predictable pipeline forecasting.",
-    });
   }
 
   if (kpis.coverage >= 4) {
@@ -246,7 +264,7 @@ const buildLocalInsights = (kpis, seed = 0) => {
       title: "Pipeline is workable, but needs lift",
       body: "Aim for 4x coverage to stabilize forecasting and reduce revenue volatility.",
     });
-  } else {
+  } else if (kpis.pipelineValue > 0 || kpis.revenue30 > 0) {
     items.push({
       type: "WARNING",
       impact: "HIGH IMPACT",
@@ -264,7 +282,7 @@ const buildLocalInsights = (kpis, seed = 0) => {
       title: "CAC is elevated",
       body: "Reduce CAC by tightening ICP targeting, adding retargeting, and improving landing page conversion rate.",
     });
-  } else {
+  } else if (kpis.cac > 0) {
     items.push({
       type: "SUCCESS",
       impact: "MEDIUM IMPACT",
@@ -651,11 +669,27 @@ export default function Dashboard() {
     () => (Array.isArray(pipeline?.deals) ? pipeline.deals : []),
     [pipeline]
   );
+  
+ const hasMetricsData = useMemo(() => {
+  return metrics.some(
+    (m) => safeNum(m.revenue) > 0 || safeNum(m.spend) > 0 || safeNum(m.leads) > 0
+  );
+}, [metrics]);
 
-  const scenarioList = useMemo(() => {
-    if (Array.isArray(serverScenarios) && serverScenarios.length) return serverScenarios;
-    return FALLBACK_SCENARIOS;
-  }, [serverScenarios]);
+const hasDealsData = useMemo(() => {
+  return deals.some((d) => safeNum(d?.amount ?? d?.value ?? d?.pipelineValue) > 0);
+}, [deals]);
+
+const hasAttributionData = useMemo(() => {
+  return channelChart.some(
+    (c) => safeNum(c.revenue) > 0 || safeNum(c.spend) > 0 || safeNum(c.leads) > 0
+  );
+}, [channelChart]);
+
+const scenarioList = useMemo(() => {
+  if (Array.isArray(serverScenarios) && serverScenarios.length) return serverScenarios;
+  return hasLiveData ? FALLBACK_SCENARIOS : [FALLBACK_SCENARIOS[0]];
+}, [serverScenarios, hasLiveData]);
 
   const activeScenario = useMemo(() => {
     const found = scenarioList.find((s) => s.key === scenarioKey);
@@ -697,11 +731,16 @@ export default function Dashboard() {
     const coverage = revenue30 > 0 ? pipelineValue / revenue30 : 0;
     const wow = calcWoW(metrics);
 
-    const base = clamp(coverage * 25, 20, 100);
-    const boost = wow == null ? 0 : clamp(wow, -10, 10);
+    const hasKpiData =
+      revenue30 > 0 || spend30 > 0 || leads30 > 0 || pipelineValue > 0;
+
+    const base = hasKpiData ? clamp(coverage * 25, 20, 100) : 0;
+    const boost = hasKpiData && wow != null ? clamp(wow, -10, 10) : 0;
     const healthScore = clamp(base + boost, 0, 100);
 
-    const risk = riskFromCoverage(coverage);
+    const risk = hasKpiData
+      ? riskFromCoverage(coverage)
+      : { label: "No Live Data", tone: "warn" };
 
     return {
       revenue30,
@@ -730,20 +769,20 @@ export default function Dashboard() {
 
   const isDemo =
   dashboard?.workspaceMode === "demo" ||
-  dashboard?.org?.isDemo === true ||
-  dashboard?.org?.slug === "demo";
+  dashboard?.org?.isDemo ||
+  dashboard?.org?.slug === "atlas-demo-company";
 
-  const workspaceName = isDemo
-    ? "Atlas Executive Demo"
-    : dashboard?.org?.name || "Atlas Workspace";
+const workspaceName = isDemo
+  ? "Atlas Executive Demo"
+  : dashboard?.org?.name || "Atlas Workspace";
 
-  const orgName = dashboard?.org?.name || dashboard?.orgName || "Atlas Executive Demo";
+const orgName = dashboard?.org?.name || dashboard?.orgName || "Atlas Workspace";
 
   const targets = useMemo(() => {
     const monthlyRevenueGoal =
       safeNum(dashboard?.targets?.monthlyRevenueGoal) ||
       safeNum(dashboard?.monthlyGoal) ||
-      100000;
+      0;
 
     const quarterlyRevenueGoal =
       safeNum(dashboard?.targets?.quarterlyRevenueGoal) || monthlyRevenueGoal * 3;
@@ -767,93 +806,83 @@ export default function Dashboard() {
   }, [dashboard, kpis]);
 
   const liveRevenueSnapshot = useMemo(() => {
-    const projectedRevenue = Math.max(
-      safeNum(kpis.forecast90),
-      safeNum(kpis.revenue30) * 3
-    );
+  const projectedRevenue = safeNum(kpis.forecast90);
+  const pipelineValue = safeNum(kpis.pipelineValue);
 
-    const pipelineValue = safeNum(kpis.pipelineValue);
-    const dealsAtRisk = Math.max(
-      0,
-      Math.round((safeNum(rss?.score) < 70 ? 3 : 1) + safeNum(dashboard?.staleDeals || 0))
-    );
-    const activeOpportunities = Array.isArray(deals) ? deals.length : 0;
+  const dealsAtRisk = hasDealsData
+    ? Math.max(
+        0,
+        deals.filter((d) => {
+          const staleDays = safeNum(d?.daysInStage ?? d?.staleDays ?? d?.ageDays);
+          const probability = safeNum(d?.probability ?? d?.closeProbability ?? 0);
+          return staleDays > 18 || probability < 35;
+        }).length
+      )
+    : 0;
 
-    const forecastConfidence = clamp(
-      Math.round((safeNum(rss?.score) || safeNum(kpis.healthScore)) * 0.95),
-      55,
-      98
-    );
-
-    return {
-      projectedRevenue,
-      pipelineValue,
-      dealsAtRisk,
-      activeOpportunities,
-      forecastConfidence,
-    };
-  }, [kpis, rss, dashboard, deals]);
-
-  const dealRiskItems = useMemo(() => {
-    const sortedDeals = [...(Array.isArray(deals) ? deals : [])]
-      .map((d, idx) => {
-        const value = safeNum(d?.amount ?? d?.value ?? d?.pipelineValue);
+  const activeOpportunities = Array.isArray(deals)
+    ? deals.filter((d) => {
         const stage = normalizeStage(d?.stage || d?.status);
-        const staleDays = safeNum(d?.daysInStage ?? d?.staleDays ?? d?.ageDays);
-        const probability = safeNum(d?.probability ?? d?.closeProbability ?? 0);
+        return stage !== "Closed Won" && stage !== "Closed Lost";
+      }).length
+    : 0;
 
-        let risk = "Watch";
-        let reason = "Atlas AI suggests this deal should be monitored closely.";
+  const forecastConfidence = hasLiveData
+    ? clamp(
+        Math.round((safeNum(rss?.score) || safeNum(kpis.healthScore)) * 0.95),
+        55,
+        98
+      )
+    : 0;
 
-        if (staleDays > 30 || probability < 35) {
-          risk = "High";
-          reason =
-            "Atlas AI detected stalled movement, weak next-step clarity, and elevated close risk.";
-        } else if (staleDays > 18 || probability < 50) {
-          risk = "Medium";
-          reason =
-            "Opportunity is aging in stage longer than expected and follow-up velocity is slowing.";
-        } else {
-          reason =
-            "Multiple timing and activity signals suggest this opportunity should remain on the watchlist.";
-        }
+  return {
+    projectedRevenue,
+    pipelineValue,
+    dealsAtRisk,
+    activeOpportunities,
+    forecastConfidence,
+  };
+}, [kpis, rss, deals, hasDealsData, hasLiveData]);
+ 
+const dealRiskItems = useMemo(() => {
+  const sortedDeals = [...(Array.isArray(deals) ? deals : [])]
+    .map((d) => {
+      const value = safeNum(d?.amount ?? d?.value ?? d?.pipelineValue);
+      const stage = normalizeStage(d?.stage || d?.status);
+      const staleDays = safeNum(d?.daysInStage ?? d?.staleDays ?? d?.ageDays);
+      const probability = safeNum(d?.probability ?? d?.closeProbability ?? 0);
 
-        return {
-          title: d?.name || d?.title || `Opportunity ${idx + 1}`,
-          stage,
-          risk,
-          value,
-          reason,
-        };
-      })
-      .sort((a, b) => {
-        const riskWeight = { High: 3, Medium: 2, Watch: 1 };
-        return (riskWeight[b.risk] || 0) - (riskWeight[a.risk] || 0) || b.value - a.value;
-      });
+      let risk = "Watch";
+      let reason = "Atlas AI suggests this deal should be monitored closely.";
 
-    if (sortedDeals.length) return sortedDeals.slice(0, 4);
+      if (staleDays > 30 || probability < 35) {
+        risk = "High";
+        reason =
+          "Atlas AI detected stalled movement, weak next-step clarity, and elevated close risk.";
+      } else if (staleDays > 18 || probability < 50) {
+        risk = "Medium";
+        reason =
+          "Opportunity is aging in stage longer than expected and follow-up velocity is slowing.";
+      }
 
-    return [
-      {
-        title: "Opportunity 1",
-        stage: "Proposal",
-        risk: "High",
-        value: 85000,
-        reason:
-          "Atlas AI detected stalled movement, weak next-step clarity, and elevated close risk.",
-      },
-      {
-        title: "Opportunity 2",
-        stage: "Negotiation",
-        risk: "Medium",
-        value: 62000,
-        reason:
-          "Opportunity is aging in stage longer than expected and follow-up velocity is slowing.",
-      },
-    ];
-  }, [deals]);
+      return {
+        title: d?.name || d?.title || "Opportunity",
+        stage,
+        risk,
+        value,
+        reason,
+      };
+    })
+    .filter((d) => d.value > 0)
+    .sort((a, b) => {
+      const riskWeight = { High: 3, Medium: 2, Watch: 1 };
+      return (riskWeight[b.risk] || 0) - (riskWeight[a.risk] || 0) || b.value - a.value;
+    });
 
-  async function onGenerateInsights() {
+  return sortedDeals.slice(0, 4);
+}, [deals]);
+ 
+    async function onGenerateInsights() {
     try {
       setInsightsLoading(true);
       setError("");
@@ -952,108 +981,166 @@ export default function Dashboard() {
       .sort((a, b) => b.value - a.value);
   }, [deals]);
 
-  const insights = useMemo(() => buildLocalInsights(kpis, insightSeed), [kpis, insightSeed]);
+  const insights = useMemo(
+  () => buildLocalInsights(kpis, insightSeed, hasLiveData),
+  [kpis, insightSeed, hasLiveData]
+);
   const displayedInsights = aiInsights?.length ? aiInsights : insights;
 
   const donutColors = ["#7C5CFF", "#22C55E", "#F59E0B", "#38BDF8", "#FB7185", "#A3A3A3"];
 
   const rsi = useMemo(() => {
-    const score =
-      rss?.ok && Number.isFinite(Number(rss.score))
-        ? Number(rss.score)
-        : clamp(Math.round(kpis.healthScore), 0, 100);
+  if (!hasLiveData) {
+    return { score: 0, tier: "No Live Data" };
+  }
 
-    const tier =
-      score >= 85
-        ? "Strong"
-        : score >= 70
-        ? "Controlled Volatility"
-        : score >= 55
-        ? "Watchlist"
-        : "High Risk";
+  const score =
+    rss?.ok && Number.isFinite(Number(rss.score))
+      ? Number(rss.score)
+      : clamp(Math.round(kpis.healthScore), 0, 100);
 
-    return { score, tier };
-  }, [rss, kpis]);
+  const tier =
+    score >= 85
+      ? "Strong"
+      : score >= 70
+      ? "Controlled Volatility"
+      : score >= 55
+      ? "Watchlist"
+      : "High Risk";
+
+  return { score, tier };
+}, [rss, kpis, hasLiveData]);
 
   const overviewSignals = useMemo(() => {
-    const items = [];
+  if (!hasLiveData) {
+    return [
+      "No live revenue data yet",
+      "No live pipeline data yet",
+      "No live attribution data yet",
+      "Connect integrations or upload a spreadsheet to activate reporting",
+    ];
+  }
 
-    if (kpis.wow != null) {
-      items.push(
-        kpis.wow >= 0
-          ? `Revenue momentum is up ${Math.abs(kpis.wow).toFixed(1)}% week over week`
-          : `Revenue momentum is down ${Math.abs(kpis.wow).toFixed(1)}% week over week`
-      );
-    }
+  const items = [];
 
-    if (kpis.coverage < 2) {
-      items.push("Pipeline coverage is below target and needs immediate lift");
-    } else if (kpis.coverage < 4) {
-      items.push("Pipeline coverage is workable but not yet elite");
-    } else {
-      items.push("Pipeline coverage is strong and protecting forecast stability");
-    }
+  if (kpis.wow != null) {
+    items.push(
+      kpis.wow >= 0
+        ? `Revenue momentum is up ${Math.abs(kpis.wow).toFixed(1)}% week over week`
+        : `Revenue momentum is down ${Math.abs(kpis.wow).toFixed(1)}% week over week`
+    );
+  }
 
-    if (channelChart.length) {
-      items.push(
-        `${channelChart[0]?.channel || "Top channel"} is currently leading attributed revenue`
-      );
-    }
+  if (kpis.coverage < 2) {
+    items.push("Pipeline coverage is below target and needs immediate lift");
+  } else if (kpis.coverage < 4) {
+    items.push("Pipeline coverage is workable but not yet elite");
+  } else {
+    items.push("Pipeline coverage is strong and protecting forecast stability");
+  }
 
-    if (integrations.length < 2) {
-      items.push("More integrations should be connected to unlock fuller attribution visibility");
-    }
+  if (channelChart.length) {
+    items.push(
+      `${channelChart[0]?.channel || "Top channel"} is currently leading attributed revenue`
+    );
+  }
 
-    if (safeNum(kpis.cac) > 500) {
-      items.push("Customer acquisition cost is elevated and should be reviewed");
-    }
+  if (integrations.length < 2) {
+    items.push("More integrations should be connected to unlock fuller attribution visibility");
+  }
 
-    return items.slice(0, 5);
-  }, [kpis, channelChart, integrations]);
+  if (safeNum(kpis.cac) > 500) {
+    items.push("Customer acquisition cost is elevated and should be reviewed");
+  }
+
+  return items.slice(0, 5);
+}, [kpis, channelChart, integrations, hasLiveData]);
 
   const regionalSignals = useMemo(() => {
-    const pipelineBase = safeNum(kpis.pipelineValue || 0);
-    const revenueBase = safeNum(kpis.revenue30 || 0);
+  const pipelineBase = safeNum(kpis.pipelineValue || 0);
+  const revenueBase = safeNum(kpis.revenue30 || 0);
 
+  if (!hasLiveData) {
     return [
       {
         region: "North America",
-        signal: 72,
-        revenue: revenueBase * 0.46,
-        pipeline: pipelineBase * 0.44,
-        note: "Strongest current execution zone",
+        signal: 0,
+        revenue: 0,
+        pipeline: 0,
+        note: "No live regional data yet.",
         lat: 37.0902,
         lng: -95.7129,
       },
       {
         region: "Europe",
-        signal: 44,
-        revenue: revenueBase * 0.24,
-        pipeline: pipelineBase * 0.27,
-        note: "Healthy pipeline, moderate close pressure",
+        signal: 0,
+        revenue: 0,
+        pipeline: 0,
+        note: "No live regional data yet.",
         lat: 50.1109,
         lng: 8.6821,
       },
       {
         region: "Asia",
-        signal: 38,
-        revenue: revenueBase * 0.18,
-        pipeline: pipelineBase * 0.19,
-        note: "Emerging expansion territory",
+        signal: 0,
+        revenue: 0,
+        pipeline: 0,
+        note: "No live regional data yet.",
         lat: 1.3521,
         lng: 103.8198,
       },
       {
         region: "LATAM",
-        signal: 21,
-        revenue: revenueBase * 0.12,
-        pipeline: pipelineBase * 0.1,
-        note: "Early-stage opportunity density",
+        signal: 0,
+        revenue: 0,
+        pipeline: 0,
+        note: "No live regional data yet.",
         lat: -15.7801,
         lng: -47.9292,
       },
-    ].sort((a, b) => b.signal - a.signal);
-  }, [kpis]);
+    ];
+  }
+
+  return [
+    {
+      region: "North America",
+      signal: 72,
+      revenue: revenueBase * 0.46,
+      pipeline: pipelineBase * 0.44,
+      note: "Strongest current execution zone",
+      lat: 37.0902,
+      lng: -95.7129,
+    },
+    {
+      region: "Europe",
+      signal: 44,
+      revenue: revenueBase * 0.24,
+      pipeline: pipelineBase * 0.27,
+      note: "Healthy pipeline, moderate close pressure",
+      lat: 50.1109,
+      lng: 8.6821,
+    },
+    {
+      region: "Asia",
+      signal: 38,
+      revenue: revenueBase * 0.18,
+      pipeline: pipelineBase * 0.19,
+      note: "Emerging expansion territory",
+      lat: 1.3521,
+      lng: 103.8198,
+    },
+    {
+      region: "LATAM",
+      signal: 21,
+      revenue: revenueBase * 0.12,
+      pipeline: pipelineBase * 0.1,
+      note: "Early-stage opportunity density",
+      lat: -15.7801,
+      lng: -47.9292,
+    },
+  ].sort((a, b) => b.signal - a.signal);
+}, [kpis, hasLiveData]);
+
 
   const revenueFlows = useMemo(
     () => [
@@ -1592,34 +1679,45 @@ export default function Dashboard() {
       <div style={S.card}>
         <div style={S.sectionTitle}>Atlas Executive Overview</div>
         <div style={{ display: "grid", gap: 8, fontSize: 14, opacity: 0.95, lineHeight: 1.6 }}>
-          <div>
-            <ExecutiveBriefing kpis={kpis} />
-            Revenue is{" "}
-            {kpis.wow == null ? (
-              <strong>steady</strong>
-            ) : (
-              <strong style={kpis.wow >= 0 ? S.statusGood : S.statusBad}>
-                {kpis.wow >= 0 ? "up" : "down"} {Math.abs(kpis.wow).toFixed(1)}% WoW
-              </strong>
-            )}
-          </div>
-          <div>
-            Pipeline coverage is <strong>{kpis.coverage.toFixed(1)}x</strong> (
-            <span style={riskStyle}>
-              <strong>{kpis.risk.label}</strong>
-            </span>
-            )
-          </div>
-          <div>
-            90-day forecast suggests <strong>{money(kpis.forecast90)}</strong>
-          </div>
-          <div style={{ marginTop: 4, opacity: 0.8, fontSize: 12 }}>
-            Mode: <strong>{kpis.scenario?.label || "Current"}</strong> —{" "}
-            {kpis.scenario?.note || "Actual performance"}
-          </div>
-        </div>
+  {!hasLiveData ? (
+    <>
+      <div>This workspace does not have live revenue intelligence data yet.</div>
+      <div>Add deals, connect integrations, or upload a spreadsheet to activate forecasting and reporting.</div>
+      <div style={{ marginTop: 4, opacity: 0.8, fontSize: 12 }}>
+        Mode: <strong>Live Workspace</strong> — waiting for real data
       </div>
-
+    </>
+  ) : (
+    <>
+      <div>
+        <ExecutiveBriefing kpis={kpis} />
+        Revenue is{" "}
+        {kpis.wow == null ? (
+          <strong>steady</strong>
+        ) : (
+          <strong style={kpis.wow >= 0 ? S.statusGood : S.statusBad}>
+            {kpis.wow >= 0 ? "up" : "down"} {Math.abs(kpis.wow).toFixed(1)}% WoW
+          </strong>
+        )}
+      </div>
+      <div>
+        Pipeline coverage is <strong>{kpis.coverage.toFixed(1)}x</strong> (
+        <span style={riskStyle}>
+          <strong>{kpis.risk.label}</strong>
+        </span>
+        )
+      </div>
+      <div>
+        90-day forecast suggests <strong>{money(kpis.forecast90)}</strong>
+      </div>
+      <div style={{ marginTop: 4, opacity: 0.8, fontSize: 12 }}>
+        Mode: <strong>{kpis.scenario?.label || "Current"}</strong> —{" "}
+        {kpis.scenario?.note || "Actual performance"}
+      </div>
+    </>
+  )}
+</div>
+            
       <div style={{ marginTop: 12, marginBottom: 12 }}>
         <LiveRevenueSnapshot
           projectedRevenue={liveRevenueSnapshot.projectedRevenue}
