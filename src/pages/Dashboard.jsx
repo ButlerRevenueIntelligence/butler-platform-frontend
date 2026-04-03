@@ -1679,44 +1679,44 @@ const dealRiskItems = useMemo(() => {
       <div style={S.card}>
         <div style={S.sectionTitle}>Atlas Executive Overview</div>
         <div style={{ display: "grid", gap: 8, fontSize: 14, opacity: 0.95, lineHeight: 1.6 }}>
-  {!hasLiveData ? (
-    <>
-      <div>This workspace does not have live revenue intelligence data yet.</div>
-      <div>Add deals, connect integrations, or upload a spreadsheet to activate forecasting and reporting.</div>
-      <div style={{ marginTop: 4, opacity: 0.8, fontSize: 12 }}>
-        Mode: <strong>Live Workspace</strong> — waiting for real data
-      </div>
-    </>
-  ) : (
-    <>
-      <div>
-        <ExecutiveBriefing kpis={kpis} />
-        Revenue is{" "}
-        {kpis.wow == null ? (
-          <strong>steady</strong>
-        ) : (
-          <strong style={kpis.wow >= 0 ? S.statusGood : S.statusBad}>
-            {kpis.wow >= 0 ? "up" : "down"} {Math.abs(kpis.wow).toFixed(1)}% WoW
-          </strong>
-        )}
-      </div>
-      <div>
-        Pipeline coverage is <strong>{kpis.coverage.toFixed(1)}x</strong> (
-        <span style={riskStyle}>
-          <strong>{kpis.risk.label}</strong>
-        </span>
-        )
-      </div>
-      <div>
-        90-day forecast suggests <strong>{money(kpis.forecast90)}</strong>
-      </div>
-      <div style={{ marginTop: 4, opacity: 0.8, fontSize: 12 }}>
-        Mode: <strong>{kpis.scenario?.label || "Current"}</strong> —{" "}
-        {kpis.scenario?.note || "Actual performance"}
-      </div>
-    </>
-  )}
-</div>
+          {!hasLiveData ? (
+            <>
+              <div>This workspace does not have live revenue intelligence data yet.</div>
+              <div>Add deals, connect integrations, or upload a spreadsheet to activate forecasting and reporting.</div>
+              <div style={{ marginTop: 4, opacity: 0.8, fontSize: 12 }}>
+                Mode: <strong>Live Workspace</strong> — waiting for real data
+              </div>
+            </>
+           ) : (
+             <>
+               <div>
+                 <ExecutiveBriefing kpis={kpis} />
+                 Revenue is{" "}
+                 {kpis.wow == null ? (
+                   <strong>steady</strong>
+                 ) : (
+                   <strong style={kpis.wow >= 0 ? S.statusGood : S.statusBad}>
+                     {kpis.wow >= 0 ? "up" : "down"} {Math.abs(kpis.wow).toFixed(1)}% WoW
+                   </strong>
+                 )}
+               </div>
+               <div>
+                 Pipeline coverage is <strong>{kpis.coverage.toFixed(1)}x</strong> (
+                 <span style={riskStyle}>
+                   <strong>{kpis.risk.label}</strong>
+                 </span>
+                 )
+               </div>
+               <div>
+                 90-day forecast suggests <strong>{money(kpis.forecast90)}</strong>
+               </div>
+               <div style={{ marginTop: 4, opacity: 0.8, fontSize: 12 }}>
+                 Mode: <strong>{kpis.scenario?.label || "Current"}</strong> —{" "}
+                 {kpis.scenario?.note || "Actual performance"}
+               </div>
+             </>
+           )}
+         </div>
             
       <div style={{ marginTop: 12, marginBottom: 12 }}>
         <LiveRevenueSnapshot
