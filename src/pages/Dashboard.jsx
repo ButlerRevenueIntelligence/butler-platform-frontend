@@ -1717,7 +1717,8 @@ const dealRiskItems = useMemo(() => {
              </>
            )}
          </div>
-            
+       </div>
+   
       <div style={{ marginTop: 12, marginBottom: 12 }}>
         <LiveRevenueSnapshot
           projectedRevenue={liveRevenueSnapshot.projectedRevenue}
