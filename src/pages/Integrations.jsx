@@ -427,19 +427,19 @@ export default function Integrations() {
 
               <div
                 style={{
-                  fontSize: 11,
-                  opacity: 0.75,
-                  marginBottom: 6,
-                  minHeight: 16,
-                  textTransform: live?.mode === "demo" ? "lowercase" : "none",
-                }}
-              >
-                {c.manual
-                  ? `Mode: ${workspaceModeLabel}`
-                  : live?.mode
-                  ? `Mode: ${live.mode}`
-                  : `Mode: ${workspaceModeLabel}`}
-              </div>
+                fontSize: 11,
+                opacity: 0.75,
+                marginBottom: 6,
+                minHeight: 16,
+                textTransform: "none",
+              }}
+            >
+              {c.manual
+                ? `Mode: ${workspaceModeLabel}`
+                : workspaceModeLabel === "demo"
+                ? `Mode: ${live?.mode || "demo"}`
+                : "Mode: Live workspace"}
+            </div>
 
               <div
                 style={{
