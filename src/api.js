@@ -461,6 +461,12 @@ export const login = async (payload) => {
   return syncSessionFromAuthResponse(res);
 };
 
+export const forgotPassword = (email) =>
+  apiPost("/auth/forgot-password", { email });
+
+export const resetPassword = (token, password) =>
+  apiPost("/auth/reset-password", { token, password });
+
 export const serverLogout = () => request("/auth/logout", { method: "POST" });
 
 export const createCheckoutSession = (payload) =>
@@ -555,7 +561,7 @@ export const switchOrg = async (orgId) => switchWorkspace(orgId);
 
 // -------------------- Workspaces --------------------
 export const getWorkspaces = async () => {
-  const res = await apiGet("/workspaces");
+  const res = await apiGet("/auth/workspaces");
 
   const workspaces = Array.isArray(res?.workspaces)
     ? res.workspaces
@@ -601,7 +607,7 @@ export const createWorkspace = async (payload) => {
 };
 
 export const switchWorkspace = async (workspaceId) => {
-  const res = await apiPost("/workspaces/switch", { workspaceId });
+  const res = await apiPost("/auth/switch-workspace", { workspaceId });
 
   const activeWorkspace = res?.activeWorkspace || null;
 
