@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
+import {
+  useNavigate,
+  useLocation,
+  useSearchParams,
+  Link,
+} from "react-router-dom";
 import {
   login,
   setToken,
@@ -323,6 +328,12 @@ export default function Login() {
               />
             </div>
 
+            <div style={styles.forgotWrap}>
+              <Link to="/forgot-password" style={styles.forgotLink}>
+                Forgot password?
+              </Link>
+            </div>
+
             {err && (
               <div style={styles.errBox}>
                 <b style={{ display: "block", marginBottom: 4 }}>Couldn’t sign in</b>
@@ -599,6 +610,17 @@ const styles = {
     fontSize: 16,
     transition: "all 0.2s ease",
     boxShadow: "inset 0 1px 0 rgba(255,255,255,0.45)",
+  },
+  forgotWrap: {
+    display: "flex",
+    justifyContent: "flex-end",
+    marginTop: -2,
+  },
+  forgotLink: {
+    color: "#93c5fd",
+    textDecoration: "none",
+    fontSize: 13,
+    fontWeight: 700,
   },
   btn: {
     height: 52,
