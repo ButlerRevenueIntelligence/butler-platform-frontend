@@ -342,8 +342,12 @@ export default function Login() {
             )}
 
             <button
+              type="submit"
               disabled={loading || prefillLoading}
-              style={styles.btn}
+              style={{
+                ...styles.btn,
+                ...(loading || prefillLoading ? styles.btnDisabled : {}),
+              }}
               className="atlas-login-button"
             >
               {loading ? "Signing in…" : "Access Atlas"}
@@ -615,12 +619,14 @@ const styles = {
     display: "flex",
     justifyContent: "flex-end",
     marginTop: -2,
+    marginBottom: 6,
   },
   forgotLink: {
     color: "#93c5fd",
     textDecoration: "none",
     fontSize: 13,
     fontWeight: 700,
+    cursor: "pointer",
   },
   btn: {
     height: 52,
@@ -634,6 +640,10 @@ const styles = {
     marginTop: 6,
     boxShadow: "0 14px 40px rgba(59,130,246,0.35)",
     transition: "all 0.2s ease",
+  },
+  btnDisabled: {
+    opacity: 0.7,
+    cursor: "not-allowed",
   },
   accessNote: {
     marginTop: 8,

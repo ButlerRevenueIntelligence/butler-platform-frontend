@@ -27,13 +27,8 @@ function getDefaultBase() {
   return "https://atlas-revenue-backend.onrender.com";
 }
 
-// Prefer env vars, otherwise smart default
-const RAW_BASE =
-  import.meta.env.VITE_API_URL ||
-  import.meta.env.VITE_API_BASE ||
-  getDefaultBase();
+export const API_BASE = "https://atlas-revenue-backend.onrender.com/api";
 
-export const API_BASE = buildApiBase(RAW_BASE);
 
 // -------------------- Shared helpers --------------------
 const oid = (v) => {

@@ -4,6 +4,8 @@ import { Routes, Route, Navigate, useLocation, Link } from "react-router-dom";
 
 import Signup from "./pages/Signup.jsx";
 import Login from "./pages/Login.jsx";
+import ForgotPassword from "./pages/ForgotPassword.jsx";
+import ResetPassword from "./pages/ResetPassword.jsx";
 import PaymentSuccess from "./pages/PaymentSuccess.jsx";
 import CreateWorkspace from "./pages/CreateWorkspace.jsx";
 import Members from "./pages/Members.jsx";
@@ -318,9 +320,7 @@ function RedirectIfAuth({ children }) {
 
     async function run() {
       if (!isAuthenticated()) {
-        if (mounted) {
-          setChecked(true);
-        }
+        if (mounted) setChecked(true);
         return;
       }
 
@@ -341,13 +341,9 @@ function RedirectIfAuth({ children }) {
         }
       } catch (err) {
         console.error("Redirect billing/workspace check failed:", err);
-        if (mounted) {
-          setRedirectTo("/billing-required");
-        }
+        if (mounted) setRedirectTo("/billing-required");
       } finally {
-        if (mounted) {
-          setChecked(true);
-        }
+        if (mounted) setChecked(true);
       }
     }
 
@@ -395,6 +391,10 @@ export default function App() {
           </RedirectIfAuth>
         }
       />
+
+      {/* KEEP THESE FULLY PUBLIC */}
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
 
       <Route path="/accept-invite" element={<AcceptInvite />} />
       <Route path="/billing-required" element={<BillingRequired />} />
@@ -603,15 +603,12 @@ export default function App() {
           }
         />
 
-        {/* Backward-compatible redirects */}
         <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
         <Route path="/revenue-intel" element={<Navigate to="/command-center" replace />} />
         <Route path="/pipeline" element={<Navigate to="/deal-war-room" replace />} />
         <Route path="/metrics" element={<Navigate to="/market-signals" replace />} />
         <Route path="/clients" element={<Navigate to="/accounts" replace />} />
         <Route path="/welcome" element={<Welcome />} />
-
-        {/* Friendly aliases */}
         <Route path="/growth" element={<Navigate to="/growth-engine" replace />} />
         <Route path="/ai-operator" element={<Navigate to="/atlas-ai-operator" replace />} />
       </Route>
