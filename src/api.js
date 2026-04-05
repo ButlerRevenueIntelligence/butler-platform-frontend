@@ -488,10 +488,22 @@ export const getRevenueStability = () => apiGet("/revenue-stability");
 export const getForecastScenarios = () => apiGet("/forecast/scenarios");
 export const getOperatorSignals = () => apiGet("/operator/signals");
 
+// -------------------- Integrations (Extended) --------------------
+export const syncHubSpot = () =>
+  apiPost("/integrations/hubspot/sync", {});
+
+export const getHubSpotStatus = () =>
+  apiGet("/integrations/hubspot/status");
+
+export const getIntegrationAuthUrl = (provider) =>
+  apiGet(`/integrations/${encodeURIComponent(provider)}/auth-url`);
+
 // -------------------- Atlas AI --------------------
 export const askAtlas = (question, metrics = {}) =>
   apiPost("/atlas/ask", { question, metrics });
 
+export const analyzeWithAtlas = (payload = {}) =>
+  apiPost("/ai/analyze", payload);
 // -------------------- Metrics --------------------
 export const getMetricsDaily = (params = {}) => {
   const qs = new URLSearchParams();

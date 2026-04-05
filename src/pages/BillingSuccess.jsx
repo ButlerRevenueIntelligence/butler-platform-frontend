@@ -1,6 +1,19 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { getMyOrgs, apiGet } from "../api";
+import {
+  getMyOrgs,
+  apiGet,
+  setUser,
+  setActiveWorkspace,
+  setStoredWorkspaces,
+  setMembership,
+  setActiveOrgId,
+  setActiveOrgName,
+} from "../api";
+
+function normalizePlan(plan) {
+  return String(plan || "").toUpperCase().trim();
+}
 
 export default function BillingSuccess() {
   const nav = useNavigate();
@@ -15,45 +28,120 @@ export default function BillingSuccess() {
 
       try {
         if (mounted) {
-          setStatus("Verifying payment and syncing workspace plan...");
+          setStatus("Verifying payment and syncing workspace access...");
         }
 
         let synced = false;
 
-        for (let i = 0; i < 6; i++) {
-          await getMyOrgs();
+        for (let i = 0; i < 8; i++) {
+          try {
+            await getMyOrgs();
+          } catch (err) {
+            console.error("Failed to refresh organizations:", err);
+          }
 
           try {
             const me = await apiGet("/me");
 
-            const freshPlan =
+            const plan = normalizePlan(
               me?.plan ||
-              me?.organization?.plan ||
-              me?.org?.plan ||
-              me?.activeWorkspace?.plan ||
-              "";
+                me?.organization?.plan ||
+                me?.org?.plan ||
+                me?.activeWorkspace?.plan ||
+                ""
+            );
 
-            if (freshPlan) {
-              localStorage.setItem("active_org_plan", freshPlan);
-              localStorage.setItem("org_plan", freshPlan);
-              localStorage.setItem("plan", freshPlan);
+            const billingStatus = String(
+              me?.billing?.status ||
+                me?.organization?.billing?.status ||
+                me?.org?.billing?.status ||
+                me?.activeWorkspace?.billing?.status ||
+                ""
+            ).toLowerCase();
+
+            const paymentStatus = String(
+              me?.paymentStatus ||
+                me?.organization?.paymentStatus ||
+                me?.org?.paymentStatus ||
+                ""
+            ).toLowerCase();
+
+            const activeWorkspace = me?.activeWorkspace || null;
+            const workspaces = Array.isArray(me?.workspaces) ? me.workspaces : [];
+            const membership = me?.membership || null;
+            const user = me?.user || null;
+
+            if (user) {
+              try {
+                setUser(user);
+              } catch (_) {}
+              localStorage.setItem("butler_user", JSON.stringify(user));
+              localStorage.setItem("user", JSON.stringify(user));
             }
 
-            localStorage.setItem("butler_user", JSON.stringify(me));
-            localStorage.setItem("user", JSON.stringify(me));
+            if (activeWorkspace) {
+              try {
+                setActiveWorkspace(activeWorkspace);
+              } catch (_) {}
+
+              const workspaceId =
+                activeWorkspace?._id || activeWorkspace?.id || "";
+              const workspaceName = activeWorkspace?.name || "";
+
+              if (workspaceId) {
+                try {
+                  setActiveOrgId(String(workspaceId));
+                } catch (_) {}
+                localStorage.setItem("x-org-id", String(workspaceId));
+                localStorage.setItem("orgId", String(workspaceId));
+                localStorage.setItem("butler_org_id", String(workspaceId));
+                localStorage.setItem("active_org_id", String(workspaceId));
+                localStorage.setItem("butler_active_org_id", String(workspaceId));
+              }
+
+              if (workspaceName) {
+                try {
+                  setActiveOrgName(String(workspaceName));
+                } catch (_) {}
+                localStorage.setItem("activeOrgName", String(workspaceName));
+                localStorage.setItem("butler_active_org_name", String(workspaceName));
+                localStorage.setItem("active_org_name", String(workspaceName));
+              }
+
+              localStorage.setItem("activeWorkspace", JSON.stringify(activeWorkspace));
+            }
+
+            if (workspaces.length) {
+              try {
+                setStoredWorkspaces(workspaces);
+              } catch (_) {}
+              localStorage.setItem("workspaces", JSON.stringify(workspaces));
+            }
+
+            if (membership) {
+              try {
+                setMembership(membership);
+              } catch (_) {}
+              localStorage.setItem("membership", JSON.stringify(membership));
+            }
+
+            if (plan) {
+              localStorage.setItem("active_org_plan", plan);
+              localStorage.setItem("org_plan", plan);
+              localStorage.setItem("plan", plan);
+            }
+
+            const paid =
+              billingStatus === "active" ||
+              paymentStatus === "paid" ||
+              me?.workspaceActive === true;
+
+            if (plan && paid) {
+              synced = true;
+              break;
+            }
           } catch (err) {
             console.error("Failed to refresh /me during billing sync:", err);
-          }
-
-          const plan =
-            localStorage.getItem("active_org_plan") ||
-            localStorage.getItem("org_plan") ||
-            localStorage.getItem("plan") ||
-            "";
-
-          if (plan && ["SCALE", "GROWTH", "ENTERPRISE"].includes(plan)) {
-            synced = true;
-            break;
           }
 
           await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -89,6 +177,8 @@ export default function BillingSuccess() {
       mounted = false;
     };
   }, [nav, params]);
+
+  const sessionId = params.get("session_id") || "";
 
   return (
     <div

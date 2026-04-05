@@ -81,7 +81,7 @@ async function fetchMe() {
 
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(data?.message || `Failed to load me: ${res.status}`);
+    throw new Error(data?.message || data?.error || `Failed to load me: ${res.status}`);
   }
 
   return res.json();
@@ -91,6 +91,7 @@ function extractBillingStatus(payload) {
   return (
     payload?.billing?.status ||
     payload?.organization?.billing?.status ||
+    payload?.activeWorkspace?.billing?.status ||
     payload?.org?.billing?.status ||
     payload?.user?.organization?.billing?.status ||
     payload?.user?.org?.billing?.status ||
@@ -103,6 +104,7 @@ function extractPlan(payload) {
   return (
     payload?.plan ||
     payload?.organization?.plan ||
+    payload?.activeWorkspace?.plan ||
     payload?.org?.plan ||
     payload?.user?.plan ||
     payload?.user?.organization?.plan ||
@@ -121,26 +123,39 @@ function extractActiveWorkspace(payload) {
   );
 }
 
-function hasActiveAccess(payload) {
-  const billingStatus = String(extractBillingStatus(payload) || "").toLowerCase();
-  const plan = String(extractPlan(payload) || "").toUpperCase();
-
-  const trialStatus = String(
-    payload?.trial?.status ||
-      payload?.organization?.trial?.status ||
-      payload?.org?.trial?.status ||
-      ""
-  ).toLowerCase();
-
-  const accessStatus = String(
+function extractAccessStatus(payload) {
+  return String(
     payload?.accessStatus ||
       payload?.organization?.accessStatus ||
+      payload?.activeWorkspace?.status ||
       payload?.org?.accessStatus ||
       payload?.status ||
       payload?.organization?.status ||
       payload?.org?.status ||
       ""
   ).toLowerCase();
+}
+
+function extractTrialStatus(payload) {
+  return String(
+    payload?.trial?.status ||
+      payload?.organization?.trial?.status ||
+      payload?.activeWorkspace?.trial?.status ||
+      payload?.org?.trial?.status ||
+      ""
+  ).toLowerCase();
+}
+
+function hasActiveAccess(payload) {
+  const workspaceActive = payload?.workspaceActive;
+  if (typeof workspaceActive === "boolean") {
+    return workspaceActive;
+  }
+
+  const billingStatus = String(extractBillingStatus(payload) || "").toLowerCase();
+  const plan = String(extractPlan(payload) || "").toUpperCase();
+  const trialStatus = extractTrialStatus(payload);
+  const accessStatus = extractAccessStatus(payload);
 
   const paidActive =
     (plan === "SCALE" || plan === "GROWTH" || plan === "ENTERPRISE") &&
@@ -154,13 +169,11 @@ function hasActiveAccess(payload) {
 }
 
 function isTrialExpired(payload) {
-  const trialStatus = String(
-    payload?.trial?.status ||
-      payload?.organization?.trial?.status ||
-      payload?.org?.trial?.status ||
-      ""
-  ).toLowerCase();
+  if (typeof payload?.trialExpired === "boolean") {
+    return payload.trialExpired;
+  }
 
+  const trialStatus = extractTrialStatus(payload);
   return trialStatus === "expired";
 }
 
@@ -196,7 +209,7 @@ function BillingRequired() {
 
         <div style={{ fontSize: 15, opacity: 0.9, lineHeight: 1.7 }}>
           Your workspace is authenticated, but Atlas billing is not active yet.
-          Complete your subscription or contact your administrator to unlock the platform.
+          Complete your subscription to continue using the platform.
         </div>
 
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 24 }}>
@@ -373,7 +386,6 @@ export default function App() {
         element={<Navigate to={authed ? "/command-center" : "/login"} replace />}
       />
 
-      {/* PUBLIC */}
       <Route
         path="/signup"
         element={
@@ -392,7 +404,6 @@ export default function App() {
         }
       />
 
-      {/* KEEP THESE FULLY PUBLIC */}
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
 
@@ -409,7 +420,6 @@ export default function App() {
         }
       />
 
-      {/* AUTH ONLY: Billing pages must be reachable before billing is active */}
       <Route
         element={
           <RequireAuth>
@@ -429,7 +439,6 @@ export default function App() {
         }
       />
 
-      {/* PROTECTED: Auth + Billing Required */}
       <Route
         element={
           <RequireAuth>

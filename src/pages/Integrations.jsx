@@ -7,22 +7,26 @@ import {
   getActiveOrgName,
   getActiveWorkspace,
   uploadSpreadsheetData,
+  getIntegrationAuthUrl,
+  getHubSpotStatus,
+  syncHubSpot,
 } from "../api";
 
 const connectorCatalog = [
-  { id: "hubspot", name: "HubSpot CRM", category: "CRM" },
-  { id: "salesforce", name: "Salesforce", category: "CRM" },
-  { id: "google_ads", name: "Google Ads", category: "Advertising" },
-  { id: "meta_ads", name: "Meta Ads", category: "Advertising" },
-  { id: "linkedin_ads", name: "LinkedIn Ads", category: "Advertising" },
-  { id: "ga4", name: "Google Analytics 4", category: "Analytics" },
-  { id: "stripe", name: "Stripe", category: "Payments" },
-  { id: "shopify", name: "Shopify", category: "Commerce" },
+  { id: "hubspot", name: "HubSpot CRM", category: "CRM", supportsLive: true },
+  { id: "salesforce", name: "Salesforce", category: "CRM", supportsLive: false },
+  { id: "google_ads", name: "Google Ads", category: "Advertising", supportsLive: false },
+  { id: "meta_ads", name: "Meta Ads", category: "Advertising", supportsLive: false },
+  { id: "linkedin_ads", name: "LinkedIn Ads", category: "Advertising", supportsLive: false },
+  { id: "ga4", name: "Google Analytics 4", category: "Analytics", supportsLive: false },
+  { id: "stripe", name: "Stripe", category: "Payments", supportsLive: false },
+  { id: "shopify", name: "Shopify", category: "Commerce", supportsLive: false },
   {
     id: "excel_csv",
     name: "Excel / CSV Import",
     category: "Manual Data Import",
     manual: true,
+    supportsLive: false,
   },
 ];
 
@@ -30,6 +34,7 @@ const statusColor = {
   connected: "#22c55e",
   syncing: "#facc15",
   disconnected: "#64748b",
+  error: "#fb7185",
 };
 
 function formatDate(value) {
@@ -49,7 +54,15 @@ function getWorkspaceModeLabel(workspace) {
     slug === "atlas-demo-company" ||
     name === "atlas demo company";
 
-  return isDemoWorkspace ? "demo" : "Live workspace";
+  return isDemoWorkspace ? "demo" : "live";
+}
+
+function normalizeIntegrationMap(list) {
+  const map = {};
+  (Array.isArray(list) ? list : []).forEach((item) => {
+    map[item.id] = item;
+  });
+  return map;
 }
 
 export default function Integrations() {
@@ -88,14 +101,7 @@ export default function Integrations() {
       setWorkspaceModeLabel(getWorkspaceModeLabel(workspace));
 
       const data = await getIntegrations();
-      const list = Array.isArray(data?.integrations) ? data.integrations : [];
-
-      const map = {};
-      list.forEach((i) => {
-        map[i.id] = i;
-      });
-
-      setIntegrations(map);
+      setIntegrations(normalizeIntegrationMap(data?.integrations));
     } catch (err) {
       console.error(err);
       setError(err?.message || "Failed to load connectors");
@@ -108,29 +114,37 @@ export default function Integrations() {
     load();
   }, []);
 
-  async function handleConnect(id) {
-    try {
-      setBusyId(id);
-      setError("");
-      setSuccess("");
+ async function handleConnect(id) {
+  alert("NEW HUBSPOT CONNECT HANDLER RUNNING");
 
-      const data = await connectIntegration(id);
-      const list = Array.isArray(data?.integrations) ? data.integrations : [];
+  try {
+    setBusyId(id);
+    setError("");
+    setSuccess("");
 
-      const map = {};
-      list.forEach((i) => {
-        map[i.id] = i;
-      });
+    const connector = connectorCatalog.find((c) => c.id === id);
 
-      setIntegrations(map);
-      setSuccess(`${connectorCatalog.find((c) => c.id === id)?.name || id} connected`);
-    } catch (err) {
-      console.error(err);
-      setError(err?.message || "Failed to connect integration");
-    } finally {
-      setBusyId("");
+    if (id === "hubspot" && connector?.supportsLive) {
+      const res = await getIntegrationAuthUrl(id);
+
+      if (!res?.authUrl) {
+        throw new Error("HubSpot auth URL was not returned.");
+      }
+
+      window.location.href = res.authUrl;
+      return;
     }
+
+    const data = await connectIntegration(id);
+    setIntegrations(normalizeIntegrationMap(data?.integrations));
+    setSuccess(`${connector?.name || id} connected`);
+  } catch (err) {
+    console.error(err);
+    setError(err?.message || "Failed to connect integration");
+  } finally {
+    setBusyId("");
   }
+}
 
   async function handleDisconnect(id) {
     try {
@@ -139,20 +153,33 @@ export default function Integrations() {
       setSuccess("");
 
       const data = await disconnectIntegration(id);
-      const list = Array.isArray(data?.integrations) ? data.integrations : [];
-
-      const map = {};
-      list.forEach((i) => {
-        map[i.id] = i;
-      });
-
-      setIntegrations(map);
-      setSuccess(
-        `${connectorCatalog.find((c) => c.id === id)?.name || id} disconnected`
-      );
+      setIntegrations(normalizeIntegrationMap(data?.integrations));
+      setSuccess(`${connectorCatalog.find((c) => c.id === id)?.name || id} disconnected`);
     } catch (err) {
       console.error(err);
       setError(err?.message || "Failed to disconnect integration");
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  async function handleHubSpotSync() {
+    try {
+      setBusyId("hubspot_sync");
+      setError("");
+      setSuccess("");
+
+      const res = await getHubSpotStatus();
+      if (!res?.connected) {
+        throw new Error("HubSpot is not connected for this workspace.");
+      }
+
+      await syncHubSpot();
+      setSuccess("HubSpot sync completed");
+      await load();
+    } catch (err) {
+      console.error(err);
+      setError(err?.message || "Failed to sync HubSpot");
     } finally {
       setBusyId("");
     }
@@ -246,7 +273,7 @@ export default function Integrations() {
         </div>
 
         <h1 style={{ fontSize: 28, fontWeight: 900, margin: 0 }}>
-          Atlas Data Connectors
+          Atlas Data Connectors Connectors TEST 123
         </h1>
 
         <div
@@ -362,9 +389,9 @@ export default function Integrations() {
         </div>
       ) : null}
 
-      {loading && (
+      {loading ? (
         <div style={{ opacity: 0.7, marginBottom: 16 }}>Loading connectors...</div>
-      )}
+      ) : null}
 
       <div
         style={{
@@ -379,6 +406,7 @@ export default function Integrations() {
           const color = statusColor[status] || "#64748b";
           const isConnected = status === "connected";
           const isBusy = busyId === c.id;
+          const isHubSpotLive = c.id === "hubspot" && live?.mode === "live";
 
           return (
             <div
@@ -427,25 +455,23 @@ export default function Integrations() {
 
               <div
                 style={{
-                fontSize: 11,
-                opacity: 0.75,
-                marginBottom: 6,
-                minHeight: 16,
-                textTransform: "none",
-              }}
-            >
-              {c.manual
-                ? `Mode: ${workspaceModeLabel}`
-                : workspaceModeLabel === "demo"
-                ? `Mode: ${live?.mode || "demo"}`
-                : "Mode: Live workspace"}
-            </div>
+                  fontSize: 11,
+                  opacity: 0.75,
+                  marginBottom: 6,
+                  minHeight: 16,
+                  textTransform: "none",
+                }}
+              >
+                {c.manual
+                  ? `Mode: ${workspaceModeLabel}`
+                  : `Mode: ${live?.mode || "demo"}`}
+              </div>
 
               <div
                 style={{
                   fontSize: 11,
                   opacity: 0.6,
-                  marginBottom: 14,
+                  marginBottom: 6,
                   minHeight: 16,
                 }}
               >
@@ -455,6 +481,21 @@ export default function Integrations() {
                   ? `Last sync: ${formatDate(live.lastSync)}`
                   : "No sync yet"}
               </div>
+
+              {!c.manual && live?.externalAccountName ? (
+                <div
+                  style={{
+                    fontSize: 11,
+                    opacity: 0.75,
+                    marginBottom: 14,
+                    minHeight: 16,
+                  }}
+                >
+                  Account: {live.externalAccountName}
+                </div>
+              ) : (
+                <div style={{ minHeight: 16, marginBottom: 14 }} />
+              )}
 
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                 {c.manual ? (
@@ -491,7 +532,7 @@ export default function Integrations() {
                       opacity: !!busyId || uploading ? 0.7 : 1,
                     }}
                   >
-                    {isBusy ? "Connecting..." : "Connect"}
+                    {isBusy ? "Connecting..." : c.id === "hubspot" ? "HUBSPOT LIVE TEST" : "Connect"}
                   </button>
                 ) : (
                   <>
@@ -510,6 +551,26 @@ export default function Integrations() {
                     >
                       Connected
                     </button>
+
+                    {isHubSpotLive ? (
+                      <button
+                        onClick={handleHubSpotSync}
+                        disabled={!!busyId || uploading}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: 10,
+                          border: "1px solid rgba(255,255,255,0.08)",
+                          background: "rgba(255,255,255,0.05)",
+                          color: "#fff",
+                          fontWeight: 700,
+                          fontSize: 12,
+                          cursor: !!busyId || uploading ? "not-allowed" : "pointer",
+                          opacity: !!busyId || uploading ? 0.7 : 1,
+                        }}
+                      >
+                        {busyId === "hubspot_sync" ? "Syncing..." : "Run Sync"}
+                      </button>
+                    ) : null}
 
                     <button
                       onClick={() => handleDisconnect(c.id)}

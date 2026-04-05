@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { askAtlas, getDashboard } from "../api";
+import { analyzeWithAtlas, getDashboard } from "../api";
 import RevenueRiskAlerts from "../components/atlas/RevenueRiskAlerts";
 import RecommendedActions from "../components/atlas/RecommendedActions";
 import {
@@ -393,6 +393,10 @@ export default function AtlasAIOperator() {
   const workspaceMode = String(dashboard?.workspaceMode || "demo").toLowerCase();
   const isDemo = workspaceMode === "demo";
   const orgName = dashboard?.activeWorkspace?.name || "Workspace";
+  const orgId =
+    dashboard?.activeWorkspace?._id ||
+    dashboard?.activeWorkspace?.id ||
+    "";
   const summary = dashboard?.summary || {};
   const revenue30 = safeNum(summary.revenue, 0);
   const pipelineValue = safeNum(summary.pipelineValue, 0);
@@ -401,7 +405,8 @@ export default function AtlasAIOperator() {
   const lostDeals = safeNum(summary.lostDeals, 0);
   const forecast90d = safeNum(summary.forecast90d, 0);
   const metrics = Array.isArray(dashboard?.metrics) ? dashboard.metrics : [];
-  const hasLiveData = revenue30 > 0 || pipelineValue > 0 || openDeals > 0 || metrics.length > 0;
+  const hasLiveData =
+    revenue30 > 0 || pipelineValue > 0 || openDeals > 0 || metrics.length > 0;
 
   const forecastTrend = useMemo(() => {
     if (isDemo) {
@@ -734,6 +739,7 @@ export default function AtlasAIOperator() {
       wonDeals,
       lostDeals,
       workspaceMode,
+      orgName,
     }),
     [
       liveCoverage,
@@ -747,6 +753,7 @@ export default function AtlasAIOperator() {
       wonDeals,
       lostDeals,
       workspaceMode,
+      orgName,
     ]
   );
 
@@ -758,18 +765,30 @@ export default function AtlasAIOperator() {
       setAsking(true);
       setAtlasResponse("");
 
-      const res = await askAtlas(finalQuestion, operatorMetrics);
+      const res = await analyzeWithAtlas({
+        orgId,
+        question: finalQuestion,
+        metrics: operatorMetrics,
+        context: {
+          workspaceMode,
+          hasLiveData,
+          orgName,
+          summary,
+          alerts: activeAlerts,
+          actions: operatorMoves,
+        },
+      });
 
       setAtlasResponse(
-        res?.answer ||
-          res?.response ||
+        res?.result ||
           "Atlas could not generate a response right now. Please try again."
       );
       setQuestion(finalQuestion);
     } catch (err) {
       console.error(err);
       setAtlasResponse(
-        "Atlas ran into an issue while analyzing your request. Please try again."
+        err?.message ||
+          "Atlas ran into an issue while analyzing your request. Please try again."
       );
     } finally {
       setAsking(false);
@@ -841,7 +860,7 @@ export default function AtlasAIOperator() {
         <div style={styles.twoCol}>
           <Section title="Forecast Trend" subtitle="Modeled Outlook">
             <div style={styles.chartShell}>
-              {(!isDemo && !hasLiveData) ? (
+              {!isDemo && !hasLiveData ? (
                 <EmptyState text="No live forecast trend data yet. Connect revenue and pipeline sources to activate Operator forecasting." />
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
@@ -891,7 +910,7 @@ export default function AtlasAIOperator() {
 
           <Section title="Operator Signal Distribution" subtitle="Signal Mix">
             <div style={styles.chartShell}>
-              {(!isDemo && !hasLiveData) ? (
+              {!isDemo && !hasLiveData ? (
                 <EmptyState text="No live operator signal mix yet." />
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
@@ -928,7 +947,7 @@ export default function AtlasAIOperator() {
         <div style={styles.twoCol}>
           <Section title="Risk Severity by Category" subtitle="Risk Model">
             <div style={styles.chartShell}>
-              {(!isDemo && !hasLiveData) ? (
+              {!isDemo && !hasLiveData ? (
                 <EmptyState text="No live risk severity model yet." />
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
@@ -1006,7 +1025,7 @@ export default function AtlasAIOperator() {
                   <button
                     style={styles.askButton}
                     onClick={() => handleAsk()}
-                    disabled={asking}
+                    disabled={asking || !orgId}
                   >
                     {asking ? "Analyzing..." : "Ask Atlas"}
                   </button>
@@ -1059,7 +1078,7 @@ export default function AtlasAIOperator() {
                     setQuestion(prompt);
                     handleAsk(prompt);
                   }}
-                  disabled={asking}
+                  disabled={asking || !orgId}
                 >
                   {prompt}
                 </button>

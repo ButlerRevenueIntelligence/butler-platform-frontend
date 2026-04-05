@@ -4,7 +4,6 @@ import {
   createPortalSession,
   createCheckoutSession,
   getActiveOrgId,
-  startFreeTrial,
 } from "../api";
 import { getPlan } from "../utils/perms";
 
@@ -29,14 +28,21 @@ function prettyBillingStatus(status) {
   if (s === "paid") return "Paid";
   if (s === "pending") return "Pending";
   if (s === "expired") return "Expired";
+  if (s === "converted") return "Converted";
+  if (s === "inactive") return "Inactive";
+  if (s === "suspended") return "Suspended";
   return s ? s.replace(/_/g, " ") : "Unknown";
 }
 
 function statusTone(status) {
   const s = String(status || "").toLowerCase().trim();
-  if (s === "active" || s === "paid" || s === "trialing") return "#22C55E";
+  if (s === "active" || s === "paid" || s === "trialing" || s === "converted") {
+    return "#22C55E";
+  }
   if (s === "past_due" || s === "pending") return "#F59E0B";
-  if (s === "canceled" || s === "suspended" || s === "expired") return "#FB7185";
+  if (s === "canceled" || s === "suspended" || s === "expired" || s === "inactive") {
+    return "#FB7185";
+  }
   return "#A3A3A3";
 }
 
@@ -57,8 +63,7 @@ function calcDaysLeft(value) {
   if (Number.isNaN(d.getTime())) return null;
 
   const diff = d.getTime() - Date.now();
-  const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-  return days;
+  return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
 export default function Billing() {
@@ -76,6 +81,7 @@ export default function Billing() {
     trialStatus: "none",
     trialStartedAt: "",
     trialEndsAt: "",
+    workspaceActive: false,
   });
 
   const orgId = getActiveOrgId();
@@ -86,19 +92,19 @@ export default function Billing() {
       SCALE: {
         label: "Atlas Core",
         price: "$197/mo",
-        desc: "Core visibility and entry-level access.",
-        badge: "Best entry point",
+        desc: "Core visibility and foundational platform access.",
+        badge: "Entry plan",
       },
       GROWTH: {
         label: "Atlas Growth",
         price: "$997/mo",
-        desc: "Your main revenue intelligence operating plan.",
+        desc: "Forecasting, AI analysis, reporting, and revenue intelligence for growth teams.",
         badge: "Most popular",
       },
       ENTERPRISE: {
         label: "Atlas Enterprise",
         price: "$3,500/mo",
-        desc: "Advanced deployment for serious growth teams.",
+        desc: "Advanced deployment for teams needing full-scale revenue intelligence and executive visibility.",
         badge: "Scale-ready",
       },
     }),
@@ -126,6 +132,7 @@ export default function Billing() {
           me?.billing?.status ||
           me?.organization?.billing?.status ||
           me?.org?.billing?.status ||
+          me?.activeWorkspace?.billing?.status ||
           "";
 
         const nextPaymentStatus =
@@ -138,12 +145,14 @@ export default function Billing() {
           me?.billing?.currentPeriodEnd ||
           me?.organization?.billing?.currentPeriodEnd ||
           me?.org?.billing?.currentPeriodEnd ||
+          me?.activeWorkspace?.billing?.currentPeriodEnd ||
           "";
 
         const nextAccessStatus =
           me?.accessStatus ||
           me?.organization?.accessStatus ||
           me?.org?.accessStatus ||
+          me?.activeWorkspace?.status ||
           "";
 
         const nextOrgName =
@@ -156,19 +165,24 @@ export default function Billing() {
           me?.trial?.status ||
           me?.organization?.trial?.status ||
           me?.org?.trial?.status ||
+          me?.activeWorkspace?.trial?.status ||
           "none";
 
         const nextTrialStartedAt =
           me?.trial?.startedAt ||
           me?.organization?.trial?.startedAt ||
           me?.org?.trial?.startedAt ||
+          me?.activeWorkspace?.trial?.startedAt ||
           "";
 
         const nextTrialEndsAt =
           me?.trial?.endsAt ||
           me?.organization?.trial?.endsAt ||
           me?.org?.trial?.endsAt ||
+          me?.activeWorkspace?.trial?.endsAt ||
           "";
+
+        const nextWorkspaceActive = Boolean(me?.workspaceActive);
 
         if (!mounted) return;
 
@@ -188,6 +202,7 @@ export default function Billing() {
           trialStatus: nextTrialStatus,
           trialStartedAt: nextTrialStartedAt,
           trialEndsAt: nextTrialEndsAt,
+          workspaceActive: nextWorkspaceActive,
         });
       } catch (e) {
         if (!mounted) return;
@@ -225,43 +240,6 @@ export default function Billing() {
     }
   }
 
-  async function handleStartTrial() {
-    try {
-      setLoading(true);
-      setErr("");
-
-      const res = await startFreeTrial({ orgId });
-
-      if (res?.trial?.status === "trialing") {
-        localStorage.setItem("active_org_plan", "GROWTH");
-        localStorage.setItem("org_plan", "GROWTH");
-        localStorage.setItem("plan", "GROWTH");
-
-        setBillingSummary((prev) => ({
-          ...prev,
-          plan: "GROWTH",
-          billingStatus: "trialing",
-          accessStatus: "active",
-          trialStatus: res.trial.status,
-          trialStartedAt: res.trial.startedAt,
-          trialEndsAt: res.trial.endsAt,
-        }));
-
-        setTimeout(() => {
-          window.location.href = "/overview";
-        }, 700);
-
-        return;
-      }
-
-      throw new Error("Trial could not be started.");
-    } catch (e) {
-      setErr(e?.message || "Failed to start free trial.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   async function upgrade(planKey) {
     try {
       setLoading(true);
@@ -289,6 +267,7 @@ export default function Billing() {
         orgId,
         email,
         priceId,
+        plan: planKey,
       });
 
       if (res?.url) {
@@ -311,14 +290,24 @@ export default function Billing() {
       billingSummary.trialStatus
   );
 
-  const isTrialing = String(billingSummary.trialStatus || "").toLowerCase() === "trialing";
-  const isTrialExpired = String(billingSummary.trialStatus || "").toLowerCase() === "expired";
+  const trialStatus = String(billingSummary.trialStatus || "").toLowerCase();
+  const billingStatus = String(billingSummary.billingStatus || "").toLowerCase();
+  const paymentStatus = String(billingSummary.paymentStatus || "").toLowerCase();
+
+  const isTrialing = trialStatus === "trialing";
+  const isTrialExpired = trialStatus === "expired";
+  const isConverted = trialStatus === "converted";
+  const isPaid =
+    billingStatus === "active" ||
+    paymentStatus === "paid" ||
+    billingStatus === "paid";
   const daysLeft = calcDaysLeft(billingSummary.trialEndsAt);
 
-  const canStartTrial =
-    !isTrialing &&
-    !isTrialExpired &&
-    String(billingSummary.trialStatus || "none").toLowerCase() !== "converted";
+  const showRestoreAccess = isTrialExpired && !isPaid;
+  const showUpgradeButtons = !isPaid;
+  const currentPeriodLabel = isTrialing || isTrialExpired
+    ? formatDate(billingSummary.trialEndsAt)
+    : formatDate(billingSummary.currentPeriodEnd);
 
   return (
     <div style={{ color: "#EAF0FF", display: "grid", gap: 16 }}>
@@ -352,7 +341,7 @@ export default function Billing() {
             }}
           >
             <div style={{ fontWeight: 900, fontSize: 15 }}>
-              7-Day Growth Trial Active
+              7-Day Trial Active
             </div>
             <div style={{ marginTop: 6, fontSize: 13, opacity: 0.9, lineHeight: 1.55 }}>
               {daysLeft != null && daysLeft >= 0
@@ -378,8 +367,27 @@ export default function Billing() {
               Your free trial has expired
             </div>
             <div style={{ marginTop: 6, fontSize: 13, opacity: 0.92, lineHeight: 1.55 }}>
-              Upgrade now to restore access to Atlas Growth features, AI analysis,
-              forecasting, reports, and revenue intelligence tools.
+              Upgrade now to restore access to Atlas AI, forecasting, reporting,
+              and revenue intelligence features.
+            </div>
+          </div>
+        ) : null}
+
+        {isConverted || isPaid ? (
+          <div
+            style={{
+              marginTop: 16,
+              borderRadius: 16,
+              padding: 14,
+              border: "1px solid rgba(34,197,94,0.28)",
+              background: "rgba(34,197,94,0.10)",
+            }}
+          >
+            <div style={{ fontWeight: 900, fontSize: 15 }}>
+              Paid subscription active
+            </div>
+            <div style={{ marginTop: 6, fontSize: 13, opacity: 0.92, lineHeight: 1.55 }}>
+              Your workspace has active paid access. Atlas remains available without trial restrictions.
             </div>
           </div>
         ) : null}
@@ -453,33 +461,13 @@ export default function Billing() {
               RENEWS / PERIOD END
             </div>
             <div style={{ marginTop: 8, fontSize: 18, fontWeight: 1000 }}>
-              {isTrialing || isTrialExpired
-                ? formatDate(billingSummary.trialEndsAt)
-                : formatDate(billingSummary.currentPeriodEnd)}
+              {currentPeriodLabel}
             </div>
           </div>
         </div>
 
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 18 }}>
-          {canStartTrial ? (
-            <button
-              onClick={handleStartTrial}
-              disabled={loading}
-              style={{
-                borderRadius: 999,
-                padding: "10px 14px",
-                border: "1px solid rgba(255,255,255,0.12)",
-                background: "linear-gradient(90deg, #7c3aed, #2563eb)",
-                color: "#fff",
-                fontWeight: 900,
-                cursor: "pointer",
-              }}
-            >
-              {loading ? "Starting Trial..." : "Start 7-Day Free Trial"}
-            </button>
-          ) : null}
-
-          {isTrialExpired ? (
+          {showRestoreAccess ? (
             <button
               onClick={() => upgrade("GROWTH")}
               disabled={loading}
@@ -525,7 +513,7 @@ export default function Billing() {
         }}
       >
         {Object.entries(pricing).map(([key, item]) => {
-          const isCurrent = plan === key;
+          const isCurrent = plan === key && !showRestoreAccess;
           const isPopular = key === "GROWTH";
 
           return (
@@ -571,7 +559,7 @@ export default function Billing() {
 
               <button
                 onClick={() => upgrade(key)}
-                disabled={loading || isCurrent}
+                disabled={loading || isCurrent || !showUpgradeButtons}
                 style={{
                   marginTop: 16,
                   borderRadius: 999,
@@ -582,7 +570,8 @@ export default function Billing() {
                     : "rgba(255,255,255,0.08)",
                   color: "#EAF0FF",
                   fontWeight: 900,
-                  cursor: isCurrent ? "default" : "pointer",
+                  cursor: isCurrent || !showUpgradeButtons ? "default" : "pointer",
+                  opacity: !showUpgradeButtons && !showRestoreAccess ? 0.7 : 1,
                 }}
               >
                 {isCurrent ? "Current Plan" : `Choose ${item.label}`}
