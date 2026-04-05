@@ -7,9 +7,7 @@ import {
   getActiveOrgName,
   getActiveWorkspace,
   uploadSpreadsheetData,
-  getIntegrationAuthUrl,
-  getHubSpotStatus,
-  syncHubSpot,
+  apiGet,
 } from "../api";
 
 const connectorCatalog = [
