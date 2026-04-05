@@ -8,6 +8,8 @@ import {
   getActiveWorkspace,
   uploadSpreadsheetData,
   apiGet,
+  getHubSpotStatus,
+  syncHubSpot,
 } from "../api";
 
 const connectorCatalog = [
@@ -112,36 +114,36 @@ export default function Integrations() {
     load();
   }, []);
 
- async function handleConnect(id) {
-  try {
-    setBusyId(id);
-    setError("");
-    setSuccess("");
+  async function handleConnect(id) {
+    try {
+      setBusyId(id);
+      setError("");
+      setSuccess("");
 
-    const connector = connectorCatalog.find((c) => c.id === id);
+      const connector = connectorCatalog.find((c) => c.id === id);
 
-    if (id === "hubspot" && connector?.supportsLive) {
-      const res = await apiGet(`/integrations/${id}/auth-url`);
+      if (id === "hubspot" && connector?.supportsLive) {
+        const res = await apiGet(`/integrations/${id}/auth-url`);
 
-      if (!res?.authUrl) {
-        throw new Error("No auth URL returned from backend");
+        if (!res?.authUrl) {
+          throw new Error("No auth URL returned from backend");
+        }
+
+        window.location.href = res.authUrl;
+        return;
       }
 
-      // 🔥 THIS is what actually triggers OAuth
-      window.location.href = res.authUrl;
-      return;
+      const data = await connectIntegration(id);
+      setIntegrations(normalizeIntegrationMap(data?.integrations));
+      setSuccess(`${connector?.name || id} connected`);
+    } catch (err) {
+      console.error(err);
+      setError(err?.message || "Failed to connect integration");
+    } finally {
+      setBusyId("");
     }
-
-    const data = await connectIntegration(id);
-    setIntegrations(normalizeIntegrationMap(data?.integrations));
-    setSuccess(`${connector?.name || id} connected`);
-  } catch (err) {
-    console.error(err);
-    setError(err?.message || "Failed to connect integration");
-  } finally {
-    setBusyId("");
   }
-}
+
   async function handleDisconnect(id) {
     try {
       setBusyId(id);
@@ -269,7 +271,7 @@ export default function Integrations() {
         </div>
 
         <h1 style={{ fontSize: 28, fontWeight: 900, margin: 0 }}>
-          Atlas Data Connectors Connectors TEST 123
+          Atlas Data Connectors
         </h1>
 
         <div
@@ -459,8 +461,12 @@ export default function Integrations() {
                 }}
               >
                 {c.manual
-                  ? `Mode: ${workspaceModeLabel}`
-                  : `Mode: ${live?.mode || "demo"}`}
+                  ? "Manual import"
+                  : isConnected
+                  ? live?.mode === "live"
+                    ? "Live connection"
+                    : "Connected"
+                  : ""}
               </div>
 
               <div
@@ -472,10 +478,10 @@ export default function Integrations() {
                 }}
               >
                 {c.manual
-                  ? "Upload Excel or CSV files manually"
+                  ? "Upload Excel or CSV data into Atlas"
                   : live?.lastSync
                   ? `Last sync: ${formatDate(live.lastSync)}`
-                  : "No sync yet"}
+                  : ""}
               </div>
 
               {!c.manual && live?.externalAccountName ? (
@@ -528,7 +534,7 @@ export default function Integrations() {
                       opacity: !!busyId || uploading ? 0.7 : 1,
                     }}
                   >
-                    {isBusy ? "Connecting..." : c.id === "hubspot" ? "HUBSPOT LIVE TEST" : "Connect"}
+                    {isBusy ? "Connecting..." : c.id === "hubspot" ? "Connect Live" : "Connect"}
                   </button>
                 ) : (
                   <>
