@@ -115,8 +115,6 @@ export default function Integrations() {
   }, []);
 
  async function handleConnect(id) {
-  alert("NEW HUBSPOT CONNECT HANDLER RUNNING");
-
   try {
     setBusyId(id);
     setError("");
@@ -125,12 +123,13 @@ export default function Integrations() {
     const connector = connectorCatalog.find((c) => c.id === id);
 
     if (id === "hubspot" && connector?.supportsLive) {
-      const res = await getIntegrationAuthUrl(id);
+      const res = await apiGet(`/integrations/${id}/auth-url`);
 
       if (!res?.authUrl) {
-        throw new Error("HubSpot auth URL was not returned.");
+        throw new Error("No auth URL returned from backend");
       }
 
+      // 🔥 THIS is what actually triggers OAuth
       window.location.href = res.authUrl;
       return;
     }
@@ -145,7 +144,6 @@ export default function Integrations() {
     setBusyId("");
   }
 }
-
   async function handleDisconnect(id) {
     try {
       setBusyId(id);
