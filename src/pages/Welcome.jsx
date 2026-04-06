@@ -1,8 +1,19 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 export default function Welcome() {
+  const nav = useNavigate();
   const [step, setStep] = useState(1);
   const [goal, setGoal] = useState("");
+
+  const workspaceName = useMemo(() => {
+    return (
+      localStorage.getItem("activeOrgName") ||
+      localStorage.getItem("butler_active_org_name") ||
+      localStorage.getItem("active_org_name") ||
+      "your workspace"
+    );
+  }, []);
 
   const S = {
     page: {
@@ -17,7 +28,7 @@ export default function Welcome() {
     },
     card: {
       width: "100%",
-      maxWidth: 720,
+      maxWidth: 760,
       padding: 28,
       borderRadius: 22,
       border: "1px solid rgba(255,255,255,0.10)",
@@ -84,12 +95,46 @@ export default function Welcome() {
       fontWeight: 900,
       marginBottom: 14,
     },
+    checklist: {
+      display: "grid",
+      gap: 12,
+      marginTop: 12,
+      marginBottom: 8,
+    },
+    checklistItem: {
+      padding: 14,
+      borderRadius: 14,
+      border: "1px solid rgba(255,255,255,0.10)",
+      background: "rgba(255,255,255,0.04)",
+    },
+    checklistTitle: {
+      fontSize: 14,
+      fontWeight: 800,
+      marginBottom: 4,
+    },
+    checklistText: {
+      fontSize: 13,
+      opacity: 0.78,
+      lineHeight: 1.6,
+    },
+    row: {
+      display: "flex",
+      gap: 12,
+      flexWrap: "wrap",
+      marginTop: 10,
+    },
   };
 
-  function finish() {
+  function finishAndGoToIntegrations() {
     localStorage.setItem("atlas_onboarded", "true");
     localStorage.setItem("atlas_primary_goal", goal || "Grow Revenue");
-    window.location.href = "/overview";
+    nav("/integrations", { replace: true });
+  }
+
+  function skipToCommandCenter() {
+    localStorage.setItem("atlas_onboarded", "true");
+    localStorage.setItem("atlas_primary_goal", goal || "Grow Revenue");
+    nav("/command-center", { replace: true });
   }
 
   return (
@@ -99,42 +144,55 @@ export default function Welcome() {
 
         {step === 1 && (
           <>
-            <div style={S.title}>Welcome to Atlas Revenue AI</div>
+            <div style={S.title}>Welcome to Atlas</div>
             <div style={S.sub}>
-              You’re officially inside your workspace. Atlas is designed to help
-              you monitor pipeline health, surface revenue opportunities, track
-              execution pressure, and give leadership a clearer path to growth.
+              Your free trial is live and {workspaceName} is ready. Atlas helps
+              you see what is driving revenue, where pipeline risk is building,
+              and where your next growth opportunities are hiding.
             </div>
+
+            <div style={S.checklist}>
+              <div style={S.checklistItem}>
+                <div style={S.checklistTitle}>Step 1: Connect your data</div>
+                <div style={S.checklistText}>
+                  Connect your CRM, ad platforms, or upload a spreadsheet so
+                  Atlas can start modeling your revenue engine.
+                </div>
+              </div>
+
+              <div style={S.checklistItem}>
+                <div style={S.checklistTitle}>Step 2: Review your command center</div>
+                <div style={S.checklistText}>
+                  Once your data is in, Atlas will surface visibility across
+                  pipeline, forecasting, signals, and performance.
+                </div>
+              </div>
+
+              <div style={S.checklistItem}>
+                <div style={S.checklistTitle}>Step 3: Activate the trial fully</div>
+                <div style={S.checklistText}>
+                  The fastest way to get value from Atlas is to connect at least
+                  one real data source during your trial.
+                </div>
+              </div>
+            </div>
+
             <button style={S.btn} onClick={() => setStep(2)}>
-              Get Started
+              Continue Setup
+            </button>
+
+            <button style={S.secondaryBtn} onClick={skipToCommandCenter}>
+              Skip for now
             </button>
           </>
         )}
 
         {step === 2 && (
           <>
-            <div style={S.title}>What Atlas Helps You Do</div>
+            <div style={S.title}>What are you trying to improve first?</div>
             <div style={S.sub}>
-              Atlas brings your revenue operation into one command center so you
-              can move faster and make better decisions.
-            </div>
-
-            <div style={S.option}>Predict revenue and forecast movement</div>
-            <div style={S.option}>Track pipeline pressure and deal momentum</div>
-            <div style={S.option}>Monitor accounts, signals, and team activity</div>
-            <div style={S.option}>Turn data into executive-level visibility</div>
-
-            <button style={S.btn} onClick={() => setStep(3)}>
-              Continue
-            </button>
-          </>
-        )}
-
-        {step === 3 && (
-          <>
-            <div style={S.title}>What’s your main goal right now?</div>
-            <div style={S.sub}>
-              This helps Atlas tailor the experience as you get started.
+              We’ll use this to shape your onboarding path and save your primary
+              goal for the workspace.
             </div>
 
             {[
@@ -156,17 +214,63 @@ export default function Welcome() {
               </button>
             ))}
 
-            <button
-              style={{
-                ...S.btn,
-                opacity: goal ? 1 : 0.55,
-                cursor: goal ? "pointer" : "not-allowed",
-              }}
-              onClick={finish}
-              disabled={!goal}
-            >
-              Finish Setup
-            </button>
+            <div style={S.row}>
+              <button
+                style={{
+                  ...S.btn,
+                  opacity: goal ? 1 : 0.55,
+                  cursor: goal ? "pointer" : "not-allowed",
+                  marginTop: 0,
+                }}
+                onClick={() => setStep(3)}
+                disabled={!goal}
+                type="button"
+              >
+                Continue
+              </button>
+
+              <button
+                style={{ ...S.secondaryBtn, marginTop: 0, marginLeft: 0 }}
+                onClick={() => setStep(1)}
+                type="button"
+              >
+                Back
+              </button>
+            </div>
+          </>
+        )}
+
+        {step === 3 && (
+          <>
+            <div style={S.title}>Next best step: connect your data</div>
+            <div style={S.sub}>
+              Based on your goal of <b>{goal || "growing revenue"}</b>, the best
+              next move is to connect at least one source so Atlas can begin
+              generating real visibility for your team.
+            </div>
+
+            <div style={S.checklist}>
+              <div style={S.checklistItem}>
+                <div style={S.checklistTitle}>Recommended first connections</div>
+                <div style={S.checklistText}>
+                  Start with HubSpot, Google Ads, or Excel / CSV import. That
+                  gives Atlas enough signal to begin showing meaningful insights.
+                </div>
+              </div>
+            </div>
+
+            <div style={S.row}>
+              <button style={{ ...S.btn, marginTop: 0 }} onClick={finishAndGoToIntegrations}>
+                Connect Data Sources
+              </button>
+
+              <button
+                style={{ ...S.secondaryBtn, marginTop: 0, marginLeft: 0 }}
+                onClick={skipToCommandCenter}
+              >
+                Go to Command Center
+              </button>
+            </div>
           </>
         )}
       </div>

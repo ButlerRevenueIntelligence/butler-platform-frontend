@@ -232,6 +232,7 @@ export function logout() {
   localStorage.removeItem("activeWorkspace");
   localStorage.removeItem("workspaces");
   localStorage.removeItem("membership");
+  clearOnboardingState();
 }
 
 // -------------------- Org context auto-fix --------------------
@@ -455,6 +456,16 @@ export const login = async (payload) => {
   const res = await apiPost("/auth/login", payload);
   return syncSessionFromAuthResponse(res);
 };
+
+export function markOnboardingComplete(goal = "Grow Revenue") {
+  localStorage.setItem("atlas_onboarded", "true");
+  localStorage.setItem("atlas_primary_goal", goal);
+}
+
+export function clearOnboardingState() {
+  localStorage.removeItem("atlas_onboarded");
+  localStorage.removeItem("atlas_primary_goal");
+}
 
 export const forgotPassword = (email) =>
   apiPost("/auth/forgot-password", { email });
