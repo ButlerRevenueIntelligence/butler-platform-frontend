@@ -7,14 +7,27 @@ export default function PaywallModal({
   onClose,
   title = "Upgrade required",
   message = "You’ve reached a usage limit on your current plan.",
+
+  // NEW
+  primaryActionLabel = "Upgrade Now",
+  onPrimaryAction,
+  force = false, // hard lock (cannot close)
 }) {
   const nav = useNavigate();
 
   if (!open) return null;
 
+  function handlePrimary() {
+    if (onPrimaryAction) {
+      onPrimaryAction();
+    } else {
+      nav("/billing");
+    }
+  }
+
   return createPortal(
     <div
-      onClick={onClose}
+      onClick={!force ? onClose : undefined} // ❌ disable click-outside if forced
       style={{
         position: "fixed",
         inset: 0,
@@ -76,6 +89,7 @@ export default function PaywallModal({
             {message}
           </div>
 
+          {/* VALUE STACK */}
           <div
             style={{
               marginTop: 20,
@@ -88,23 +102,24 @@ export default function PaywallModal({
             }}
           >
             <div style={{ fontWeight: 900, fontSize: 14 }}>
-              Upgrade to unlock more Atlas power
+              Unlock full Atlas capabilities
             </div>
 
-            <div style={{ fontSize: 13, lineHeight: 1.55, opacity: 0.92 }}>
-              • More AI analyses and strategic recommendations
+            <div style={{ fontSize: 13, opacity: 0.92 }}>
+              • Predict revenue with AI-driven forecasting
             </div>
-            <div style={{ fontSize: 13, lineHeight: 1.55, opacity: 0.92 }}>
-              • More reports, forecasting runs, and executive exports
+            <div style={{ fontSize: 13, opacity: 0.92 }}>
+              • Track pipeline pressure and deal velocity
             </div>
-            <div style={{ fontSize: 13, lineHeight: 1.55, opacity: 0.92 }}>
-              • Greater visibility across your revenue system
+            <div style={{ fontSize: 13, opacity: 0.92 }}>
+              • Generate executive-level reports instantly
             </div>
-            <div style={{ fontSize: 13, lineHeight: 1.55, opacity: 0.92 }}>
-              • Access designed for growing and scaling teams
+            <div style={{ fontSize: 13, opacity: 0.92 }}>
+              • Full visibility across your revenue system
             </div>
           </div>
 
+          {/* ACTIONS */}
           <div
             style={{
               marginTop: 20,
@@ -114,7 +129,7 @@ export default function PaywallModal({
             }}
           >
             <button
-              onClick={() => nav("/billing")}
+              onClick={handlePrimary}
               style={{
                 borderRadius: 999,
                 padding: "12px 18px",
@@ -125,23 +140,26 @@ export default function PaywallModal({
                 cursor: "pointer",
               }}
             >
-              Upgrade Now
+              {primaryActionLabel}
             </button>
 
-            <button
-              onClick={onClose}
-              style={{
-                borderRadius: 999,
-                padding: "12px 18px",
-                border: "1px solid rgba(255,255,255,0.12)",
-                background: "rgba(255,255,255,0.06)",
-                color: "#EAF0FF",
-                fontWeight: 900,
-                cursor: "pointer",
-              }}
-            >
-              Maybe Later
-            </button>
+            {/* ❌ Hide close button if forced */}
+            {!force && (
+              <button
+                onClick={onClose}
+                style={{
+                  borderRadius: 999,
+                  padding: "12px 18px",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  background: "rgba(255,255,255,0.06)",
+                  color: "#EAF0FF",
+                  fontWeight: 900,
+                  cursor: "pointer",
+                }}
+              >
+                Maybe Later
+              </button>
+            )}
           </div>
         </div>
       </div>

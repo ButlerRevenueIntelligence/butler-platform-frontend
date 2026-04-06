@@ -9,6 +9,7 @@ import {
   getActiveWorkspace,
   switchWorkspace,
   getMyOrgs,
+  apiGet,
 } from "../api";
 import { hasPerm } from "../utils/permissions";
 import TrialBanner from "./TrialBanner";
@@ -112,6 +113,80 @@ function workspaceNameFromItem(item) {
   );
 }
 
+function normalizeBillingState(me) {
+  const billingStatus =
+    me?.billing?.status ||
+    me?.activeWorkspace?.billing?.status ||
+    "";
+
+  const paymentStatus =
+    me?.paymentStatus ||
+    me?.activeWorkspace?.paymentStatus ||
+    "";
+
+  const accessStatus =
+    me?.accessStatus ||
+    me?.activeWorkspace?.status ||
+    "";
+
+  const trialStatus =
+    me?.trial?.status ||
+    me?.activeWorkspace?.trial?.status ||
+    "";
+
+  const workspaceActive = Boolean(me?.workspaceActive);
+  const trialExpired = Boolean(me?.trialExpired) || trialStatus === "expired";
+
+  const blocked =
+    !workspaceActive ||
+    trialExpired ||
+    ["past_due", "canceled", "inactive"].includes(String(billingStatus).toLowerCase()) ||
+    ["past_due", "canceled", "pending"].includes(String(paymentStatus).toLowerCase()) ||
+    ["suspended"].includes(String(accessStatus).toLowerCase());
+
+  return {
+    billingStatus: String(billingStatus || "").toLowerCase(),
+    paymentStatus: String(paymentStatus || "").toLowerCase(),
+    accessStatus: String(accessStatus || "").toLowerCase(),
+    trialStatus: String(trialStatus || "").toLowerCase(),
+    workspaceActive,
+    trialExpired,
+    blocked,
+  };
+}
+
+function getPaywallCopy(state) {
+  if (state.trialExpired) {
+    return {
+      title: "Your trial has expired",
+      message:
+        "Your Atlas trial has ended. Upgrade your workspace to restore access to command center, forecasting, reporting, and revenue intelligence.",
+    };
+  }
+
+  if (state.paymentStatus === "past_due" || state.billingStatus === "past_due") {
+    return {
+      title: "Billing issue detected",
+      message:
+        "Your workspace billing is past due. Update your billing to restore full access to Atlas.",
+    };
+  }
+
+  if (state.accessStatus === "suspended") {
+    return {
+      title: "Workspace suspended",
+      message:
+        "This workspace is currently suspended. Visit billing to restore access.",
+    };
+  }
+
+  return {
+    title: "Workspace access required",
+    message:
+      "This workspace no longer has active access. Visit billing to continue using Atlas.",
+  };
+}
+
 export default function AppLayout() {
   const nav = useNavigate();
 
@@ -121,6 +196,7 @@ export default function AppLayout() {
   });
 
   const [paywallData, setPaywallData] = useState(null);
+  const [workspaceBlocked, setWorkspaceBlocked] = useState(false);
 
   const can = (perm) => !permissions?.length || hasPerm(permissions, perm);
 
@@ -209,6 +285,33 @@ export default function AppLayout() {
     window.addEventListener("atlas:usage-limit", handleLimit);
     return () => window.removeEventListener("atlas:usage-limit", handleLimit);
   }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function checkWorkspaceState() {
+      try {
+        const me = await apiGet("/me");
+        if (!mounted) return;
+
+        const state = normalizeBillingState(me);
+        setWorkspaceBlocked(state.blocked);
+
+        if (state.blocked) {
+          setPaywallData(getPaywallCopy(state));
+        } else {
+          setPaywallData(null);
+        }
+      } catch (err) {
+        console.error("Workspace access state check failed:", err);
+      }
+    }
+
+    checkWorkspaceState();
+    return () => {
+      mounted = false;
+    };
+  }, [selectedWorkspaceId]);
 
   const [now, setNow] = useState(() => new Date());
 
@@ -366,11 +469,13 @@ export default function AppLayout() {
                     width: 7,
                     height: 7,
                     borderRadius: 999,
-                    background: "#22c55e",
-                    boxShadow: "0 0 8px rgba(34,197,94,0.5)",
+                    background: workspaceBlocked ? "#fb7185" : "#22c55e",
+                    boxShadow: workspaceBlocked
+                      ? "0 0 8px rgba(251,113,133,0.5)"
+                      : "0 0 8px rgba(34,197,94,0.5)",
                   }}
                 />
-                <strong>Systems Online</strong>
+                <strong>{workspaceBlocked ? "Access Limited" : "Systems Online"}</strong>
               </div>
 
               {visibleWorkspaceOptions.length > 0 ? (
@@ -459,6 +564,8 @@ export default function AppLayout() {
               background:
                 "linear-gradient(180deg, rgba(255,255,255,0.022), rgba(255,255,255,0.012))",
               boxShadow: "0 8px 22px rgba(0,0,0,0.14)",
+              opacity: workspaceBlocked ? 0.55 : 1,
+              pointerEvents: workspaceBlocked ? "none" : "auto",
             }}
           >
             <NavRow title="CORE">
@@ -467,25 +574,21 @@ export default function AppLayout() {
                   Overview
                 </NavLink>
               )}
-
               {can("command_center.view") && (
                 <NavLink to="/command-center" style={navLinkStyle}>
                   Command Center
                 </NavLink>
               )}
-
               {can("deal_room.view") && (
                 <NavLink to="/deal-war-room" style={navLinkStyle}>
                   Deal War Room
                 </NavLink>
               )}
-
               {can("market_signals.view") && (
                 <NavLink to="/growth-engine" style={navLinkStyle}>
                   Growth Engine
                 </NavLink>
               )}
-
               {can("clients.view") && (
                 <NavLink to="/account-intelligence" style={navLinkStyle}>
                   Account Intelligence
@@ -499,37 +602,31 @@ export default function AppLayout() {
                   Data Connectors
                 </NavLink>
               )}
-
               {can("market_signals.view") && (
                 <NavLink to="/market-signals" style={navLinkStyle}>
                   Market Signals
                 </NavLink>
               )}
-
               {can("partners.manage") && (
                 <NavLink to="/partners" style={navLinkStyle}>
                   Partners
                 </NavLink>
               )}
-
               {can("admin.audit") && (
                 <NavLink to="/global-revenue-map" style={navLinkStyle}>
                   Global Revenue Map
                 </NavLink>
               )}
-
               {can("dashboard.view") && (
                 <NavLink to="/atlas-ai-operator" style={navLinkStyle}>
                   Atlas AI Operator
                 </NavLink>
               )}
-
               {can("dashboard.view") && (
                 <NavLink to="/reports" style={navLinkStyle}>
                   Reports
                 </NavLink>
               )}
-
               {can("dashboard.view") && (
                 <NavLink to="/board-mode" style={navLinkStyle}>
                   Board Mode
@@ -543,19 +640,16 @@ export default function AppLayout() {
                   Global HQ
                 </NavLink>
               )}
-
               {can("admin.audit") && (
                 <NavLink to="/billing" style={navLinkStyle}>
                   Billing
                 </NavLink>
               )}
-
               {can("admin.audit") && (
                 <NavLink to="/members" style={navLinkStyle}>
                   Members
                 </NavLink>
               )}
-
               {can("admin.audit") && (
                 <NavLink to="/invites" style={navLinkStyle}>
                   Invites
@@ -569,7 +663,6 @@ export default function AppLayout() {
                   Deal Room
                 </NavLink>
               )}
-
               {can("clients.view") && (
                 <NavLink to="/accounts" style={navLinkStyle}>
                   Accounts
@@ -585,6 +678,9 @@ export default function AppLayout() {
           maxWidth: 1440,
           margin: "0 auto",
           padding: "14px 18px 32px",
+          opacity: workspaceBlocked ? 0.55 : 1,
+          pointerEvents: workspaceBlocked ? "none" : "auto",
+          filter: workspaceBlocked ? "blur(1px)" : "none",
         }}
       >
         <Outlet />
@@ -593,12 +689,12 @@ export default function AppLayout() {
       {paywallData ? (
         <PaywallModal
           open={!!paywallData}
-          title="Usage limit reached"
-          message={
-            paywallData?.message ||
-            "You’ve reached a limit on your current Atlas plan."
-          }
-          onClose={() => setPaywallData(null)}
+          title={paywallData?.title}
+          message={paywallData?.message}
+          onClose={() => {}}
+          primaryActionLabel="Go to Billing"
+          onPrimaryAction={() => nav("/billing")}
+          force={workspaceBlocked}
         />
       ) : null}
     </div>
