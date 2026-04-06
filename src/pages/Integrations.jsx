@@ -8,6 +8,7 @@ import {
   getActiveWorkspace,
   uploadSpreadsheetData,
   apiGet,
+  apiPost,
   getHubSpotStatus,
   syncHubSpot,
 } from "../api";
@@ -15,7 +16,7 @@ import {
 const connectorCatalog = [
   { id: "hubspot", name: "HubSpot CRM", category: "CRM", supportsLive: true },
   { id: "salesforce", name: "Salesforce", category: "CRM", supportsLive: false },
-  { id: "google_ads", name: "Google Ads", category: "Advertising", supportsLive: false },
+  { id: "google_ads", name: "Google Ads", category: "Advertising", supportsLive: true },
   { id: "meta_ads", name: "Meta Ads", category: "Advertising", supportsLive: false },
   { id: "linkedin_ads", name: "LinkedIn Ads", category: "Advertising", supportsLive: false },
   { id: "ga4", name: "Google Analytics 4", category: "Analytics", supportsLive: false },
@@ -65,6 +66,10 @@ function normalizeIntegrationMap(list) {
   return map;
 }
 
+function customerIdFromResourceName(value) {
+  return String(value || "").replace("customers/", "");
+}
+
 export default function Integrations() {
   const [integrations, setIntegrations] = useState({});
   const [loading, setLoading] = useState(true);
@@ -72,6 +77,7 @@ export default function Integrations() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [selectedGoogleAccounts, setSelectedGoogleAccounts] = useState({});
 
   const fileInputRef = useRef(null);
 
@@ -101,7 +107,32 @@ export default function Integrations() {
       setWorkspaceModeLabel(getWorkspaceModeLabel(workspace));
 
       const data = await getIntegrations();
-      setIntegrations(normalizeIntegrationMap(data?.integrations));
+      const map = normalizeIntegrationMap(data?.integrations);
+      setIntegrations(map);
+
+      const googleAds = map.google_ads;
+      if (googleAds?.selectedCustomer) {
+        setSelectedGoogleAccounts((prev) => ({
+          ...prev,
+          google_ads: customerIdFromResourceName(googleAds.selectedCustomer),
+        }));
+      } else if (
+        googleAds?.externalAccountId &&
+        !googleAds?.needsSelection
+      ) {
+        setSelectedGoogleAccounts((prev) => ({
+          ...prev,
+          google_ads: googleAds.externalAccountId,
+        }));
+      } else if (
+        Array.isArray(googleAds?.accessibleCustomers) &&
+        googleAds.accessibleCustomers.length === 1
+      ) {
+        setSelectedGoogleAccounts((prev) => ({
+          ...prev,
+          google_ads: customerIdFromResourceName(googleAds.accessibleCustomers[0]),
+        }));
+      }
     } catch (err) {
       console.error(err);
       setError(err?.message || "Failed to load connectors");
@@ -122,7 +153,7 @@ export default function Integrations() {
 
       const connector = connectorCatalog.find((c) => c.id === id);
 
-      if (id === "hubspot" && connector?.supportsLive) {
+      if (connector?.supportsLive) {
         const res = await apiGet(`/integrations/${id}/auth-url`);
 
         if (!res?.authUrl) {
@@ -178,6 +209,32 @@ export default function Integrations() {
     } catch (err) {
       console.error(err);
       setError(err?.message || "Failed to sync HubSpot");
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  async function handleGoogleAdsSelectAccount() {
+    try {
+      const customerId = selectedGoogleAccounts.google_ads;
+      if (!customerId) {
+        throw new Error("Please select a Google Ads account.");
+      }
+
+      setBusyId("google_ads_select");
+      setError("");
+      setSuccess("");
+
+      const data = await apiPost("/integrations/google_ads/select-account", {
+        customerId,
+      });
+
+      const map = normalizeIntegrationMap(data?.integrations);
+      setIntegrations(map);
+      setSuccess("Google Ads account selected");
+    } catch (err) {
+      console.error(err);
+      setError(err?.message || "Failed to select Google Ads account");
     } finally {
       setBusyId("");
     }
@@ -405,6 +462,18 @@ export default function Integrations() {
           const isConnected = status === "connected";
           const isBusy = busyId === c.id;
           const isHubSpotLive = c.id === "hubspot" && live?.mode === "live";
+          const isGoogleAds = c.id === "google_ads";
+          const needsGoogleSelection =
+            isGoogleAds &&
+            isConnected &&
+            live?.mode === "live" &&
+            live?.needsSelection &&
+            Array.isArray(live?.accessibleCustomers) &&
+            live.accessibleCustomers.length > 0;
+
+          const accountLabel =
+            live?.externalAccountName ||
+            (live?.externalAccountId ? `Google Ads ${live.externalAccountId}` : "");
 
           return (
             <div
@@ -464,7 +533,9 @@ export default function Integrations() {
                   ? "Manual import"
                   : isConnected
                   ? live?.mode === "live"
-                    ? "Live connection"
+                    ? needsGoogleSelection
+                      ? "Select client account"
+                      : "Live connection"
                     : "Connected"
                   : ""}
               </div>
@@ -484,7 +555,7 @@ export default function Integrations() {
                   : ""}
               </div>
 
-              {!c.manual && live?.externalAccountName ? (
+              {!c.manual && accountLabel ? (
                 <div
                   style={{
                     fontSize: 11,
@@ -493,11 +564,89 @@ export default function Integrations() {
                     minHeight: 16,
                   }}
                 >
-                  Account: {live.externalAccountName}
+                  Account: {accountLabel}
+                  {live?.externalAccountId ? ` (${live.externalAccountId})` : ""}
                 </div>
               ) : (
                 <div style={{ minHeight: 16, marginBottom: 14 }} />
               )}
+
+              {needsGoogleSelection ? (
+                <div
+                  style={{
+                    marginBottom: 14,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                  }}
+                >
+                  <select
+                    value={selectedGoogleAccounts.google_ads || ""}
+                    onChange={(e) =>
+                      setSelectedGoogleAccounts((prev) => ({
+                        ...prev,
+                        google_ads: e.target.value,
+                      }))
+                    }
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      borderRadius: 10,
+                      border: "1px solid rgba(255,255,255,0.10)",
+                      background: "rgba(255,255,255,0.05)",
+                      color: "#fff",
+                      fontSize: 12,
+                      outline: "none",
+                    }}
+                  >
+                    <option value="" style={{ color: "#111" }}>
+                      Select Google Ads account
+                    </option>
+                    {live.accessibleCustomers.map((item) => {
+                      const customerId = customerIdFromResourceName(item);
+                      return (
+                        <option
+                          key={item}
+                          value={customerId}
+                          style={{ color: "#111" }}
+                        >
+                          Google Ads {customerId}
+                        </option>
+                      );
+                    })}
+                  </select>
+
+                  <button
+                    onClick={handleGoogleAdsSelectAccount}
+                    disabled={
+                      !!busyId ||
+                      uploading ||
+                      !selectedGoogleAccounts.google_ads
+                    }
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: 10,
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      background: "rgba(255,255,255,0.05)",
+                      color: "#fff",
+                      fontWeight: 700,
+                      fontSize: 12,
+                      cursor:
+                        !!busyId || uploading || !selectedGoogleAccounts.google_ads
+                          ? "not-allowed"
+                          : "pointer",
+                      opacity:
+                        !!busyId || uploading || !selectedGoogleAccounts.google_ads
+                          ? 0.7
+                          : 1,
+                    }}
+                  >
+                    {busyId === "google_ads_select"
+                      ? "Saving..."
+                      : "Use Selected Account"}
+                  </button>
+                </div>
+              ) : null}
 
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                 {c.manual ? (
@@ -534,7 +683,7 @@ export default function Integrations() {
                       opacity: !!busyId || uploading ? 0.7 : 1,
                     }}
                   >
-                    {isBusy ? "Connecting..." : c.id === "hubspot" ? "Connect Live" : "Connect"}
+                    {isBusy ? "Connecting..." : c.supportsLive ? "Connect Live" : "Connect"}
                   </button>
                 ) : (
                   <>
