@@ -487,6 +487,7 @@ export const startFreeTrial = (payload = {}) =>
 export const uploadSpreadsheetData = (payload) =>
   apiPost("/imports/spreadsheet", payload);
 
+}
 // -------------------- Dashboard --------------------
 export const getDashboard = () => apiGet("/dashboard");
 export const getIntegrations = () => apiGet("/integrations");

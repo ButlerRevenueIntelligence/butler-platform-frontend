@@ -348,9 +348,9 @@ export default function Integrations() {
 
       const summary = res?.summary || {};
       setSuccess(
-        `Upload complete. Deals: ${summary.dealsInserted || 0}, Metrics: ${
-          summary.metricsInserted || 0
-        }, Skipped: ${summary.skipped || 0}`
+        `Upload complete. Clients: ${summary.clientsInserted || 0}, Deals: ${
+          summary.dealsInserted || 0
+        }, Metrics: ${summary.metricsInserted || 0}, Skipped: ${summary.skipped || 0}`
       );
 
       await load();
@@ -537,6 +537,7 @@ export default function Integrations() {
           const isGoogleAds = c.id === "google_ads";
           const isGA4 = c.id === "ga4";
           const isStripe = c.id === "stripe";
+          const isManualImport = c.id === "excel_csv";
 
           const needsGoogleSelection =
             isGoogleAds &&
@@ -588,26 +589,48 @@ export default function Integrations() {
                 {c.category}
               </div>
 
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  fontSize: 12,
-                  marginBottom: 8,
-                  textTransform: "capitalize",
-                }}
-              >
-                <span
+              {isManualImport ? (
+                <div
                   style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: 999,
-                    background: color,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    fontSize: 12,
+                    marginBottom: 8,
                   }}
-                />
-                {status}
-              </div>
+                >
+                  <span
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: 999,
+                      background: "#38bdf8",
+                    }}
+                  />
+                  Manual Import
+                </div>
+              ) : (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    fontSize: 12,
+                    marginBottom: 8,
+                    textTransform: "capitalize",
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: 999,
+                      background: color,
+                    }}
+                  />
+                  {status}
+                </div>
+              )}
 
               <div
                 style={{
@@ -618,8 +641,10 @@ export default function Integrations() {
                   textTransform: "none",
                 }}
               >
-                {c.manual
-                  ? "Manual import"
+                {isManualImport
+                  ? success && success.toLowerCase().includes("upload complete")
+                    ? "Last upload completed"
+                    : "Ready to upload"
                   : isConnected
                   ? live?.mode === "live"
                     ? needsGoogleSelection
@@ -641,7 +666,7 @@ export default function Integrations() {
                   minHeight: 16,
                 }}
               >
-                {c.manual
+                {isManualImport
                   ? "Upload Excel or CSV data into Atlas"
                   : live?.lastSync
                   ? `Last sync: ${formatDate(live.lastSync)}`
