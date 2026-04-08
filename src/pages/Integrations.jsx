@@ -21,7 +21,7 @@ const connectorCatalog = [
   { id: "meta_ads", name: "Meta Ads", category: "Advertising", supportsLive: true },
   { id: "linkedin_ads", name: "LinkedIn Ads", category: "Advertising", supportsLive: false },
   { id: "ga4", name: "Google Analytics 4", category: "Analytics", supportsLive: true },
-  { id: "stripe", name: "Stripe", category: "Payments", supportsLive: false },
+  { id: "stripe", name: "Stripe", category: "Payments", supportsLive: true },
   { id: "shopify", name: "Shopify", category: "Commerce", supportsLive: false },
   {
     id: "excel_csv",
@@ -177,6 +177,11 @@ export default function Integrations() {
       setError("");
       setSuccess("");
 
+      if (id === "stripe") {
+        window.location.href = "/billing";
+        return;
+      }
+
       const connector = connectorCatalog.find((c) => c.id === id);
 
       if (connector?.supportsLive) {
@@ -235,6 +240,23 @@ export default function Integrations() {
     } catch (err) {
       console.error(err);
       setError(err?.message || "Failed to sync HubSpot");
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  async function handleStripeSync() {
+    try {
+      setBusyId("stripe_sync");
+      setError("");
+      setSuccess("");
+
+      await apiPost("/integrations/stripe/sync", {});
+      setSuccess("Stripe sync completed");
+      await load();
+    } catch (err) {
+      console.error(err);
+      setError(err?.message || "Failed to sync Stripe");
     } finally {
       setBusyId("");
     }
@@ -511,8 +533,10 @@ export default function Integrations() {
           const isConnected = status === "connected";
           const isBusy = busyId === c.id;
           const isHubSpotLive = c.id === "hubspot" && live?.mode === "live";
+          const isStripeLive = c.id === "stripe" && live?.mode === "live";
           const isGoogleAds = c.id === "google_ads";
           const isGA4 = c.id === "ga4";
+          const isStripe = c.id === "stripe";
 
           const needsGoogleSelection =
             isGoogleAds &&
@@ -535,6 +559,8 @@ export default function Integrations() {
             (live?.externalAccountId
               ? c.id === "ga4"
                 ? `GA4 Property ${live.externalAccountId}`
+                : c.id === "stripe"
+                ? `Stripe ${live.externalAccountId}`
                 : `Google Ads ${live.externalAccountId}`
               : "");
 
@@ -602,6 +628,8 @@ export default function Integrations() {
                       ? "Select property"
                       : "Live connection"
                     : "Connected"
+                  : isStripe
+                  ? "Activate billing to connect Stripe"
                   : ""}
               </div>
 
@@ -822,7 +850,13 @@ export default function Integrations() {
                       opacity: !!busyId || uploading ? 0.7 : 1,
                     }}
                   >
-                    {isBusy ? "Connecting..." : c.supportsLive ? "Connect Live" : "Connect"}
+                    {isBusy
+                      ? "Connecting..."
+                      : isStripe
+                      ? "Activate via Billing"
+                      : c.supportsLive
+                      ? "Connect Live"
+                      : "Connect"}
                   </button>
                 ) : (
                   <>
@@ -859,6 +893,26 @@ export default function Integrations() {
                         }}
                       >
                         {busyId === "hubspot_sync" ? "Syncing..." : "Run Sync"}
+                      </button>
+                    ) : null}
+
+                    {isStripeLive ? (
+                      <button
+                        onClick={handleStripeSync}
+                        disabled={!!busyId || uploading}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: 10,
+                          border: "1px solid rgba(255,255,255,0.08)",
+                          background: "rgba(255,255,255,0.05)",
+                          color: "#fff",
+                          fontWeight: 700,
+                          fontSize: 12,
+                          cursor: !!busyId || uploading ? "not-allowed" : "pointer",
+                          opacity: !!busyId || uploading ? 0.7 : 1,
+                        }}
+                      >
+                        {busyId === "stripe_sync" ? "Syncing..." : "Run Sync"}
                       </button>
                     ) : null}
 
