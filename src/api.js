@@ -509,6 +509,8 @@ export const getHubSpotStatus = () =>
 export const getIntegrationAuthUrl = (provider) =>
   apiGet(`/integrations/${encodeURIComponent(provider)}/auth-url`);
 
+export const selectGA4Property = (propertyId) =>
+  apiPost("/integrations/ga4/select-property", { propertyId });
 // -------------------- Atlas AI --------------------
 export const askAtlas = (question, metrics = {}) =>
   apiPost("/atlas/ask", { question, metrics });

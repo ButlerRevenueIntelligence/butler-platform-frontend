@@ -11,6 +11,7 @@ import {
   apiPost,
   getHubSpotStatus,
   syncHubSpot,
+  selectGA4Property,
 } from "../api";
 
 const connectorCatalog = [
@@ -19,7 +20,7 @@ const connectorCatalog = [
   { id: "google_ads", name: "Google Ads", category: "Advertising", supportsLive: true },
   { id: "meta_ads", name: "Meta Ads", category: "Advertising", supportsLive: false },
   { id: "linkedin_ads", name: "LinkedIn Ads", category: "Advertising", supportsLive: false },
-  { id: "ga4", name: "Google Analytics 4", category: "Analytics", supportsLive: false },
+  { id: "ga4", name: "Google Analytics 4", category: "Analytics", supportsLive: true },
   { id: "stripe", name: "Stripe", category: "Payments", supportsLive: false },
   { id: "shopify", name: "Shopify", category: "Commerce", supportsLive: false },
   {
@@ -78,6 +79,7 @@ export default function Integrations() {
   const [success, setSuccess] = useState("");
   const [uploading, setUploading] = useState(false);
   const [selectedGoogleAccounts, setSelectedGoogleAccounts] = useState({});
+  const [selectedGA4Properties, setSelectedGA4Properties] = useState({});
 
   const fileInputRef = useRef(null);
 
@@ -131,6 +133,30 @@ export default function Integrations() {
         setSelectedGoogleAccounts((prev) => ({
           ...prev,
           google_ads: customerIdFromResourceName(googleAds.accessibleCustomers[0]),
+        }));
+      }
+
+      const ga4 = map.ga4;
+      if (ga4?.selectedProperty?.propertyId) {
+        setSelectedGA4Properties((prev) => ({
+          ...prev,
+          ga4: ga4.selectedProperty.propertyId,
+        }));
+      } else if (
+        ga4?.externalAccountId &&
+        !ga4?.needsSelection
+      ) {
+        setSelectedGA4Properties((prev) => ({
+          ...prev,
+          ga4: ga4.externalAccountId,
+        }));
+      } else if (
+        Array.isArray(ga4?.properties) &&
+        ga4.properties.length === 1
+      ) {
+        setSelectedGA4Properties((prev) => ({
+          ...prev,
+          ga4: ga4.properties[0].propertyId,
         }));
       }
     } catch (err) {
@@ -235,6 +261,29 @@ export default function Integrations() {
     } catch (err) {
       console.error(err);
       setError(err?.message || "Failed to select Google Ads account");
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  async function handleGA4SelectProperty() {
+    try {
+      const propertyId = selectedGA4Properties.ga4;
+      if (!propertyId) {
+        throw new Error("Please select a GA4 property.");
+      }
+
+      setBusyId("ga4_select");
+      setError("");
+      setSuccess("");
+
+      const data = await selectGA4Property(propertyId);
+      const map = normalizeIntegrationMap(data?.integrations);
+      setIntegrations(map);
+      setSuccess("GA4 property selected");
+    } catch (err) {
+      console.error(err);
+      setError(err?.message || "Failed to select GA4 property");
     } finally {
       setBusyId("");
     }
@@ -463,6 +512,8 @@ export default function Integrations() {
           const isBusy = busyId === c.id;
           const isHubSpotLive = c.id === "hubspot" && live?.mode === "live";
           const isGoogleAds = c.id === "google_ads";
+          const isGA4 = c.id === "ga4";
+
           const needsGoogleSelection =
             isGoogleAds &&
             isConnected &&
@@ -471,9 +522,21 @@ export default function Integrations() {
             Array.isArray(live?.accessibleCustomers) &&
             live.accessibleCustomers.length > 0;
 
+          const needsGA4Selection =
+            isGA4 &&
+            isConnected &&
+            live?.mode === "live" &&
+            live?.needsSelection &&
+            Array.isArray(live?.properties) &&
+            live.properties.length > 0;
+
           const accountLabel =
             live?.externalAccountName ||
-            (live?.externalAccountId ? `Google Ads ${live.externalAccountId}` : "");
+            (live?.externalAccountId
+              ? c.id === "ga4"
+                ? `GA4 Property ${live.externalAccountId}`
+                : `Google Ads ${live.externalAccountId}`
+              : "");
 
           return (
             <div
@@ -535,6 +598,8 @@ export default function Integrations() {
                   ? live?.mode === "live"
                     ? needsGoogleSelection
                       ? "Select client account"
+                      : needsGA4Selection
+                      ? "Select property"
                       : "Live connection"
                     : "Connected"
                   : ""}
@@ -644,6 +709,80 @@ export default function Integrations() {
                     {busyId === "google_ads_select"
                       ? "Saving..."
                       : "Use Selected Account"}
+                  </button>
+                </div>
+              ) : null}
+
+              {needsGA4Selection ? (
+                <div
+                  style={{
+                    marginBottom: 14,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                  }}
+                >
+                  <select
+                    value={selectedGA4Properties.ga4 || ""}
+                    onChange={(e) =>
+                      setSelectedGA4Properties((prev) => ({
+                        ...prev,
+                        ga4: e.target.value,
+                      }))
+                    }
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      borderRadius: 10,
+                      border: "1px solid rgba(255,255,255,0.10)",
+                      background: "rgba(255,255,255,0.05)",
+                      color: "#fff",
+                      fontSize: 12,
+                      outline: "none",
+                    }}
+                  >
+                    <option value="" style={{ color: "#111" }}>
+                      Select GA4 property
+                    </option>
+                    {live.properties.map((item) => (
+                      <option
+                        key={item.resourceName || item.propertyId}
+                        value={item.propertyId}
+                        style={{ color: "#111" }}
+                      >
+                        {item.property} ({item.propertyId})
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    onClick={handleGA4SelectProperty}
+                    disabled={
+                      !!busyId ||
+                      uploading ||
+                      !selectedGA4Properties.ga4
+                    }
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: 10,
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      background: "rgba(255,255,255,0.05)",
+                      color: "#fff",
+                      fontWeight: 700,
+                      fontSize: 12,
+                      cursor:
+                        !!busyId || uploading || !selectedGA4Properties.ga4
+                          ? "not-allowed"
+                          : "pointer",
+                      opacity:
+                        !!busyId || uploading || !selectedGA4Properties.ga4
+                          ? 0.7
+                          : 1,
+                    }}
+                  >
+                    {busyId === "ga4_select"
+                      ? "Saving..."
+                      : "Use Selected Property"}
                   </button>
                 </div>
               ) : null}
