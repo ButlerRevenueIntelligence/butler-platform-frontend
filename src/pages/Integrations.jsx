@@ -18,7 +18,7 @@ const connectorCatalog = [
   { id: "hubspot", name: "HubSpot CRM", category: "CRM", supportsLive: true },
   { id: "salesforce", name: "Salesforce", category: "CRM", supportsLive: false },
   { id: "google_ads", name: "Google Ads", category: "Advertising", supportsLive: true },
-  { id: "meta_ads", name: "Meta Ads", category: "Advertising", supportsLive: false },
+  { id: "meta_ads", name: "Meta Ads", category: "Advertising", supportsLive: true },
   { id: "linkedin_ads", name: "LinkedIn Ads", category: "Advertising", supportsLive: false },
   { id: "ga4", name: "Google Analytics 4", category: "Analytics", supportsLive: true },
   { id: "stripe", name: "Stripe", category: "Payments", supportsLive: false },
