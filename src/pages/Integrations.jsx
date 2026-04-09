@@ -177,11 +177,7 @@ export default function Integrations() {
       setError("");
       setSuccess("");
 
-      if (id === "stripe") {
-        window.location.href = "/billing";
-        return;
-      }
-
+     
       const connector = connectorCatalog.find((c) => c.id === id);
 
       if (connector?.supportsLive) {
@@ -654,7 +650,7 @@ export default function Integrations() {
                       : "Live connection"
                     : "Connected"
                   : isStripe
-                  ? "Activate billing to connect Stripe"
+                  ? "Live connection available"
                   : ""}
               </div>
 
@@ -877,11 +873,9 @@ export default function Integrations() {
                   >
                     {isBusy
                       ? "Connecting..."
-                      : isStripe
-                      ? "Activate via Billing"
                       : c.supportsLive
                       ? "Connect Live"
-                      : "Connect"}
+                      : "Connect"
                   </button>
                 ) : (
                   <>
