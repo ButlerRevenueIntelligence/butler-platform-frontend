@@ -875,8 +875,8 @@ export default function Integrations() {
                       ? "Connecting..."
                       : c.supportsLive
                       ? "Connect Live"
-                      : "Connect"
-                  </button>
+                      : "Connect"}
+                    </button>
                 ) : (
                   <>
                     <button
