@@ -11,6 +11,7 @@ import {
   getClients,
   createClient,
   createDeal,
+  getStripeRevenueDaily,
 } from "../api";
 
 import { useNavigate } from "react-router-dom";
@@ -384,7 +385,6 @@ function MiniRegionMarker({ region, onClick }) {
 }
 
 export default function Dashboard() {
-  const stripeRevenue = await getStripeRevenueDaily();
   const nav = useNavigate();
 
   useEffect(() => {
@@ -395,12 +395,26 @@ export default function Dashboard() {
       window.location.href = "/welcome";
     }
   }, []);
+   
+   useEffect(() => {
+  async function loadStripeRevenue() {
+    try {
+      const data = await getStripeRevenueDaily();
+      setStripeData(data);
+    } catch (err) {
+      console.error("Stripe error:", err);
+    }
+  }
+
+  loadStripeRevenue();
+}, []);
 
   const [dashboard, setDashboard] = useState(null);
   const [integrations, setIntegrations] = useState([]);
   const [pipeline, setPipeline] = useState({ deals: [], pipelineValue: 0 });
   const [attribution, setAttribution] = useState(null);
   const [rss, setRss] = useState(null);
+  const [stripeData, setStripeData] = useState(null);
 
   const [serverScenarios, setServerScenarios] = useState(null);
   const [scenarioKey, setScenarioKey] = useState("current");
