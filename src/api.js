@@ -511,6 +511,9 @@ export const getIntegrationAuthUrl = (provider) =>
 
 export const selectGA4Property = (propertyId) =>
   apiPost("/integrations/ga4/select-property", { propertyId });
+
+export const getStripeRevenueDaily = () =>
+  apiGet("/integrations/stripe/revenue-daily");
 // -------------------- Atlas AI --------------------
 export const askAtlas = (question, metrics = {}) =>
   apiPost("/atlas/ask", { question, metrics });

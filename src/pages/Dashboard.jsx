@@ -384,6 +384,7 @@ function MiniRegionMarker({ region, onClick }) {
 }
 
 export default function Dashboard() {
+  const stripeRevenue = await getStripeRevenueDaily();
   const nav = useNavigate();
 
   useEffect(() => {
@@ -2799,7 +2800,19 @@ export default function Dashboard() {
           <RevenueTimeline forecast={kpis.forecast90} />
         </div>
       </div>
+      
+      {stripeData && (
+        <div style={{ padding: 16, borderRadius: 12, background: "#111" }}>
+          <h3>Stripe Revenue</h3>
+          <p style={{ fontSize: 24, fontWeight: 700 }}>
+            ${stripeData.summary.totalRevenue.toLocaleString()}
+          </p>
 
+          <p>
+            {stripeData.summary.totalTransactions} transactions
+          </p>
+        </div>
+      )}
       {showClientModal ? (
         <div style={S.modalOverlay} onClick={() => setShowClientModal(false)}>
           <div style={S.modalCard} onClick={(e) => e.stopPropagation()}>
