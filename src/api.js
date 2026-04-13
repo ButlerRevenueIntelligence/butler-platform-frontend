@@ -669,6 +669,21 @@ export const getInvite = (token) =>
 export const acceptInvite = (token, payload = {}) =>
   apiPost(`/invites/${encodeURIComponent(token)}/accept`, payload);
 
+// -------------------- Members --------------------
+export const getMembers = () => apiGet("/members");
+
+export const createMember = (payload) =>
+  apiPost("/members", payload);
+
+export const updateMember = (membershipId, payload) =>
+  apiPatch(`/members/${membershipId}`, payload);
+
+export const resetMemberPassword = (membershipId, newPassword) =>
+  apiPost(`/members/${membershipId}/reset-password`, { newPassword });
+
+export const deleteMember = (membershipId) =>
+  apiDelete(`/members/${membershipId}`);
+
 // -------------------- Clients (CRUD) --------------------
 export const getClients = () => apiGet("/clients");
 export const getClient = (id) => apiGet(`/clients/${id}`);

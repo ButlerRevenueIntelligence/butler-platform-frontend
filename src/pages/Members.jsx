@@ -1,6 +1,12 @@
-// frontend/src/pages/Members.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import { apiGet, apiPut, getActiveOrgName } from "../api";
+import {
+  getActiveOrgName,
+  getMembers,
+  createMember,
+  updateMember,
+  resetMemberPassword,
+  deleteMember,
+} from "../api";
 
 const safe = (v) => (v == null ? "" : String(v));
 
@@ -39,6 +45,15 @@ export default function Members() {
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  const [newMember, setNewMember] = useState({
+    name: "",
+    email: "",
+    password: "",
+    role: "member",
+    status: "active",
+  });
 
   const workspaceName = getActiveOrgName() || "Current Workspace";
 
@@ -47,7 +62,7 @@ export default function Members() {
     setErr("");
 
     try {
-      const data = await apiGet("/members");
+      const data = await getMembers();
       const list = Array.isArray(data?.members)
         ? data.members
         : Array.isArray(data)
@@ -65,13 +80,45 @@ export default function Members() {
     load();
   }, []);
 
-  async function updateMember(membershipId, patch) {
+  async function handleCreateMember(e) {
+    e.preventDefault();
+    setErr("");
+    setSuccess("");
+    setCreating(true);
+
+    try {
+      await createMember({
+        name: newMember.name,
+        email: newMember.email,
+        password: newMember.password,
+        role: newMember.role,
+        status: newMember.status,
+      });
+
+      setSuccess("Member created successfully.");
+      setNewMember({
+        name: "",
+        email: "",
+        password: "",
+        role: "member",
+        status: "active",
+      });
+
+      await load();
+    } catch (e) {
+      setErr(e?.message || "Failed to create member");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleUpdateMember(membershipId, patch) {
     setErr("");
     setSuccess("");
     setSavingId(membershipId);
 
     try {
-      await apiPut(`/members/${membershipId}`, patch);
+      await updateMember(membershipId, patch);
       setSuccess("Member updated successfully.");
       await load();
     } catch (e) {
@@ -81,14 +128,58 @@ export default function Members() {
     }
   }
 
+  async function handleResetPassword(membershipId) {
+    setErr("");
+    setSuccess("");
+
+    const newPassword = window.prompt("Enter a new password (minimum 8 characters)");
+    if (!newPassword) return;
+
+    try {
+      setSavingId(membershipId);
+      await resetMemberPassword(membershipId, newPassword);
+      setSuccess("Password reset successfully.");
+    } catch (e) {
+      setErr(e?.message || "Failed to reset password");
+    } finally {
+      setSavingId("");
+    }
+  }
+
+  async function handleDeleteMember(membershipId) {
+    setErr("");
+    setSuccess("");
+
+    const confirmed = window.confirm(
+      "Are you sure you want to remove this member from the workspace?"
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setSavingId(membershipId);
+      await deleteMember(membershipId);
+      setSuccess("Member removed successfully.");
+      await load();
+    } catch (e) {
+      setErr(e?.message || "Failed to remove member");
+    } finally {
+      setSavingId("");
+    }
+  }
+
   const stats = useMemo(() => {
     const total = items.length;
-    const active = items.filter((i) => safe(i?.status).toLowerCase() === "active").length;
+    const active = items.filter(
+      (i) => safe(i?.membershipStatus).toLowerCase() === "active"
+    ).length;
     const admins = items.filter((i) => {
       const r = safe(i?.role).toLowerCase();
       return r === "owner" || r === "admin";
     }).length;
-    const managers = items.filter((i) => safe(i?.role).toLowerCase() === "manager").length;
+    const managers = items.filter(
+      (i) => safe(i?.role).toLowerCase() === "manager"
+    ).length;
 
     return { total, active, admins, managers };
   }, [items]);
@@ -248,6 +339,15 @@ export default function Members() {
       marginTop: 12,
       alignItems: "center",
     },
+    input: {
+      padding: "10px 12px",
+      borderRadius: 10,
+      border: "1px solid rgba(255,255,255,0.12)",
+      background: "rgba(255,255,255,0.04)",
+      color: "#EAF0FF",
+      outline: "none",
+      minWidth: 180,
+    },
     select: {
       padding: "10px 12px",
       borderRadius: 10,
@@ -322,10 +422,85 @@ export default function Members() {
 
       <div style={S.card}>
         <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 4 }}>
+          Add Member
+        </div>
+        <div style={{ opacity: 0.78, fontSize: 13, marginBottom: 12 }}>
+          Create a new member and attach them to this workspace.
+        </div>
+
+        <form onSubmit={handleCreateMember} style={S.controls}>
+          <input
+            style={S.input}
+            placeholder="Full name"
+            value={newMember.name}
+            onChange={(e) =>
+              setNewMember((s) => ({ ...s, name: e.target.value }))
+            }
+            required
+          />
+
+          <input
+            style={S.input}
+            type="email"
+            placeholder="Email"
+            value={newMember.email}
+            onChange={(e) =>
+              setNewMember((s) => ({ ...s, email: e.target.value }))
+            }
+            required
+          />
+
+          <input
+            style={S.input}
+            type="password"
+            placeholder="Temporary password"
+            value={newMember.password}
+            onChange={(e) =>
+              setNewMember((s) => ({ ...s, password: e.target.value }))
+            }
+            required
+          />
+
+          <select
+            style={S.select}
+            value={newMember.role}
+            onChange={(e) =>
+              setNewMember((s) => ({ ...s, role: e.target.value }))
+            }
+          >
+            <option value="owner">owner</option>
+            <option value="admin">admin</option>
+            <option value="manager">manager</option>
+            <option value="analyst">analyst</option>
+            <option value="member">member</option>
+            <option value="viewer">viewer</option>
+          </select>
+
+          <select
+            style={S.select}
+            value={newMember.status}
+            onChange={(e) =>
+              setNewMember((s) => ({ ...s, status: e.target.value }))
+            }
+          >
+            <option value="active">active</option>
+            <option value="invited">invited</option>
+            <option value="suspended">suspended</option>
+            <option value="disabled">disabled</option>
+          </select>
+
+          <button type="submit" style={S.button} disabled={creating}>
+            {creating ? "Creating..." : "Create Member"}
+          </button>
+        </form>
+      </div>
+
+      <div style={S.card}>
+        <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 4 }}>
           Workspace Members
         </div>
         <div style={{ opacity: 0.78, fontSize: 13 }}>
-          Review active members, update roles, and manage status across the workspace.
+          Review active members, update roles, reset passwords, and manage status across the workspace.
         </div>
 
         {success ? <div style={S.success}>{success}</div> : null}
@@ -340,7 +515,8 @@ export default function Members() {
             {items.map((member) => {
               const id = member?.membershipId || member?._id || member?.id;
               const roleColor = roleTone(member?.role);
-              const statusColor = statusTone(member?.status);
+              const memberStatus = member?.membershipStatus || member?.status || "active";
+              const statusColor = statusTone(memberStatus);
 
               return (
                 <div key={id} style={S.item}>
@@ -350,6 +526,7 @@ export default function Members() {
                       <div style={S.itemMeta}>
                         {member?.email || "—"}
                         {" • "}Joined: <strong>{formatDate(member?.joinedAt || member?.createdAt)}</strong>
+                        {" • "}Last Login: <strong>{formatDate(member?.lastLoginAt)}</strong>
                         {member?.lastActiveAt ? (
                           <>
                             {" • "}Last Active: <strong>{formatDate(member.lastActiveAt)}</strong>
@@ -363,7 +540,7 @@ export default function Members() {
                         Role {safe(member?.role || "—").toUpperCase()}
                       </div>
                       <div style={{ ...S.tag, color: statusColor }}>
-                        {safe(member?.status || "—").toUpperCase()}
+                        {safe(memberStatus).toUpperCase()}
                       </div>
                     </div>
                   </div>
@@ -383,7 +560,7 @@ export default function Members() {
                     </select>
 
                     <select
-                      defaultValue={member?.status || "active"}
+                      defaultValue={memberStatus}
                       style={S.select}
                       id={`status-${id}`}
                     >
@@ -400,13 +577,29 @@ export default function Members() {
                         const roleEl = document.getElementById(`role-${id}`);
                         const statusEl = document.getElementById(`status-${id}`);
 
-                        updateMember(id, {
+                        handleUpdateMember(id, {
                           role: roleEl?.value,
-                          status: statusEl?.value,
+                          membershipStatus: statusEl?.value,
                         });
                       }}
                     >
                       {savingId === id ? "Saving..." : "Update Member"}
+                    </button>
+
+                    <button
+                      style={S.button}
+                      disabled={savingId === id}
+                      onClick={() => handleResetPassword(id)}
+                    >
+                      Reset Password
+                    </button>
+
+                    <button
+                      style={S.button}
+                      disabled={savingId === id}
+                      onClick={() => handleDeleteMember(id)}
+                    >
+                      Remove Member
                     </button>
                   </div>
                 </div>
