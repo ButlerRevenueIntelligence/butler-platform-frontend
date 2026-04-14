@@ -16,13 +16,13 @@ import {
 
 const connectorCatalog = [
   { id: "hubspot", name: "HubSpot CRM", category: "CRM", supportsLive: true },
-  { id: "salesforce", name: "Salesforce", category: "CRM", supportsLive: false },
+  { id: "salesforce", name: "Salesforce", category: "CRM", supportsLive: true },
   { id: "google_ads", name: "Google Ads", category: "Advertising", supportsLive: true },
   { id: "meta_ads", name: "Meta Ads", category: "Advertising", supportsLive: true },
-  { id: "linkedin_ads", name: "LinkedIn Ads", category: "Advertising", supportsLive: false },
+  { id: "linkedin_ads", name: "LinkedIn Ads", category: "Advertising", supportsLive: true },
   { id: "ga4", name: "Google Analytics 4", category: "Analytics", supportsLive: true },
   { id: "stripe", name: "Stripe", category: "Payments", supportsLive: true },
-  { id: "shopify", name: "Shopify", category: "Commerce", supportsLive: false },
+  { id: "shopify", name: "Shopify", category: "Commerce", supportsLive: true },
   {
     id: "excel_csv",
     name: "Excel / CSV Import",
@@ -69,6 +69,12 @@ function normalizeIntegrationMap(list) {
 
 function customerIdFromResourceName(value) {
   return String(value || "").replace("customers/", "");
+}
+
+function prettifyProviderLabel(value) {
+  return String(value || "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export default function Integrations() {
@@ -118,10 +124,7 @@ export default function Integrations() {
           ...prev,
           google_ads: customerIdFromResourceName(googleAds.selectedCustomer),
         }));
-      } else if (
-        googleAds?.externalAccountId &&
-        !googleAds?.needsSelection
-      ) {
+      } else if (googleAds?.externalAccountId && !googleAds?.needsSelection) {
         setSelectedGoogleAccounts((prev) => ({
           ...prev,
           google_ads: googleAds.externalAccountId,
@@ -142,10 +145,7 @@ export default function Integrations() {
           ...prev,
           ga4: ga4.selectedProperty.propertyId,
         }));
-      } else if (
-        ga4?.externalAccountId &&
-        !ga4?.needsSelection
-      ) {
+      } else if (ga4?.externalAccountId && !ga4?.needsSelection) {
         setSelectedGA4Properties((prev) => ({
           ...prev,
           ga4: ga4.externalAccountId,
@@ -171,16 +171,65 @@ export default function Integrations() {
     load();
   }, []);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const connected = params.get("connected");
+    const errorParam = params.get("error");
+
+    if (connected) {
+      setSuccess(`${prettifyProviderLabel(connected)} connected successfully`);
+      load();
+
+      const url = new URL(window.location.href);
+      url.searchParams.delete("connected");
+      url.searchParams.delete("mode");
+      url.searchParams.delete("needsSelection");
+      window.history.replaceState({}, "", url.toString());
+    }
+
+    if (errorParam) {
+      setError(prettifyProviderLabel(errorParam));
+      const url = new URL(window.location.href);
+      url.searchParams.delete("error");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, []);
+
   async function handleConnect(id) {
     try {
       setBusyId(id);
       setError("");
       setSuccess("");
 
-     
       const connector = connectorCatalog.find((c) => c.id === id);
 
       if (connector?.supportsLive) {
+        if (id === "shopify") {
+          const shopDomainInput = window.prompt(
+            "Enter your Shopify store domain (example: store.myshopify.com)"
+          );
+
+          const shopDomain = String(shopDomainInput || "").trim();
+
+          if (!shopDomain) {
+            setBusyId("");
+            return;
+          }
+
+          const res = await apiGet(
+            `/integrations/shopify/auth-url?shopDomain=${encodeURIComponent(
+              shopDomain
+            )}`
+          );
+
+          if (!res?.authUrl) {
+            throw new Error("No Shopify auth URL returned from backend");
+          }
+
+          window.location.href = res.authUrl;
+          return;
+        }
+
         const res = await apiGet(`/integrations/${id}/auth-url`);
 
         if (!res?.authUrl) {
@@ -253,6 +302,57 @@ export default function Integrations() {
     } catch (err) {
       console.error(err);
       setError(err?.message || "Failed to sync Stripe");
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  async function handleShopifySync() {
+    try {
+      setBusyId("shopify_sync");
+      setError("");
+      setSuccess("");
+
+      await apiPost("/integrations/shopify/sync", {});
+      setSuccess("Shopify sync completed");
+      await load();
+    } catch (err) {
+      console.error(err);
+      setError(err?.message || "Failed to sync Shopify");
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  async function handleSalesforceSync() {
+    try {
+      setBusyId("salesforce_sync");
+      setError("");
+      setSuccess("");
+
+      await apiPost("/integrations/salesforce/sync", {});
+      setSuccess("Salesforce sync completed");
+      await load();
+    } catch (err) {
+      console.error(err);
+      setError(err?.message || "Failed to sync Salesforce");
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  async function handleLinkedInAdsSync() {
+    try {
+      setBusyId("linkedin_ads_sync");
+      setError("");
+      setSuccess("");
+
+      await apiPost("/integrations/linkedin_ads/sync", {});
+      setSuccess("LinkedIn Ads sync completed");
+      await load();
+    } catch (err) {
+      console.error(err);
+      setError(err?.message || "Failed to sync LinkedIn Ads");
     } finally {
       setBusyId("");
     }
@@ -530,6 +630,9 @@ export default function Integrations() {
           const isBusy = busyId === c.id;
           const isHubSpotLive = c.id === "hubspot" && live?.mode === "live";
           const isStripeLive = c.id === "stripe" && live?.mode === "live";
+          const isShopifyLive = c.id === "shopify" && live?.mode === "live";
+          const isSalesforceLive = c.id === "salesforce" && live?.mode === "live";
+          const isLinkedInAdsLive = c.id === "linkedin_ads" && live?.mode === "live";
           const isGoogleAds = c.id === "google_ads";
           const isGA4 = c.id === "ga4";
           const isStripe = c.id === "stripe";
@@ -558,7 +661,7 @@ export default function Integrations() {
                 ? `GA4 Property ${live.externalAccountId}`
                 : c.id === "stripe"
                 ? `Stripe ${live.externalAccountId}`
-                : `Google Ads ${live.externalAccountId}`
+                : `Account ${live.externalAccountId}`
               : "");
 
           return (
@@ -876,7 +979,7 @@ export default function Integrations() {
                       : c.supportsLive
                       ? "Connect Live"
                       : "Connect"}
-                    </button>
+                  </button>
                 ) : (
                   <>
                     <button
@@ -932,6 +1035,66 @@ export default function Integrations() {
                         }}
                       >
                         {busyId === "stripe_sync" ? "Syncing..." : "Run Sync"}
+                      </button>
+                    ) : null}
+
+                    {isShopifyLive ? (
+                      <button
+                        onClick={handleShopifySync}
+                        disabled={!!busyId || uploading}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: 10,
+                          border: "1px solid rgba(255,255,255,0.08)",
+                          background: "rgba(255,255,255,0.05)",
+                          color: "#fff",
+                          fontWeight: 700,
+                          fontSize: 12,
+                          cursor: !!busyId || uploading ? "not-allowed" : "pointer",
+                          opacity: !!busyId || uploading ? 0.7 : 1,
+                        }}
+                      >
+                        {busyId === "shopify_sync" ? "Syncing..." : "Run Sync"}
+                      </button>
+                    ) : null}
+
+                    {isSalesforceLive ? (
+                      <button
+                        onClick={handleSalesforceSync}
+                        disabled={!!busyId || uploading}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: 10,
+                          border: "1px solid rgba(255,255,255,0.08)",
+                          background: "rgba(255,255,255,0.05)",
+                          color: "#fff",
+                          fontWeight: 700,
+                          fontSize: 12,
+                          cursor: !!busyId || uploading ? "not-allowed" : "pointer",
+                          opacity: !!busyId || uploading ? 0.7 : 1,
+                        }}
+                      >
+                        {busyId === "salesforce_sync" ? "Syncing..." : "Run Sync"}
+                      </button>
+                    ) : null}
+
+                    {isLinkedInAdsLive ? (
+                      <button
+                        onClick={handleLinkedInAdsSync}
+                        disabled={!!busyId || uploading}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: 10,
+                          border: "1px solid rgba(255,255,255,0.08)",
+                          background: "rgba(255,255,255,0.05)",
+                          color: "#fff",
+                          fontWeight: 700,
+                          fontSize: 12,
+                          cursor: !!busyId || uploading ? "not-allowed" : "pointer",
+                          opacity: !!busyId || uploading ? 0.7 : 1,
+                        }}
+                      >
+                        {busyId === "linkedin_ads_sync" ? "Syncing..." : "Run Sync"}
                       </button>
                     ) : null}
 
