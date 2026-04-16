@@ -12,11 +12,18 @@ import {
   getHubSpotStatus,
   syncHubSpot,
   selectGA4Property,
+  syncZohoCRM,
+  syncPipedrive,
+  syncBitrix24,
+  connectBitrix24Webhook,
 } from "../api";
 
 const connectorCatalog = [
   { id: "hubspot", name: "HubSpot CRM", category: "CRM", supportsLive: true },
   { id: "salesforce", name: "Salesforce", category: "CRM", supportsLive: true },
+  { id: "zoho_crm", name: "Zoho CRM", category: "CRM", supportsLive: true },
+  { id: "pipedrive", name: "Pipedrive", category: "CRM", supportsLive: true },
+  { id: "bitrix24", name: "Bitrix24", category: "CRM", supportsLive: true, webhook: true },
   { id: "google_ads", name: "Google Ads", category: "Advertising", supportsLive: true },
   { id: "meta_ads", name: "Meta Ads", category: "Advertising", supportsLive: true },
   { id: "linkedin_ads", name: "LinkedIn Ads", category: "Advertising", supportsLive: true },
@@ -86,6 +93,7 @@ export default function Integrations() {
   const [uploading, setUploading] = useState(false);
   const [selectedGoogleAccounts, setSelectedGoogleAccounts] = useState({});
   const [selectedGA4Properties, setSelectedGA4Properties] = useState({});
+  const [bitrixWebhookDraft, setBitrixWebhookDraft] = useState({});
 
   const fileInputRef = useRef(null);
 
@@ -159,6 +167,14 @@ export default function Integrations() {
           ga4: ga4.properties[0].propertyId,
         }));
       }
+
+      const bitrix = map.bitrix24;
+      if (bitrix?.bitrixWebhookUrl || bitrix?.webhookUrl) {
+        setBitrixWebhookDraft((prev) => ({
+          ...prev,
+          bitrix24: bitrix.bitrixWebhookUrl || bitrix.webhookUrl || "",
+        }));
+      }
     } catch (err) {
       console.error(err);
       setError(err?.message || "Failed to load connectors");
@@ -202,6 +218,19 @@ export default function Integrations() {
       setSuccess("");
 
       const connector = connectorCatalog.find((c) => c.id === id);
+
+      if (id === "bitrix24") {
+        const webhookUrl = String(bitrixWebhookDraft.bitrix24 || "").trim();
+
+        if (!webhookUrl) {
+          throw new Error("Please paste your Bitrix24 webhook URL first.");
+        }
+
+        const data = await connectBitrix24Webhook(webhookUrl);
+        setIntegrations(normalizeIntegrationMap(data?.integrations));
+        setSuccess("Bitrix24 connected");
+        return;
+      }
 
       if (connector?.supportsLive) {
         if (id === "shopify") {
@@ -285,6 +314,57 @@ export default function Integrations() {
     } catch (err) {
       console.error(err);
       setError(err?.message || "Failed to sync HubSpot");
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  async function handleZohoSync() {
+    try {
+      setBusyId("zoho_crm_sync");
+      setError("");
+      setSuccess("");
+
+      await syncZohoCRM();
+      setSuccess("Zoho CRM sync completed");
+      await load();
+    } catch (err) {
+      console.error(err);
+      setError(err?.message || "Failed to sync Zoho CRM");
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  async function handlePipedriveSync() {
+    try {
+      setBusyId("pipedrive_sync");
+      setError("");
+      setSuccess("");
+
+      await syncPipedrive();
+      setSuccess("Pipedrive sync completed");
+      await load();
+    } catch (err) {
+      console.error(err);
+      setError(err?.message || "Failed to sync Pipedrive");
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  async function handleBitrix24Sync() {
+    try {
+      setBusyId("bitrix24_sync");
+      setError("");
+      setSuccess("");
+
+      await syncBitrix24();
+      setSuccess("Bitrix24 sync completed");
+      await load();
+    } catch (err) {
+      console.error(err);
+      setError(err?.message || "Failed to sync Bitrix24");
     } finally {
       setBusyId("");
     }
@@ -628,7 +708,11 @@ export default function Integrations() {
           const color = statusColor[status] || "#64748b";
           const isConnected = status === "connected";
           const isBusy = busyId === c.id;
+
           const isHubSpotLive = c.id === "hubspot" && live?.mode === "live";
+          const isZohoLive = c.id === "zoho_crm" && live?.mode === "live";
+          const isPipedriveLive = c.id === "pipedrive" && live?.mode === "live";
+          const isBitrix24Live = c.id === "bitrix24" && live?.mode === "live";
           const isStripeLive = c.id === "stripe" && live?.mode === "live";
           const isShopifyLive = c.id === "shopify" && live?.mode === "live";
           const isSalesforceLive = c.id === "salesforce" && live?.mode === "live";
@@ -637,6 +721,7 @@ export default function Integrations() {
           const isGA4 = c.id === "ga4";
           const isStripe = c.id === "stripe";
           const isManualImport = c.id === "excel_csv";
+          const isBitrix24 = c.id === "bitrix24";
 
           const needsGoogleSelection =
             isGoogleAds &&
@@ -661,6 +746,8 @@ export default function Integrations() {
                 ? `GA4 Property ${live.externalAccountId}`
                 : c.id === "stripe"
                 ? `Stripe ${live.externalAccountId}`
+                : c.id === "bitrix24"
+                ? "Bitrix24 Webhook"
                 : `Account ${live.externalAccountId}`
               : "");
 
@@ -752,6 +839,8 @@ export default function Integrations() {
                       ? "Select property"
                       : "Live connection"
                     : "Connected"
+                  : isBitrix24
+                  ? "Paste webhook and connect"
                   : isStripe
                   ? "Live connection available"
                   : ""}
@@ -779,14 +868,50 @@ export default function Integrations() {
                     opacity: 0.75,
                     marginBottom: 14,
                     minHeight: 16,
+                    wordBreak: "break-word",
                   }}
                 >
                   Account: {accountLabel}
-                  {live?.externalAccountId ? ` (${live.externalAccountId})` : ""}
+                  {live?.externalAccountId && c.id !== "bitrix24"
+                    ? ` (${live.externalAccountId})`
+                    : ""}
                 </div>
               ) : (
                 <div style={{ minHeight: 16, marginBottom: 14 }} />
               )}
+
+              {isBitrix24 && !isConnected ? (
+                <div
+                  style={{
+                    marginBottom: 14,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                  }}
+                >
+                  <input
+                    type="text"
+                    value={bitrixWebhookDraft.bitrix24 || ""}
+                    onChange={(e) =>
+                      setBitrixWebhookDraft((prev) => ({
+                        ...prev,
+                        bitrix24: e.target.value,
+                      }))
+                    }
+                    placeholder="https://yourcompany.bitrix24.com/rest/1/xxxxxxxx"
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      borderRadius: 10,
+                      border: "1px solid rgba(255,255,255,0.10)",
+                      background: "rgba(255,255,255,0.05)",
+                      color: "#fff",
+                      fontSize: 12,
+                      outline: "none",
+                    }}
+                  />
+                </div>
+              ) : null}
 
               {needsGoogleSelection ? (
                 <div
@@ -1015,6 +1140,66 @@ export default function Integrations() {
                         }}
                       >
                         {busyId === "hubspot_sync" ? "Syncing..." : "Run Sync"}
+                      </button>
+                    ) : null}
+
+                    {isZohoLive ? (
+                      <button
+                        onClick={handleZohoSync}
+                        disabled={!!busyId || uploading}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: 10,
+                          border: "1px solid rgba(255,255,255,0.08)",
+                          background: "rgba(255,255,255,0.05)",
+                          color: "#fff",
+                          fontWeight: 700,
+                          fontSize: 12,
+                          cursor: !!busyId || uploading ? "not-allowed" : "pointer",
+                          opacity: !!busyId || uploading ? 0.7 : 1,
+                        }}
+                      >
+                        {busyId === "zoho_crm_sync" ? "Syncing..." : "Run Sync"}
+                      </button>
+                    ) : null}
+
+                    {isPipedriveLive ? (
+                      <button
+                        onClick={handlePipedriveSync}
+                        disabled={!!busyId || uploading}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: 10,
+                          border: "1px solid rgba(255,255,255,0.08)",
+                          background: "rgba(255,255,255,0.05)",
+                          color: "#fff",
+                          fontWeight: 700,
+                          fontSize: 12,
+                          cursor: !!busyId || uploading ? "not-allowed" : "pointer",
+                          opacity: !!busyId || uploading ? 0.7 : 1,
+                        }}
+                      >
+                        {busyId === "pipedrive_sync" ? "Syncing..." : "Run Sync"}
+                      </button>
+                    ) : null}
+
+                    {isBitrix24Live ? (
+                      <button
+                        onClick={handleBitrix24Sync}
+                        disabled={!!busyId || uploading}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: 10,
+                          border: "1px solid rgba(255,255,255,0.08)",
+                          background: "rgba(255,255,255,0.05)",
+                          color: "#fff",
+                          fontWeight: 700,
+                          fontSize: 12,
+                          cursor: !!busyId || uploading ? "not-allowed" : "pointer",
+                          opacity: !!busyId || uploading ? 0.7 : 1,
+                        }}
+                      >
+                        {busyId === "bitrix24_sync" ? "Syncing..." : "Run Sync"}
                       </button>
                     ) : null}
 

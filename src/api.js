@@ -27,7 +27,9 @@ function getDefaultBase() {
   return "https://atlas-revenue-backend.onrender.com";
 }
 
-export const API_BASE = "https://atlas-revenue-backend.onrender.com/api";
+export const API_BASE = buildApiBase(
+  import.meta.env.VITE_API_BASE || getDefaultBase()
+);
 
 
 // -------------------- Shared helpers --------------------
@@ -514,6 +516,27 @@ export const selectGA4Property = (propertyId) =>
 
 export const getStripeRevenueDaily = () =>
   apiGet("/integrations/stripe/revenue-daily");
+
+export const getZohoStatus = () =>
+  apiGet("/integrations/zoho_crm/status");
+
+export const getPipedriveStatus = () =>
+  apiGet("/integrations/pipedrive/status");
+
+export const getBitrix24Status = () =>
+  apiGet("/integrations/bitrix24/status");
+
+export const syncZohoCRM = () =>
+  apiPost("/integrations/zoho_crm/sync", {});
+
+export const syncPipedrive = () =>
+  apiPost("/integrations/pipedrive/sync", {});
+
+export const syncBitrix24 = () =>
+  apiPost("/integrations/bitrix24/sync", {});
+
+export const connectBitrix24Webhook = (webhookUrl) =>
+  apiPost("/integrations/bitrix24/connect-webhook", { webhookUrl });
 // -------------------- Atlas AI --------------------
 export const askAtlas = (question, metrics = {}) =>
   apiPost("/atlas/ask", { question, metrics });
