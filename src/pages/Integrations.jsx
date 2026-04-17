@@ -84,6 +84,16 @@ function prettifyProviderLabel(value) {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function getActiveOrgId() {
+  return (
+    localStorage.getItem("x-org-id") ||
+    localStorage.getItem("orgId") ||
+    localStorage.getItem("butler_org_id") ||
+    localStorage.getItem("active_org_id") ||
+    ""
+  );
+}
+
 export default function Integrations() {
   const [integrations, setIntegrations] = useState({});
   const [loading, setLoading] = useState(true);
@@ -230,6 +240,12 @@ export default function Integrations() {
       }
 
       if (connector?.supportsLive) {
+        const activeOrgId = getActiveOrgId();
+
+        if (!activeOrgId) {
+          throw new Error("No workspace selected");
+        }
+
         if (id === "shopify") {
           const shopDomainInput = window.prompt(
             "Enter your Shopify store domain (example: store.myshopify.com)"
@@ -243,9 +259,9 @@ export default function Integrations() {
           }
 
           const res = await apiGet(
-            `/integrations/shopify/auth-url?shopDomain=${encodeURIComponent(
-              shopDomain
-            )}`
+            `/integrations/shopify/auth-url?orgId=${encodeURIComponent(
+              activeOrgId
+            )}&shopDomain=${encodeURIComponent(shopDomain)}`
           );
 
           if (!res?.authUrl) {
@@ -257,30 +273,21 @@ export default function Integrations() {
         }
 
         if (id === "pipedrive") {
-          const activeOrgId =
-            localStorage.getItem("x-org-id") ||
-            localStorage.getItem("orgId") ||
-            localStorage.getItem("butler_org_id") ||
-            localStorage.getItem("active_org_id") ||
-            "";
+          const res = await apiGet(
+            `/integrations/pipedrive/auth-url?orgId=${encodeURIComponent(activeOrgId)}`
+          );
 
-          if (!activeOrgId) {
-            throw new Error("No workspace selected");
+          if (!res?.authUrl) {
+            throw new Error("No Pipedrive auth URL returned from backend");
           }
 
-          const backendBase = (
-            import.meta.env.VITE_API_URL || "https://atlas-revenue-backend.onrender.com"
-          )
-            .replace(/\/api\/?$/, "")
-            .replace(/\/+$/, "");
-
-          window.location.href = `${backendBase}/api/integrations/pipedrive/connect?orgId=${encodeURIComponent(
-            activeOrgId
-          )}`;
+          window.location.href = res.authUrl;
           return;
         }
 
-        const res = await apiGet(`/integrations/${id}/auth-url`);
+        const res = await apiGet(
+          `/integrations/${id}/auth-url?orgId=${encodeURIComponent(activeOrgId)}`
+        );
 
         if (!res?.authUrl) {
           throw new Error("No auth URL returned from backend");
