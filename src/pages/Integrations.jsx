@@ -779,6 +779,9 @@ export default function Integrations() {
                 : `Account ${live.externalAccountId}`
               : "");
 
+          const lastSyncTime = live?.lastSyncAt || live?.lastSync;
+          const syncStatus = live?.lastSyncStatus || "unknown";
+
           return (
             <div
               key={c.id}
@@ -882,12 +885,51 @@ export default function Integrations() {
                   minHeight: 16,
                 }}
               >
-                {isManualImport
-                  ? "Upload Excel or CSV data into Atlas"
-                  : live?.lastSync
-                  ? `Last sync: ${formatDate(live.lastSync)}`
+                {isManualImport ? "Upload Excel or CSV data into Atlas" : ""}
+                {!isManualImport && lastSyncTime
+                  ? `Last sync: ${formatDate(lastSyncTime)}`
                   : ""}
               </div>
+
+              {!isManualImport && isConnected && live?.mode === "live" ? (
+                <div
+                  style={{
+                    fontSize: 11,
+                    marginBottom: 8,
+                    minHeight: 16,
+                  }}
+                >
+                  {syncStatus === "success" ? (
+                    <span style={{ color: "#22c55e" }}>✅ Data synced successfully</span>
+                  ) : null}
+                  {syncStatus === "error" ? (
+                    <span style={{ color: "#fb7185" }}>❌ Sync failed</span>
+                  ) : null}
+                  {syncStatus === "syncing" ? (
+                    <span style={{ color: "#facc15" }}>🔄 Syncing...</span>
+                  ) : null}
+                  {syncStatus === "never" ? (
+                    <span style={{ color: "rgba(226,232,240,0.6)" }}>Waiting for first sync</span>
+                  ) : null}
+                </div>
+              ) : (
+                <div style={{ minHeight: 16, marginBottom: 8 }} />
+              )}
+
+              {!isManualImport && isConnected && live?.mode === "live" ? (
+                <div
+                  style={{
+                    fontSize: 11,
+                    opacity: 0.65,
+                    marginBottom: 10,
+                    minHeight: 16,
+                  }}
+                >
+                  Live CRM data flowing into Atlas
+                </div>
+              ) : (
+                <div style={{ minHeight: 16, marginBottom: 10 }} />
+              )}
 
               {!c.manual && accountLabel ? (
                 <div
