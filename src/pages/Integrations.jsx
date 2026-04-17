@@ -158,10 +158,7 @@ export default function Integrations() {
           ...prev,
           ga4: ga4.externalAccountId,
         }));
-      } else if (
-        Array.isArray(ga4?.properties) &&
-        ga4.properties.length === 1
-      ) {
+      } else if (Array.isArray(ga4?.properties) && ga4.properties.length === 1) {
         setSelectedGA4Properties((prev) => ({
           ...prev,
           ga4: ga4.properties[0].propertyId,
@@ -256,6 +253,30 @@ export default function Integrations() {
           }
 
           window.location.href = res.authUrl;
+          return;
+        }
+
+        if (id === "pipedrive") {
+          const activeOrgId =
+            localStorage.getItem("x-org-id") ||
+            localStorage.getItem("orgId") ||
+            localStorage.getItem("butler_org_id") ||
+            localStorage.getItem("active_org_id") ||
+            "";
+
+          if (!activeOrgId) {
+            throw new Error("No workspace selected");
+          }
+
+          const backendBase = (
+            import.meta.env.VITE_API_URL || "https://atlas-revenue-backend.onrender.com"
+          )
+            .replace(/\/api\/?$/, "")
+            .replace(/\/+$/, "");
+
+          window.location.href = `${backendBase}/api/integrations/pipedrive/connect?orgId=${encodeURIComponent(
+            activeOrgId
+          )}`;
           return;
         }
 
@@ -947,11 +968,7 @@ export default function Integrations() {
                     {live.accessibleCustomers.map((item) => {
                       const customerId = customerIdFromResourceName(item);
                       return (
-                        <option
-                          key={item}
-                          value={customerId}
-                          style={{ color: "#111" }}
-                        >
+                        <option key={item} value={customerId} style={{ color: "#111" }}>
                           Google Ads {customerId}
                         </option>
                       );
@@ -960,11 +977,7 @@ export default function Integrations() {
 
                   <button
                     onClick={handleGoogleAdsSelectAccount}
-                    disabled={
-                      !!busyId ||
-                      uploading ||
-                      !selectedGoogleAccounts.google_ads
-                    }
+                    disabled={!!busyId || uploading || !selectedGoogleAccounts.google_ads}
                     style={{
                       padding: "8px 12px",
                       borderRadius: 10,
@@ -978,14 +991,10 @@ export default function Integrations() {
                           ? "not-allowed"
                           : "pointer",
                       opacity:
-                        !!busyId || uploading || !selectedGoogleAccounts.google_ads
-                          ? 0.7
-                          : 1,
+                        !!busyId || uploading || !selectedGoogleAccounts.google_ads ? 0.7 : 1,
                     }}
                   >
-                    {busyId === "google_ads_select"
-                      ? "Saving..."
-                      : "Use Selected Account"}
+                    {busyId === "google_ads_select" ? "Saving..." : "Use Selected Account"}
                   </button>
                 </div>
               ) : null}
@@ -1034,11 +1043,7 @@ export default function Integrations() {
 
                   <button
                     onClick={handleGA4SelectProperty}
-                    disabled={
-                      !!busyId ||
-                      uploading ||
-                      !selectedGA4Properties.ga4
-                    }
+                    disabled={!!busyId || uploading || !selectedGA4Properties.ga4}
                     style={{
                       padding: "8px 12px",
                       borderRadius: 10,
@@ -1052,14 +1057,10 @@ export default function Integrations() {
                           ? "not-allowed"
                           : "pointer",
                       opacity:
-                        !!busyId || uploading || !selectedGA4Properties.ga4
-                          ? 0.7
-                          : 1,
+                        !!busyId || uploading || !selectedGA4Properties.ga4 ? 0.7 : 1,
                     }}
                   >
-                    {busyId === "ga4_select"
-                      ? "Saving..."
-                      : "Use Selected Property"}
+                    {busyId === "ga4_select" ? "Saving..." : "Use Selected Property"}
                   </button>
                 </div>
               ) : null}
@@ -1099,11 +1100,7 @@ export default function Integrations() {
                       opacity: !!busyId || uploading ? 0.7 : 1,
                     }}
                   >
-                    {isBusy
-                      ? "Connecting..."
-                      : c.supportsLive
-                      ? "Connect Live"
-                      : "Connect"}
+                    {isBusy ? "Connecting..." : c.supportsLive ? "Connect Live" : "Connect"}
                   </button>
                 ) : (
                   <>
