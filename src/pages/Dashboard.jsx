@@ -2051,6 +2051,8 @@ export default function Dashboard() {
           dealsAtRisk={liveRevenueSnapshot.dealsAtRisk}
           activeOpportunities={liveRevenueSnapshot.activeOpportunities}
           forecastConfidence={liveRevenueSnapshot.forecastConfidence}
+          stripeRevenue={stripeData?.summary?.totalRevenue || 0}
+          stripeTransactions={stripeData?.summary?.totalTransactions || 0}
         />
       </div>
 
@@ -2815,18 +2817,6 @@ export default function Dashboard() {
         </div>
       </div>
       
-      {stripeData && (
-        <div style={{ padding: 16, borderRadius: 12, background: "#111" }}>
-          <h3>Stripe Revenue</h3>
-          <p style={{ fontSize: 24, fontWeight: 700 }}>
-            ${stripeData.summary.totalRevenue.toLocaleString()}
-          </p>
-
-          <p>
-            {stripeData.summary.totalTransactions} transactions
-          </p>
-        </div>
-      )}
       {showClientModal ? (
         <div style={S.modalOverlay} onClick={() => setShowClientModal(false)}>
           <div style={S.modalCard} onClick={(e) => e.stopPropagation()}>

@@ -14,7 +14,7 @@ const moneyCompact = (n) => {
   return `$${Math.round(num)}`;
 };
 
-function Metric({ label, value, accent }) {
+function Metric({ label, value, accent, subtext = "" }) {
   return (
     <div
       style={{
@@ -48,6 +48,19 @@ function Metric({ label, value, accent }) {
       >
         {value}
       </div>
+
+      {subtext ? (
+        <div
+          style={{
+            marginTop: 8,
+            fontSize: 12,
+            lineHeight: 1.45,
+            color: "rgba(203,213,225,0.78)",
+          }}
+        >
+          {subtext}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -58,6 +71,8 @@ export default function LiveRevenueSnapshot({
   dealsAtRisk = 0,
   activeOpportunities = 0,
   forecastConfidence = 91,
+  stripeRevenue = 0,
+  stripeTransactions = 0,
 }) {
   return (
     <div
@@ -121,22 +136,48 @@ export default function LiveRevenueSnapshot({
         }}
       >
         A real-time executive summary of the company’s current revenue position,
-        pipeline health, and forecast quality.
+        pipeline health, forecast quality, and Stripe revenue activity.
       </div>
 
       <div
         style={{
           marginTop: 18,
           display: "grid",
-          gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+          gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
           gap: 12,
         }}
       >
-        <Metric label="Projected Revenue (90 Days)" value={moneyCompact(projectedRevenue)} accent="#67e8f9" />
-        <Metric label="Pipeline Value" value={moneyCompact(pipelineValue)} accent="#93c5fd" />
-        <Metric label="Deals At Risk" value={safeNum(dealsAtRisk)} accent="#FB7185" />
-        <Metric label="Active Opportunities" value={safeNum(activeOpportunities)} accent="#EAF0FF" />
-        <Metric label="Forecast Confidence" value={`${Math.round(safeNum(forecastConfidence))}%`} accent="#22C55E" />
+        <Metric
+          label="Projected Revenue (90 Days)"
+          value={moneyCompact(projectedRevenue)}
+          accent="#67e8f9"
+        />
+        <Metric
+          label="Pipeline Value"
+          value={moneyCompact(pipelineValue)}
+          accent="#93c5fd"
+        />
+        <Metric
+          label="Deals At Risk"
+          value={safeNum(dealsAtRisk)}
+          accent="#FB7185"
+        />
+        <Metric
+          label="Active Opportunities"
+          value={safeNum(activeOpportunities)}
+          accent="#EAF0FF"
+        />
+        <Metric
+          label="Forecast Confidence"
+          value={`${Math.round(safeNum(forecastConfidence))}%`}
+          accent="#22C55E"
+        />
+        <Metric
+          label="Stripe Revenue"
+          value={moneyCompact(stripeRevenue)}
+          accent="#a78bfa"
+          subtext={`${safeNum(stripeTransactions)} transactions`}
+        />
       </div>
 
       <div
@@ -170,7 +211,8 @@ export default function LiveRevenueSnapshot({
         >
           Atlas AI analysis of your pipeline and market signals suggests the current
           revenue trajectory is stable, with opportunities to increase growth by
-          prioritizing high-value deals and reducing pipeline leakage.
+          prioritizing high-value deals, reducing pipeline leakage, and improving
+          monetization visibility across Stripe activity.
         </div>
       </div>
     </div>
