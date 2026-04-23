@@ -21,28 +21,38 @@ export default function OrgSwitcher({ onSwitched }) {
       setErr("");
 
       const res = await getMyOrgs();
-      const list = Array.isArray(res?.orgs) ? res.orgs : [];
+      const rawList = Array.isArray(res?.orgs)
+        ? res.orgs
+        : Array.isArray(res)
+        ? res
+        : [];
+
+      const list = rawList.map((org, idx) => ({
+        id: String(org?._id || org?.id || org?.orgId || idx),
+        name: org?.name || org?.orgName || org?.title || "Untitled Workspace",
+      }));
+
       setOrgs(list);
 
       const current = getActiveOrgId();
 
-      // If there's no active org yet, pick the first one.
       if (!current && list.length) {
-        const firstOrgId = list[0]?._id;
+        const firstOrgId = list[0]?.id;
         const firstOrgName = list[0]?.name;
 
         if (firstOrgId) {
           setActiveOrgId(firstOrgId);
-          setActive(String(firstOrgId));
+          setActive(firstOrgId);
           setActiveOrgName(firstOrgName || "");
           if (typeof onSwitched === "function") onSwitched();
         }
       } else {
         setActive(current || "");
-        const found = list.find((o) => String(o._id) === String(current));
+        const found = list.find((o) => String(o.id) === String(current));
         if (found?.name) setActiveOrgName(found.name);
       }
     } catch (e) {
+      console.error("OrgSwitcher load error:", e);
       setErr(e?.message || "Failed to load workspaces");
     } finally {
       setLoading(false);
@@ -51,7 +61,6 @@ export default function OrgSwitcher({ onSwitched }) {
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function onChangeOrg(e) {
@@ -59,21 +68,20 @@ export default function OrgSwitcher({ onSwitched }) {
     setActive(orgId);
     if (!orgId) return;
 
-    const picked = orgs.find((o) => String(o._id) === String(orgId));
+    const picked = orgs.find((o) => String(o.id) === String(orgId));
 
     try {
       setSwitching(true);
       setErr("");
 
-      // server validates membership
       await switchOrg(orgId);
 
-      // client stores active org (x-org-id header comes from api.js)
       setActiveOrgId(orgId);
       setActiveOrgName(picked?.name || "");
 
       if (typeof onSwitched === "function") onSwitched();
     } catch (e2) {
+      console.error("OrgSwitcher switch error:", e2);
       setErr(e2?.message || "Failed to switch workspace");
     } finally {
       setSwitching(false);
@@ -106,8 +114,8 @@ export default function OrgSwitcher({ onSwitched }) {
         </option>
 
         {orgs.map((o) => (
-          <option key={o.orgId} value={o.orgId}>
-            {o.orgName}
+          <option key={o.id} value={o.id}>
+            {o.name}
           </option>
         ))}
       </select>
